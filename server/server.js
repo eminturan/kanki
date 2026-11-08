@@ -104,33 +104,12 @@ function startServer(opts = {}) {
   /** @type {Map<string, {id,name,channelId,muted,deafened,sharing,ws,alive}>} */
   const users = new Map();
   const chatHistory = new Map(); // channelId -> [{...}]
-  // Yazı kanallarının geçmişi diske yazılır (sunucu yeniden başlasa da kalır)
-  const textHistoryFile = path.join(dataDir, 'text-history.json');
+  // Yazı kanallarının geçmişi sadece bellekte tutulur: sunucu kapanınca silinir (ses kanalları gibi).
+  // Önceki sürüm (1.0.16) geçmişi diske yazıyordu; o dosya kalmasın diye açılışta silinir.
   try {
-    const saved = JSON.parse(fs.readFileSync(textHistoryFile, 'utf8'));
-    for (const [cid, msgs] of Object.entries(saved)) if (isText(cid) && Array.isArray(msgs)) chatHistory.set(cid, msgs);
+    fs.rmSync(path.join(dataDir, 'text-history.json'), { force: true });
+    fs.rmSync(path.join(dataDir, 'text-history.json.tmp'), { force: true });
   } catch {}
-  let textSaveTimer = null;
-  function saveTextHistory() {
-    clearTimeout(textSaveTimer);
-    textSaveTimer = setTimeout(() => {
-      const out = {};
-      for (const [cid, msgs] of chatHistory) {
-        if (!isText(cid)) continue;
-        // Dosya şişmesin: her kanalda en yeni 10 resim saklanır
-        const imgs = msgs.filter((x) => x.image);
-        const keep = new Set(imgs.slice(-10));
-        out[cid] = msgs.map((x) => (x.image && !keep.has(x) ? { ...x, image: null, imageExpired: true } : x));
-      }
-      try {
-        fs.mkdirSync(dataDir, { recursive: true });
-        fs.writeFileSync(textHistoryFile + '.tmp', JSON.stringify(out));
-        fs.renameSync(textHistoryFile + '.tmp', textHistoryFile);
-      } catch (e) {
-        log('Sohbet geçmişi kaydedilemedi:', e.message);
-      }
-    }, 3000);
-  }
   // Mesajın gideceği kanal: yazı kanalı seçildiyse o, yoksa kişinin bulunduğu ses kanalı
   const chatTarget = (me, cid) => (cid && isText(cid) ? cid : me.channelId);
   // Yazı kanalı mesajları herkese, ses kanalı sohbeti sadece o kanaldakilere gider
@@ -367,7 +346,6 @@ function startServer(opts = {}) {
           if (orig && !orig.system) msg.replyTo = { id: orig.id, name: orig.name, text: String(orig.text || '').slice(0, 140), image: !!orig.image };
           pushHistory(cid, msg);
           broadcast(pubMsg(msg), audience(cid));
-          if (isText(cid)) saveTextHistory();
           // Sohbet komutu: "!çal şarkı adı" → müzik botuna
           const cm = !me.bot && /^!([^\s!]+)\s*([\s\S]*)$/.exec(text);
           if (cm && BOT_WORDS.has(cm[1].toLocaleLowerCase('tr'))) forwardToBot(me, cm[1].toLocaleLowerCase('tr'), cm[2].trim());
@@ -409,7 +387,6 @@ function startServer(opts = {}) {
           msg.text = text;
           msg.edited = Date.now();
           broadcast({ t: 'chatUpdate', channelId: cid, msg: pubMsg(msg) }, audience(cid));
-          if (isText(cid)) saveTextHistory();
           break;
         }
         case 'chatDelete': {
@@ -419,7 +396,6 @@ function startServer(opts = {}) {
           const arr = chatHistory.get(cid);
           arr.splice(arr.indexOf(msg), 1);
           broadcast({ t: 'chatDelete', channelId: cid, id: msg.id }, audience(cid));
-          if (isText(cid)) saveTextHistory();
           break;
         }
         case 'react': {
@@ -433,7 +409,6 @@ function startServer(opts = {}) {
           else if (Object.keys(msg.reactions).length < 20 || msg.reactions[emoji]) msg.reactions[emoji] = [...list, me.name];
           if (!msg.reactions[emoji]?.length) delete msg.reactions[emoji];
           broadcast({ t: 'chatUpdate', channelId: cid, msg: pubMsg(msg) }, audience(cid));
-          if (isText(cid)) saveTextHistory();
           break;
         }
         case 'profile': {
@@ -501,7 +476,6 @@ function startServer(opts = {}) {
           channels = channels.filter((c) => !ids.has(c.id));
           for (const id of ids) chatHistory.delete(id);
           saveChannels();
-          if (ch.type === 'text') saveTextHistory();
           broadcastState();
           break;
         }

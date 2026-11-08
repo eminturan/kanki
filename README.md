@@ -106,7 +106,7 @@ GitHub Actions paketleri derler, Release'e `latest.yml` ile birlikte ekler; kuru
 - **macOS:** İlk paylaşımda *Sistem Ayarları → Gizlilik ve Güvenlik → Ekran Kaydı* bölümünden Kanki'ye izin ver ve uygulamayı yeniden başlat.
 
 ## Sohbet ve kişiler
-- **Yazı kanalları:** Kenar çubuğunun üstündeki `#` kanallar sese katılmadan herkesin okuyup yazabildiği kanallardır; geçmişleri sunucu yeniden başlasa da kalır. Açık olmayan kanaldaki yeni mesajlar kanal adının yanında sayı olarak görünür (senden bahsedilirse kırmızı). Ses kanallarının kendi sohbeti de duruyor: bulunduğun ses kanalının adına tıklayınca açılır. Yönetici `+` ile yazı kanalı açar, sağ tıkla yeniden adlandırır ya da siler.
+- **Yazı kanalları:** Kenar çubuğunun üstündeki `#` kanallar sese katılmadan herkesin okuyup yazabildiği kanallardır. Mesajlar ve resimler diske kaydedilmez; sunucu kapanınca silinir. Açık olmayan kanaldaki yeni mesajlar kanal adının yanında sayı olarak görünür (senden bahsedilirse kırmızı). Ses kanallarının kendi sohbeti de duruyor: bulunduğun ses kanalının adına tıklayınca açılır. Yönetici `+` ile yazı kanalı açar, sağ tıkla yeniden adlandırır ya da siler.
 - **Durum:** Sol alttaki adına tıklayıp Çevrimiçi / Boşta / Rahatsız Etmeyin seçilir; 10 dakika hareketsiz kalınca otomatik Boşta olur. Rahatsız Etmeyin'de mesaj sesleri, bildirimler ve dürtme titreşimi kapalıdır.
 - **Profil kartı:** Bir kişiye tıklayınca durumu, kişiye özel ses seviyesi ve Dürt / Sustur / Yayını izle düğmeleri açılır. Sağ tık menüsü de duruyor.
 - **Sunucu menüsü:** Sol üstte sunucu adına tıklayınca davet adresini kopyala, sunucu yönetimi (yönetici), kanal oluştur, ayarlar ve bağlantıyı kes.

@@ -6,6 +6,14 @@
  */
 const CHANGELOG = [
   {
+    version: '1.0.17',
+    date: '2026-11-09',
+    title: 'Yazı kanalı geçmişi kaydedilmiyor',
+    changed: [
+      'Yazı kanallarının mesajları ve resimleri artık diske kaydedilmiyor; ses kanalları gibi sunucu kapanınca silinir. Önceki sürümün kaydettiği geçmiş dosyası da silinir.',
+    ],
+  },
+  {
     version: '1.0.16',
     date: '2026-11-09',
     title: 'Yazı kanalları',
