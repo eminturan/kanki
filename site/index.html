@@ -227,15 +227,15 @@
         <h1>Arkadaşlarınla konuş, <span>ekranını paylaş.</span></h1>
         <p class="lead">Kanki; kanal kanal sesli sohbet, yazılı mesaj ve 4K 60 FPS'e kadar ekran paylaşımı sunan, sadece bizim ekip için yapılmış bir uygulama.</p>
         <div class="cta">
-          <a class="btn primary" id="hero-download" data-file="Kanki-Portable.exe">
+          <a class="btn primary" id="hero-download" data-file="Kanki-Setup.exe">
             <svg viewBox="0 0 24 24"><path d="M3 5.5 10 4.5v7H3v-6Zm8-1.1L21 3v8.5H11V4.4ZM3 12.5h7v7L3 18.5v-6Zm8 0h10V21l-10-1.4v-7.1Z"/></svg>
-            Windows için indir <small>(kurulumsuz .exe)</small>
+            Windows için indir <small>(.exe)</small>
           </a>
           <a class="btn" href="#kurulum">Kurulum adımları</a>
         </div>
         <div class="alt-links" id="hero-alt">
           Diğer sürümler:
-          <a data-file="Kanki-Setup.exe">Windows (kurulumlu)</a>·<a data-file="Kanki-mac-arm64.dmg">Mac (Apple Silicon)</a>·<a data-file="Kanki-mac-x64.dmg">Mac (Intel)</a>
+          <a data-file="Kanki-Portable.exe">Windows (kurulumsuz)</a>·<a data-file="Kanki-mac-arm64.dmg">Mac (Apple Silicon)</a>·<a data-file="Kanki-mac-x64.dmg">Mac (Intel)</a>
         </div>
         <div class="shot">
           <div class="shot-bar"><i></i><i></i><i></i></div>
@@ -283,7 +283,7 @@
       <div class="wrap">
         <div class="eyebrow">İndir</div>
         <h2>Bilgisayarına uygun sürümü seç</h2>
-        <p class="sub">Windows için kurulum gerektirmeyen tek dosyalık sürümü öneriyoruz: indir, çift tıkla, kullan. Dosyalar GitHub üzerinden indirilir.</p>
+        <p class="sub">Windows için kurulumlu sürümü öneriyoruz: bir kere kurarsın, yeni sürümler çıktıkça kendiliğinden güncellenir. Dosyalar GitHub üzerinden indirilir.</p>
         <div class="downloads">
           <div class="dl rec" id="dl-win">
             <span class="tag">Önerilen</span>
@@ -293,8 +293,8 @@
             </div>
             <p class="req">Windows 10 / 11 · 64 bit</p>
             <div class="btns">
-              <a class="btn primary" data-file="Kanki-Portable.exe">Kanki-Portable.exe <small>(kurulumsuz)</small></a>
-              <a class="btn" data-file="Kanki-Setup.exe">Kurulumlu sürüm <small>(Kanki-Setup.exe)</small></a>
+              <a class="btn primary" data-file="Kanki-Setup.exe">Kanki-Setup.exe <small>(otomatik güncellenir)</small></a>
+              <a class="btn" data-file="Kanki-Portable.exe">Kurulumsuz sürüm <small>(Kanki-Portable.exe)</small></a>
             </div>
           </div>
           <div class="dl" id="dl-mac-arm">
@@ -342,25 +342,25 @@
         <div class="panel" id="panel-win" role="tabpanel" aria-labelledby="tab-win">
           <ol class="steps">
             <li>
-              <h3>Kanki-Portable.exe dosyasını indir</h3>
-              <p>Yukarıdaki <b>Windows için indir</b> düğmesine bas. Kurulum gerekmeyen tek bir .exe dosyası iner.</p>
+              <h3>Kanki-Setup.exe dosyasını indir</h3>
+              <p>Yukarıdaki <b>Windows için indir</b> düğmesine bas ve inen dosyaya çift tıkla.</p>
               <div class="note">Tarayıcı indirmeyi engellerse indirmeler listesinde dosyanın yanındaki <b>⋯</b> menüsünden <b>Sakla / Koru</b> seçeneğini seç.</div>
             </li>
             <li>
-              <h3>Dosyayı kalıcı bir yere taşı</h3>
-              <p>İndirilenler klasöründen <b>Masaüstü</b>'ne ya da istediğin bir klasöre taşı. Kanki'yi her seferinde bu dosyaya çift tıklayarak açacaksın.</p>
+              <h3>"Windows bilgisayarınızı korudu" uyarısını geç</h3>
+              <p>Mavi bir SmartScreen penceresi çıkarsa önce <span class="kbd">Ek bilgi</span> yazısına, ardından <span class="kbd">Yine de çalıştır</span> düğmesine tıkla. Bu uyarı sadece ilk kurulumda çıkar.</p>
             </li>
             <li>
-              <h3>Çift tıkla ve "Windows bilgisayarınızı korudu" uyarısını geç</h3>
-              <p>Mavi bir SmartScreen penceresi çıkarsa önce <span class="kbd">Ek bilgi</span> yazısına, ardından <span class="kbd">Yine de çalıştır</span> düğmesine tıkla. Bu uyarı sadece ilk açılışta çıkar.</p>
-              <div class="note">Kurulumsuz sürüm her açılışta kendini geçici olarak açtığı için ilk ekranın gelmesi birkaç saniye sürebilir; bu normal.</div>
+              <h3>Kurulumu tamamla</h3>
+              <p>Kurulum yerini istersen değiştir, <span class="kbd">Yükle</span> ve ardından <span class="kbd">Son</span>. Kanki masaüstüne ve Başlat menüsüne eklenir, yönetici izni istemez.</p>
             </li>
             <li>
               <h3>İzinleri ver</h3>
-              <p>Windows Güvenlik Duvarı izin isterse <b>Özel ağlar</b> kutusu işaretliyken <span class="kbd">Erişime izin ver</span> de. Mikrofon izni sorulursa onayla.</p>
+              <p>İlk açılışta Windows Güvenlik Duvarı izin isterse <b>Özel ağlar</b> kutusu işaretliyken <span class="kbd">Erişime izin ver</span> de. Mikrofon izni sorulursa onayla.</p>
             </li>
           </ol>
-          <div class="tip"><b>Kurulumlu sürümü mü tercih edersin?</b> <a data-file="Kanki-Setup.exe">Kanki-Setup.exe</a>'yi indir. Aynı SmartScreen adımından sonra kurulum sihirbazında <span class="kbd">Yükle</span> → <span class="kbd">Son</span>; Kanki Başlat menüsüne ve masaüstüne eklenir, açılışı biraz daha hızlı olur.</div>
+          <div class="tip"><b>Güncellemeler kendiliğinden gelir.</b> Yeni sürüm çıktığında Kanki onu arka planda indirir, sol altta <b>Yeniden başlat ve güncelle</b> düğmesi çıkar. Basmazsan da Kanki'yi kapattığında kurulur. Tekrar bir şey indirmene gerek yok.</div>
+          <div class="tip">Kurulum yapmak istemiyorsan <a data-file="Kanki-Portable.exe">kurulumsuz sürümü</a> indir: tek bir .exe dosyası, çift tıklaman yeterli. Ama kendini güncelleyemez; yeni sürümde bu sayfadan tekrar indirmen gerekir.</div>
         </div>
 
         <div class="panel" id="panel-mac" role="tabpanel" aria-labelledby="tab-mac" hidden>
