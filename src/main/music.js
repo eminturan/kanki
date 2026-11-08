@@ -115,6 +115,22 @@ function shortError(t) {
   return msg.slice(0, 160);
 }
 
+// Sadece doğrudan indirilebilen (HLS olmayan) ses biçimleri; <audio> HLS çalamaz
+const AUDIO_FORMAT = 'bestaudio[acodec=opus][protocol^=http]/bestaudio[protocol^=http]/best[protocol^=http]';
+// Bağlantı çözülürken alınan akış adresi bir süre saklanır (aynı şarkı için yt-dlp iki kez çalışmasın)
+const streamCache = new Map(); // sayfa adresi -> { url, headers, at, info }
+function cacheStream(info) {
+  if (info.is_live) return;
+  const fmt = info.requested_formats ? info.requested_formats[0] : info;
+  if (!fmt.url) return;
+  const entry = { url: fmt.url, headers: fmt.http_headers || info.http_headers || {}, at: Date.now(), info, availableAt: availableAt(fmt, info) };
+  for (const k of [info.webpage_url, info.original_url].filter(Boolean)) streamCache.set(k, entry);
+  if (streamCache.size > 200) streamCache.delete(streamCache.keys().next().value);
+}
+
+// YouTube bazı videolarda akış adresini reklam süresi kadar (birkaç sn) sonra açar; yt-dlp bunu available_at ile bildirir
+const availableAt = (fmt, info) => Math.round(((fmt && fmt.available_at) || (info && info.available_at) || 0) * 1000);
+
 const toItem = (e) => ({
   title: e.title || e.id || 'Bilinmeyen',
   url: e.webpage_url || e.url || (e.id ? `https://www.youtube.com/watch?v=${e.id}` : ''),
@@ -140,19 +156,33 @@ async function resolve(query, onStatus) {
     const out = JSON.parse(await ytdlp(['--flat-playlist', '-J', '--playlist-end', '50', query]));
     return (out.entries || []).map(toItem).filter((x) => x.url);
   }
-  const info = JSON.parse(await ytdlp(['-J', '--no-playlist', '--skip-download', query]));
+  const info = JSON.parse(await ytdlp(['-J', '--no-playlist', '-f', AUDIO_FORMAT, query]));
   if (info._type === 'playlist') return (info.entries || []).slice(0, 50).map(toItem);
+  if (info.is_live) throw new Error('Canlı yayınlar çalınamıyor.');
+  cacheStream(info);
   return [toItem(info)];
 }
 
 /** Çalmadan hemen önce: şarkının ses akışı adresi (adresler birkaç saat geçerli olduğu için önceden alınmaz) */
-async function stream(pageUrl, onStatus) {
+const inflight = new Map(); // aynı şarkı için aynı anda tek yt-dlp çalışsın (ön hazırlık + çalma)
+function stream(pageUrl, onStatus) {
+  if (inflight.has(pageUrl)) return inflight.get(pageUrl);
+  const p = streamNow(pageUrl, onStatus).finally(() => inflight.delete(pageUrl));
+  inflight.set(pageUrl, p);
+  return p;
+}
+async function streamNow(pageUrl, onStatus) {
   if (DIRECT_AUDIO.test(pageUrl) && !isYouTube(pageUrl)) return { url: pageUrl, headers: {} };
+  const hit = streamCache.get(pageUrl);
+  // Not: şarkı bilgisi önce, akış adresi sonra (toItem'deki sayfa adresi akış adresinin üzerine yazmasın)
+  if (hit && Date.now() - hit.at < 60 * 60 * 1000) return { ...toItem(hit.info), url: hit.url, headers: hit.headers, availableAt: hit.availableAt };
   await ensureYtDlp(onStatus);
-  const info = JSON.parse(await ytdlp(['-J', '--no-playlist', '-f', 'bestaudio[acodec=opus]/bestaudio/best', pageUrl]));
+  const info = JSON.parse(await ytdlp(['-J', '--no-playlist', '-f', AUDIO_FORMAT, pageUrl]));
+  if (info.is_live) throw new Error('Canlı yayınlar çalınamıyor.');
   const fmt = info.requested_formats ? info.requested_formats[0] : info;
   if (!fmt.url) throw new Error('Ses akışı bulunamadı.');
-  return { url: fmt.url, headers: fmt.http_headers || info.http_headers || {}, ...toItem(info) };
+  cacheStream(info);
+  return { ...toItem(info), url: fmt.url, headers: fmt.http_headers || info.http_headers || {}, availableAt: availableAt(fmt, info) };
 }
 
 module.exports = { resolve, stream, ensureYtDlp, isDirect: (u) => isUrl(u) && !isYouTube(u) && DIRECT_AUDIO.test(u) };

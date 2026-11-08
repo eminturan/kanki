@@ -4366,7 +4366,7 @@ const botCmd = (cmd, arg = '') => send({ t: 'botCmd', cmd, arg: String(arg) });
 const botPosition = () => {
   const st = S.botState;
   if (!st?.current) return 0;
-  const p = (st.position || 0) + (st.paused ? 0 : (Date.now() - (st.at || Date.now())) / 1000);
+  const p = (st.position || 0) + (st.paused || st.loading ? 0 : (Date.now() - (st.at || Date.now())) / 1000);
   return st.current.duration ? Math.min(p, st.current.duration) : p;
 };
 
@@ -4380,7 +4380,10 @@ function renderMusic() {
   btn.classList.toggle('playing', !!cur && !st.paused);
   // Çalan şarkı çubuğu
   const bar = $('#music-bar');
+  const wasHidden = bar.classList.contains('hidden');
   bar.classList.toggle('hidden', !cur);
+  // Çubuk açılıp kapanınca sahnenin yüksekliği değişir: kutular yeniden dizilsin
+  if (wasHidden !== !cur) requestAnimationFrame(() => renderStage());
   if (cur) {
     const img = bar.querySelector('.mb-thumb');
     if (img.dataset.src !== (cur.thumbnail || '')) {
@@ -4405,7 +4408,7 @@ function tickMusic() {
   const bar = $('#music-bar');
   const pos = botPosition();
   const dur = st.current.duration || 0;
-  bar.querySelector('.mb-time').textContent = dur ? `${fmtTime(pos)} / ${fmtTime(dur)}` : fmtTime(pos);
+  bar.querySelector('.mb-time').textContent = st.loading ? 'yükleniyor…' : dur ? `${fmtTime(pos)} / ${fmtTime(dur)}` : fmtTime(pos);
   bar.querySelector('.mb-progress i').style.width = dur ? `${Math.min(100, (pos / dur) * 100)}%` : '0%';
 }
 setInterval(tickMusic, 500);

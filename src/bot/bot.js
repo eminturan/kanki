@@ -288,6 +288,7 @@ async function handleCmd(m) {
       } else {
         say(items.length > 1 ? `📃 ${items.length} şarkı kuyruğa eklendi.` : `➕ Kuyruğa eklendi (#${B.queue.length}): **${items[0].title}**${items[0].duration ? ` (${fmt(items[0].duration)})` : ''}`);
         pushState();
+        if (!B.loading) prefetchNext();
       }
       return;
     }
@@ -361,6 +362,7 @@ function stopAll() {
   B.queue = [];
   B.current = null;
   B.paused = false;
+  B.loading = false;
   B.playToken++;
   el.pause();
   el.removeAttribute('src');
@@ -385,31 +387,53 @@ async function playNext(skipped = false) {
   }
   B.current = { ...item };
   B.paused = false;
+  B.loading = true;
+  // Önceki şarkının konumu yeni şarkıya karışmasın
+  el.pause();
+  el.removeAttribute('src');
+  el.load();
   pushState();
   try {
     const st = await kankiBot.stream(item.url);
     if (token !== B.playToken) return;
     if (!st.ok) throw new Error(st.error);
     if (st.title && !item.direct) Object.assign(B.current, { title: st.title, duration: st.duration || item.duration, thumbnail: st.thumbnail || item.thumbnail });
+    // YouTube akışı bazen birkaç saniye sonra açılır (reklam süresi); erken istenirse 403 döner
+    const wait = (st.availableAt || 0) - Date.now();
+    if (wait > 0) await new Promise((r) => setTimeout(r, wait + 400));
+    if (token !== B.playToken) return;
     el.src = st.url;
     await ctx.resume();
     await el.play();
     if (token !== B.playToken) return;
+    B.loading = false;
+    prefetchNext();
     if (!(B.loop && !skipped && item === B.current)) say(`🎵 Çalıyor: **${B.current.title}**${B.current.duration ? ` (${fmt(B.current.duration)})` : ''} · isteyen: ${item.by}`);
   } catch (e) {
     if (token !== B.playToken) return;
     say(`⚠️ Çalınamadı: ${item.title} — ${String(e.message || e).slice(0, 140)}`);
     B.current = null;
+    B.loading = false;
     setTimeout(() => token === B.playToken && playNext(), 400);
   }
   pushState();
 }
 el.addEventListener('ended', () => playNext());
+// Sıradaki şarkının ses adresini önceden hazırla (geçişte yt-dlp ve YouTube'un bekletmesi beklenmesin)
+let prefetched = '';
+function prefetchNext() {
+  const nx = B.queue[0];
+  if (!nx || nx.direct || prefetched === nx.url) return;
+  prefetched = nx.url;
+  kankiBot.stream(nx.url).catch(() => {});
+}
 el.addEventListener('error', () => {
   if (!B.current || !el.getAttribute('src')) return;
+  log('ses öğesi hatası', el.error?.code, el.error?.message);
   say(`⚠️ Akış kesildi: ${B.current.title}. Sıradakine geçiliyor.`);
   playNext(true);
 });
+el.addEventListener('playing', () => pushState()); // gerçek başlama anı (ilerleme çubuğu doğru başlasın)
 el.addEventListener('loadedmetadata', () => {
   if (B.current && !B.current.duration && Number.isFinite(el.duration)) B.current.duration = Math.round(el.duration);
   pushState();
@@ -428,6 +452,7 @@ function pushState() {
       position: el.currentTime || 0,
       at: Date.now(),
       paused: B.paused || (!!B.current && el.paused && !el.ended),
+      loading: !!B.loading,
       volume: B.volume,
       loop: B.loop,
       queue: B.queue.slice(0, 25).map((x) => ({ title: x.title, duration: x.duration || 0, by: x.by })),

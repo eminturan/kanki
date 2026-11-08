@@ -121,6 +121,7 @@ GitHub Actions paketleri derler, Release'e `latest.yml` ile birlikte ekler; kuru
 - Sohbete yaz: `!çal <YouTube linki ya da şarkı adı>` (oynatma listesi linki en fazla 50 şarkı ekler), `!geç`, `!duraklat`, `!devam`, `!dur` (kuyruğu da temizler), `!kuyruk`, `!çıkar <sıra>`, `!temizle`, `!karıştır`, `!tekrar`, `!ses <0-100>`, `!şimdi`, `!gel`, `!ayrıl`, `!yardım`.
 - Aynı işler sahnenin sağ üstündeki nota düğmesinden ve çalan şarkı çubuğundan da yapılır. Kişiye özel bot sesi: botun profil kartındaki ses sürgüsü.
 - Kanalda 1 dakika kimse kalmazsa bot durur ve kanaldan ayrılır.
+- Bir YouTube şarkısının başlaması 10–15 saniye sürebilir: bağlantı çözülür ve YouTube bazı videolarda akışı reklam süresi kadar (birkaç saniye) bekletir. Kuyruktaki sıradaki şarkı önceden hazırlandığı için geçişler genelde beklemesizdir. Canlı yayınlar çalınamaz.
 - YouTube için [yt-dlp](https://github.com/yt-dlp/yt-dlp) kullanılır: ilk kullanımda resmi GitHub sürümünden Kanki Admin'in veri klasörüne indirilir ve haftada bir kendini günceller. Doğrudan ses dosyası ve radyo bağlantıları buna gerek duymaz.
 
 ## Yazı stili

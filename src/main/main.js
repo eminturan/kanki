@@ -338,6 +338,10 @@ function startMusicBot() {
   });
   botWin.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   botWin.webContents.on('will-navigate', (e) => e.preventDefault());
+  if (process.env.KANKI_AUTOTEST) {
+    ses.webRequest.onCompleted({ urls: ['*://*.googlevideo.com/*'] }, (d) => process.stdout.write(`[bot] googlevideo ${d.statusCode} ${d.method}\n`));
+    ses.webRequest.onErrorOccurred({ urls: ['*://*.googlevideo.com/*'] }, (d) => process.stdout.write(`[bot] googlevideo hata ${d.error}\n`));
+  }
   if (process.env.KANKI_AUTOTEST)
     botWin.webContents.on('console-message', (e) => /\[bot\]|Error/i.test(e.message) && process.stdout.write(`[bot] ${e.message}\n`));
   botWin.loadFile(path.join(__dirname, '..', 'bot', 'bot.html'), { query: { ws: `ws://127.0.0.1:${hostedServer.port}`, key: hostedServer.botKey } });
