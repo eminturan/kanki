@@ -251,15 +251,16 @@ body.mac .topbar { padding-left: 86px; }
   flex: 1; display: flex; flex-wrap: wrap; align-content: center; justify-content: center; gap: 16px; overflow: auto;
 }
 .p-card {
-  width: 170px; height: 150px; border-radius: 14px; background: var(--bg-2); border: 1px solid var(--line);
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; position: relative;
+  width: 180px; min-height: 196px; padding: 36px 14px 16px; border-radius: 14px; background: var(--bg-2); border: 1px solid var(--line);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; position: relative;
 }
 .p-card .avatar { width: 64px; height: 64px; font-size: 24px; }
 .p-card .avatar.speaking { box-shadow: 0 0 0 3px var(--bg-2), 0 0 0 6px var(--green); }
-.p-card .p-name { font-weight: 600; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.p-card .p-name { font-weight: 600; max-width: 152px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .p-card .p-flags { position: absolute; top: 10px; right: 10px; display: flex; gap: 4px; color: var(--red); }
 .p-card .p-flags svg { width: 16px; height: 16px; }
-.p-card .watch-btn { position: absolute; bottom: 8px; }
+.p-card .watch-btn { height: 32px; padding: 0 14px; font-size: 13px; margin-top: 4px; }
+.p-card .watch-btn svg { width: 15px; height: 15px; }
 .p-card.sharing { border-color: rgba(240, 82, 79, .5); cursor: pointer; }
 .p-card.sharing:hover { background: var(--bg-3); }
 .p-card .live { position: absolute; top: 10px; left: 10px; }
@@ -398,3 +399,22 @@ body.mac .topbar { padding-left: 86px; }
 .danger-zone { padding: 12px 14px; border-radius: 10px; border: 1px solid rgba(240, 82, 79, .3); background: rgba(240, 82, 79, .05); }
 .danger-zone a { color: #8cbaff; }
 .user .badges .crown svg { color: var(--amber); }
+
+/* ---------- Ayar açıklamaları ---------- */
+[data-tip] > span:first-child::after,
+.check[data-tip] > span::after {
+  content: "?"; display: inline-grid; place-items: center; width: 14px; height: 14px; margin-left: 6px;
+  border-radius: 50%; border: 1px solid var(--text-3); color: var(--text-3);
+  font-size: 9.5px; font-weight: 700; vertical-align: 1px; opacity: .7;
+}
+[data-tip]:hover > span:first-child::after,
+.check[data-tip]:hover > span::after { opacity: 1; border-color: var(--accent); color: var(--accent); }
+.tip-pop {
+  position: fixed; z-index: 400; max-width: 320px; padding: 10px 12px; border-radius: 10px;
+  background: #0b0d11; border: 1px solid var(--bg-4); color: var(--text-2);
+  font-size: 12.5px; line-height: 1.5; white-space: pre-line; pointer-events: none;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, .5);
+  opacity: 0; transform: translateY(-3px); transition: opacity .12s, transform .12s;
+}
+.tip-pop.above { transform: translateY(3px); }
+.tip-pop.show { opacity: 1; transform: none; }

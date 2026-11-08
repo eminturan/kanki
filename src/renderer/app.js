@@ -1775,6 +1775,111 @@ navigator.mediaDevices.addEventListener('devicechange', async () => {
 });
 
 // =====================================================================
+//  Ayar açıklamaları (üzerine gelince çıkan bilgi kutusu)
+// =====================================================================
+const TIPS = {
+  // Ses
+  'set-input': 'Sesinin alınacağı cihaz. Kulaklığının mikrofonu varsa onu seç. Değiştirdiğin anda uygulanır.',
+  'set-output': 'Arkadaşlarının sesini ve izlediğin yayının sesini hangi cihazdan duyacağın.',
+  'set-mode':
+    'Sesle etkinleştirme: konuştuğunda mikrofon kendiliğinden açılır.\nBas-konuş: sadece atadığın tuşa basılıyken sesin gider.\nSürekli açık: mikrofon hep açıktır.',
+  'set-vad':
+    'Mikrofonun açılması için sesinin ne kadar yüksek olması gerektiği. Konuşurken renkli çubuk beyaz çizgiyi geçmeli, sessizken geçmemeli. Klavye ya da fan sesin gidiyorsa çizgiyi sağa kaydır.',
+  'btn-ptt-key':
+    'Konuşmak için basılı tutacağın klavye ya da fare yan tuşu. Oyun içindeyken de çalışır (macOS’ta Erişilebilirlik izni ister).',
+  'set-ns': 'Fan, klavye, trafik gibi sürekli arka plan seslerini temizler. Mikrofona müzik ya da enstrüman çalıyorsan kapatmak sesi daha doğal yapar.',
+  'set-ec': 'Hoparlörden çıkan arkadaş sesinin mikrofonuna girip onlara yankı olarak dönmesini engeller. Kulaklık kullanıyorsan kapatabilirsin.',
+  'set-agc': 'Mikrofon seviyeni kendiliğinden ayarlar; fısıldasan da bağırsan da benzer seviyede duyulursun.',
+  'set-sounds': 'Biri kanala girip çıktığında, mesaj geldiğinde ve dürtüldüğünde kısa bir uyarı sesi çalar.',
+  // Ekran paylaşımı ayarları
+  'set-codec':
+    'Yayınının sıkıştırılma biçimi.\nH.264: ekran kartını kullanır, bilgisayarı en az yorar (önerilen).\nVP9: yazılar daha net, işlemciyi daha çok kullanır.\nAV1: aynı kalitede en az internet, en ağır seçenek.',
+  'set-autowatch':
+    'Kanalda biri ekran paylaşınca tıklamana gerek kalmadan izlemeye başlarsın. Kapalıysa izlemek için adına tıklarsın; internetin kısıtlıysa kapatman iyi olur.',
+  // Ekran seçici
+  'opt-res': 'Yayının netliği. Yüksek çözünürlük daha net ama daha çok internet ister. Arkadaşların normal bir ekranda izliyorsa 1080p yeterli.',
+  'opt-fps': 'Saniyede gönderilen kare sayısı. Oyun ve video için 60, yazı/kod/sunum için 30 yeterli. Yükleme hızın düşükse 30’a indir.',
+  'opt-hint':
+    'İnternet yetmediğinde neyin korunacağı.\nAkıcılık: görüntü biraz yumuşar ama takılmaz (oyun, video).\nNetlik: yazılar keskin kalır, kare hızı düşebilir (kod, belge).',
+  'opt-bitrate':
+    'Yayına ayrılan internet hızı. "Otomatik", çözünürlük ve kare hızına göre seçer. Her izleyiciye ayrı gönderilir: 6 Mbps × 3 izleyici = 18 Mbps yükleme hızı gerekir.',
+  'opt-audio': 'Oyunun, videonun ya da müziğin sesi de yayına eklenir. Windows’ta çalışır; macOS’ta 14.2 ve üstü gerekir.',
+  // Bağlantı ekranı
+  'in-nick': 'Sunucuda arkadaşlarının göreceği adın. Aynı ad kullanılıyorsa sonuna otomatik numara eklenir.',
+  'in-address': 'Sunucuyu kuran kişinin verdiği adres, ör. bizim-kanki.ngrok-free.app ya da 192.168.1.20:4455. Başına https:// eklemene gerek yok.',
+  'in-password': 'Sunucuya şifre konduysa buraya yaz; şifre yoksa boş bırak.',
+  'in-admin-key': 'Başka bir bilgisayarda kurulu sunucuyu yönetmek için o sunucunun yönetici anahtarı. Kendi kurduğun sunucuda gerekmez.',
+  'in-host-name': 'Sunucunun adı; herkesin ekranının sol üstünde görünür.',
+  'in-host-port': 'Sunucunun dinleyeceği kapı numarası. Başka bir program kullanmıyorsa 4455 olarak bırak.',
+  'in-host-password': 'Sunucuya girmek için istenecek şifre. Boş bırakırsan adresi bilen herkes girebilir.',
+  'in-ngrok': 'Sunucuyu ngrok üzerinden internete açar; arkadaşların farklı evlerden, port açmana gerek kalmadan bağlanır.',
+  'in-ngrok-token': 'ngrok hesabının giriş anahtarı. dashboard.ngrok.com › Your Authtoken sayfasından kopyala. Sadece bu bilgisayarda saklanır.',
+  'in-ngrok-domain': 'ngrok’tan aldığın ücretsiz sabit adres. Doldurursan sunucunun adresi her açılışta aynı kalır.',
+  // Yönetim paneli
+  'adm-name': 'Sunucunun herkese görünen adı. Kaydet’e basınca bağlı herkeste hemen değişir.',
+  'adm-password': 'Yeni giriş şifresi. Boş bırakırsan mevcut şifre değişmez. Zaten bağlı olanlar atılmaz.',
+  'adm-nopass': 'Şifreyi tamamen kaldırır; adresi bilen herkes şifresiz girebilir.',
+};
+
+const tipEl = h('div', { class: 'tip-pop', role: 'tooltip' });
+document.body.append(tipEl);
+let tipTimer = null;
+let tipTarget = null;
+
+function hideTip() {
+  clearTimeout(tipTimer);
+  tipTarget = null;
+  tipEl.classList.remove('show');
+}
+
+function placeTip(target) {
+  tipEl.textContent = target.dataset.tip;
+  tipEl.classList.add('show');
+  const r = target.getBoundingClientRect();
+  const t = tipEl.getBoundingClientRect();
+  let top = r.bottom + 8;
+  let below = true;
+  if (top + t.height > innerHeight - 8) {
+    top = r.top - t.height - 8;
+    below = false;
+  }
+  const left = Math.max(8, Math.min(r.left, innerWidth - t.width - 8));
+  tipEl.style.left = left + 'px';
+  tipEl.style.top = Math.max(8, top) + 'px';
+  tipEl.classList.toggle('above', !below);
+}
+
+function showTipSoon(target) {
+  if (target === tipTarget) return;
+  clearTimeout(tipTimer);
+  tipTarget = target;
+  tipTimer = setTimeout(() => tipTarget === target && placeTip(target), 350);
+}
+
+// Her açıklamayı ayarın tüm satırına bağla (etiket + kontrol)
+for (const [id, text] of Object.entries(TIPS)) {
+  const el = document.getElementById(id);
+  if (!el) continue;
+  const row = el.closest('.field, .check') || el;
+  row.dataset.tip = text;
+}
+document.addEventListener('mouseover', (e) => {
+  const t = e.target.closest?.('[data-tip]');
+  if (t) showTipSoon(t);
+  else if (tipTarget) hideTip();
+});
+document.addEventListener('focusin', (e) => {
+  const t = e.target.closest?.('[data-tip]');
+  if (t) showTipSoon(t);
+});
+document.addEventListener('focusout', hideTip);
+document.addEventListener('mousedown', (e) => {
+  if (e.target.closest?.('select')) hideTip(); // açılır listeyi kapatmasın
+});
+document.addEventListener('scroll', hideTip, true);
+window.addEventListener('blur', hideTip);
+
+// =====================================================================
 //  Yönetim paneli
 // =====================================================================
 const ICON_CROWN = () => {
