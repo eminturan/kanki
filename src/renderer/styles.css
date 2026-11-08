@@ -1138,3 +1138,20 @@ kbd {
 .msg-tools { top: -22px; }
 .mt-btn { width: 27px; }
 .voice-actions .btn.share { white-space: nowrap; min-width: 0; }
+
+/* ---------- Windows düzeltmeleri ---------- */
+/* Güncelleme düğmesi sağ üstteyken başlıktaki düğmelerle çakışmasın */
+body.has-update .layout:not(.chat-hidden) .chat-head { padding-right: 56px; }
+body.has-update .layout.chat-hidden .stage-head { padding-right: 56px; }
+/* Uzun cihaz adları seçim kutusunu taşırmasın */
+.row2 > * { min-width: 0; }
+.field select { width: 100%; min-width: 0; text-overflow: ellipsis; }
+/* Mesaj kutusu: yer tutucu tek satır, metin dikey ortada */
+.chat-form textarea { overflow-y: hidden; }
+.chat-form textarea::placeholder { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Yayın sesi: hoparlöre tıklayınca sustur */
+.tile-mute { width: 26px; height: 26px; padding: 0; border: 0; border-radius: 4px; display: grid; place-items: center; background: transparent; color: #fff; cursor: pointer; }
+.tile-mute svg { width: 17px; height: 17px; }
+.tile-mute:hover { background: rgba(255, 255, 255, .14); }
+.tile-vol.muted .tile-mute { color: var(--red); }
+.tile-vol.muted input { opacity: .35; }

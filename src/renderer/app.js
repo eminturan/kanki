@@ -31,6 +31,7 @@ const ICON = {
   power: '<svg viewBox="0 0 24 24"><path d="M12 9c-1.6 0-3.15.25-4.6.72v3.1c0 .39-.23.74-.56.9-.98.49-1.87 1.12-2.66 1.85-.18.18-.43.28-.7.28-.28 0-.53-.11-.71-.29L.29 13.08a.96.96 0 0 1 0-1.36C3.34 8.78 7.46 7 12 7s8.66 1.78 11.71 4.72c.18.18.29.43.29.71 0 .28-.11.53-.29.71l-2.48 2.48c-.18.18-.43.29-.71.29-.27 0-.52-.11-.7-.28a11.3 11.3 0 0 0-2.67-1.85.99.99 0 0 1-.56-.9v-3.1C15.15 9.25 13.6 9 12 9Z"/></svg>',
   channel: '<svg viewBox="0 0 24 24"><path d="M11.38 3.08A1 1 0 0 1 12 4v16a1 1 0 0 1-1.7.7L5.58 16H3a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1h2.58l4.72-4.7a1 1 0 0 1 1.08-.22ZM15.1 8.3a1 1 0 0 1 1.4.1 5.5 5.5 0 0 1 0 7.2 1 1 0 1 1-1.5-1.3 3.5 3.5 0 0 0 0-4.6 1 1 0 0 1 .1-1.4Zm2.85-2.6a1 1 0 0 1 1.41.05 9.5 9.5 0 0 1 0 12.5 1 1 0 0 1-1.46-1.36 7.5 7.5 0 0 0 0-9.78 1 1 0 0 1 .05-1.41Z"/></svg>',
   speaker: '<svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9H4Zm12.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4Z"/></svg>',
+  speakerOff: '<svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9H4Zm11.6.2 1.4-1.4 2 2 2-2 1.4 1.4-2 2 2 2-1.4 1.4-2-2-2 2-1.4-1.4 2-2-2-2Z"/></svg>',
   camera: '<svg viewBox="0 0 24 24"><path d="M4 6h11a2 2 0 0 1 2 2v1.5l3.4-2.3A1 1 0 0 1 22 8v8a1 1 0 0 1-1.6.8L17 14.5V16a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2Z"/></svg>',
   cameraOff: '<svg viewBox="0 0 24 24"><path d="M3.3 2.3 2 3.6 4.4 6H4a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h11c.4 0 .8-.1 1.1-.3l4.3 4.3 1.3-1.3L3.3 2.3ZM22 8a1 1 0 0 0-1.6-.8L17 9.5V8a2 2 0 0 0-2-2H9.2L22 18.8V8Z"/></svg>',
   screen: '<svg viewBox="0 0 24 24"><path d="M3 5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-6v2h3a1 1 0 1 1 0 2H8a1 1 0 1 1 0-2h3v-2H5a2 2 0 0 1-2-2V5Zm2 0v10h14V5H5Zm7 1.5 3.5 3.5H13v3h-2v-3H8.5L12 6.5Z"/></svg>',
@@ -327,7 +328,7 @@ function applyRemoteVolume(userId) {
   applyScreenVolumes();
 }
 function applyScreenVolumes() {
-  for (const sc of S.remoteScreens.values()) if (sc.audioEl) sc.audioEl.muted = S.deafened;
+  for (const sc of S.remoteScreens.values()) if (sc.audioEl) sc.audioEl.muted = S.deafened || !!sc.muted;
 }
 const userName = (id) => S.users.get(id)?.name || '';
 const volKey = (id) => userName(id);
@@ -1025,7 +1026,7 @@ function addRemoteScreenTrack(userId, shareId, track) {
   const key = shareKey(userId, shareId);
   let sc = S.remoteScreens.get(key);
   if (!sc) {
-    sc = { key, userId, shareId, video: new MediaStream(), audioEl: null, volume: 1, trackId: null };
+    sc = { key, userId, shareId, video: new MediaStream(), audioEl: null, volume: 1, muted: false, trackId: null };
     S.remoteScreens.set(key, sc);
   }
   if (!S.watching.has(key)) {
@@ -1046,7 +1047,7 @@ function addRemoteScreenTrack(userId, shareId, track) {
     }
     sc.audioEl.srcObject = new MediaStream([track]);
     sc.audioEl.volume = sc.volume;
-    sc.audioEl.muted = S.deafened;
+    sc.audioEl.muted = S.deafened || !!sc.muted;
     if (settings.outputId && sc.audioEl.setSinkId) sc.audioEl.setSinkId(settings.outputId).catch(() => {});
     sc.audioEl.play().catch(() => {});
   }
@@ -1149,6 +1150,13 @@ function buildTile(key) {
     if (!cur) return;
     cur.volume = Number(vol.value) / 100;
     if (cur.audioEl) cur.audioEl.volume = cur.volume;
+    if (cur.muted && cur.volume > 0) toggleScreenMute(key); // sesi açmak için sürgüyü oynatmak da yeter
+  });
+  const muteBtn = h('button', { class: 'tile-mute', title: 'Yayın sesini kapat' });
+  muteBtn.innerHTML = ICON.speaker;
+  muteBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    toggleScreenMute(key);
   });
   const btn = (title, icon, fn) => {
     const b = h('button', { class: 'tile-btn', title });
@@ -1166,7 +1174,7 @@ function buildTile(key) {
     h('span', { class: 'tile-name' }),
     h('span', { class: 'tile-stats' }),
     h('span', { class: 'spacer' }),
-    h('label', { class: 'tile-vol' }, svgEl(ICON.speaker), vol),
+    h('div', { class: 'tile-vol' }, muteBtn, vol),
     h('span', { class: 'tile-noaudio', title: 'Bu yayında ses yok (yayıncı sistem sesini paylaşmıyor)' }, 'ses yok'),
     btn('Ayrı pencerede aç (istediğin yere, başka monitöre taşıyabilirsin)', ICON_POP, () => popOut(key)),
     btn('Tam ekran (F)', ICON_FULL, () => tileFullscreen(key)),
@@ -1187,6 +1195,30 @@ function buildTile(key) {
   for (const ev of ['loadeddata', 'playing']) video.addEventListener(ev, () => el.classList.remove('waiting'));
   bringFront(el, key);
   return el;
+}
+
+// Yayının sesini tamamen kapat / geri aç (ses seviyesi korunur)
+function toggleScreenMute(key) {
+  const sc = S.remoteScreens.get(key);
+  if (!sc) return;
+  sc.muted = !sc.muted;
+  if (sc.audioEl) sc.audioEl.muted = S.deafened || sc.muted;
+  syncTileMute(key);
+}
+function syncTileMute(key) {
+  const el = tileEls.get(key);
+  const sc = S.remoteScreens.get(key);
+  if (!el || !sc) return;
+  const box = el.querySelector('.tile-vol');
+  const btn = box.querySelector('.tile-mute');
+  const muted = !!sc.muted;
+  box.classList.toggle('muted', muted);
+  const icon = muted ? ICON.speakerOff : ICON.speaker;
+  if (btn.dataset.icon !== icon) {
+    btn.innerHTML = icon;
+    btn.dataset.icon = icon;
+  }
+  btn.title = muted ? 'Yayın sesini aç' : 'Yayın sesini kapat';
 }
 
 function startDrag(e, key, el, mode) {
@@ -1261,6 +1293,7 @@ function renderTiles() {
     const sc = S.remoteScreens.get(k);
     const hasAudio = !!sc?.audioEl;
     el.querySelector('.tile-vol').classList.toggle('hidden', !hasAudio);
+    syncTileMute(k);
     el.querySelector('.tile-noaudio').classList.toggle('hidden', hasAudio || !sc);
     const v = el.querySelector('video');
     const want = sc?.video || null;
@@ -2977,6 +3010,7 @@ function renderUpdate(u) {
   const btn = $('#update-btn');
   const active = u && (u.state === 'downloading' || u.state === 'ready');
   btn.classList.toggle('hidden', !active);
+  document.body.classList.toggle('has-update', !!active); // sağ üstte ona yer açılır
   if (!active) {
     $('#launch-update').classList.add('hidden');
     return;
@@ -3734,7 +3768,7 @@ function renderComposerExtras() {
   }
   box.classList.toggle('hidden', !box.childElementCount);
   const ch = S.channels.find((c) => c.id === S.channelId);
-  $('#chat-input').placeholder = S.pendingImage ? 'Not ekle (isteğe bağlı)' : S.replyTo ? 'Yanıtını yaz' : `Mesaj gönder: #${ch?.name || 'kanal'}`;
+  $('#chat-input').placeholder = S.pendingImage ? 'Not ekle (isteğe bağlı)' : S.replyTo ? 'Yanıtını yaz' : `#${ch?.name || 'kanal'} kanalına yaz`;
   if (atBottom) chatLog.scrollTop = chatLog.scrollHeight;
 }
 
@@ -3757,10 +3791,13 @@ function sendChat() {
 function autoGrow(el) {
   const box = $('#chat-log');
   const atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 60;
-  if (!el.value) el.style.height = '';
-  else {
+  if (!el.value) {
+    el.style.height = '';
+    el.style.overflowY = 'hidden';
+  } else {
     el.style.height = 'auto';
     el.style.height = Math.min(el.scrollHeight + 2, 200) + 'px';
+    el.style.overflowY = el.scrollHeight > 200 ? 'auto' : 'hidden'; // kaydırma çubuğu sadece gerekince
   }
   if (atBottom) box.scrollTop = box.scrollHeight; // kutu büyüyünce son mesajlar kaybolmasın
 }

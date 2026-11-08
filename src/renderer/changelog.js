@@ -6,6 +6,17 @@
  */
 const CHANGELOG = [
   {
+    version: '1.0.12',
+    date: '2026-11-08',
+    title: 'Windows düzeltmeleri',
+    added: ['İzlediğin yayında hoparlör simgesine tıklayınca yayının sesi tamamen kapanır, tekrar tıklayınca açılır.'],
+    fixed: [
+      'Sağ üstteki güncelleme düğmesi üye sayısı düğmesinin üstüne biniyordu.',
+      'Ayarlar › Ses ve görüntü bölümünde uzun kulaklık/mikrofon adları kutudan taşıyordu.',
+      'Mesaj kutusundaki yazı iki satıra bölünüp aşağı kayıyordu.',
+    ],
+  },
+  {
     version: '1.0.11',
     date: '2026-11-08',
     title: 'Yayında yankı düzeltmesi',
