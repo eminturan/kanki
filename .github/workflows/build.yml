@@ -52,7 +52,7 @@ jobs:
 
             | Platform | Dosya |
             |---|---|
-            | Windows | `Kanki-Setup.exe` (kurulumlu) · `Kanki-Portable.exe` (kurulumsuz) |
+            | Windows (önerilen) | `Kanki-Portable.exe` (kurulumsuz) · `Kanki-Setup.exe` (kurulumlu) |
             | Mac (M1–M4) | `Kanki-mac-arm64.dmg` |
             | Mac (Intel) | `Kanki-mac-x64.dmg` |
           files: release/*

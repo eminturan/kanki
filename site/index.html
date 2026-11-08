@@ -227,15 +227,15 @@
         <h1>Arkadaşlarınla konuş, <span>ekranını paylaş.</span></h1>
         <p class="lead">Kanki; kanal kanal sesli sohbet, yazılı mesaj ve 4K 60 FPS'e kadar ekran paylaşımı sunan, sadece bizim ekip için yapılmış bir uygulama.</p>
         <div class="cta">
-          <a class="btn primary" id="hero-download" href="#indir">
-            <svg viewBox="0 0 24 24"><path d="M11 3h2v10.17l3.59-3.58L18 11l-6 6-6-6 1.41-1.41L11 13.17V3ZM5 19h14v2H5v-2Z"/></svg>
-            <span id="hero-download-text">Kanki'yi indir</span>
+          <a class="btn primary" id="hero-download" data-file="Kanki-Portable.exe">
+            <svg viewBox="0 0 24 24"><path d="M3 5.5 10 4.5v7H3v-6Zm8-1.1L21 3v8.5H11V4.4ZM3 12.5h7v7L3 18.5v-6Zm8 0h10V21l-10-1.4v-7.1Z"/></svg>
+            Windows için indir <small>(kurulumsuz .exe)</small>
           </a>
           <a class="btn" href="#kurulum">Kurulum adımları</a>
         </div>
         <div class="alt-links" id="hero-alt">
           Diğer sürümler:
-          <a href="#indir">Windows</a>·<a href="#indir">Mac (Apple Silicon)</a>·<a href="#indir">Mac (Intel)</a>
+          <a data-file="Kanki-Setup.exe">Windows (kurulumlu)</a>·<a data-file="Kanki-mac-arm64.dmg">Mac (Apple Silicon)</a>·<a data-file="Kanki-mac-x64.dmg">Mac (Intel)</a>
         </div>
         <div class="shot">
           <div class="shot-bar"><i></i><i></i><i></i></div>
@@ -283,33 +283,31 @@
       <div class="wrap">
         <div class="eyebrow">İndir</div>
         <h2>Bilgisayarına uygun sürümü seç</h2>
-        <p class="sub">Senin sistemin için önerilen sürüm işaretli. Dosyalar GitHub üzerinden indirilir.</p>
+        <p class="sub">Windows için kurulum gerektirmeyen tek dosyalık sürümü öneriyoruz: indir, çift tıkla, kullan. Dosyalar GitHub üzerinden indirilir.</p>
         <div class="downloads">
-          <div class="dl" id="dl-win">
-            <span class="tag">Senin için önerilen</span>
+          <div class="dl rec" id="dl-win">
+            <span class="tag">Önerilen</span>
             <div class="dl-head">
               <svg viewBox="0 0 24 24"><path d="M3 5.5 10 4.5v7H3v-6Zm8-1.1L21 3v8.5H11V4.4ZM3 12.5h7v7L3 18.5v-6Zm8 0h10V21l-10-1.4v-7.1Z"/></svg>
               <h3>Windows</h3>
             </div>
             <p class="req">Windows 10 / 11 · 64 bit</p>
             <div class="btns">
-              <a class="btn primary" data-file="Kanki-Setup.exe">Kanki-Setup.exe <small>(kurulumlu)</small></a>
-              <a class="btn" data-file="Kanki-Portable.exe">Kurulumsuz sürüm <small>(.exe)</small></a>
+              <a class="btn primary" data-file="Kanki-Portable.exe">Kanki-Portable.exe <small>(kurulumsuz)</small></a>
+              <a class="btn" data-file="Kanki-Setup.exe">Kurulumlu sürüm <small>(Kanki-Setup.exe)</small></a>
             </div>
           </div>
           <div class="dl" id="dl-mac-arm">
-            <span class="tag">Senin için önerilen</span>
             <div class="dl-head">
               <svg viewBox="0 0 24 24"><path d="M16.4 12.6c0-2.4 2-3.6 2.1-3.6a4.5 4.5 0 0 0-3.6-1.9c-1.5-.2-3 .9-3.7.9-.8 0-2-.9-3.2-.9a4.8 4.8 0 0 0-4 2.4c-1.7 3-.4 7.4 1.2 9.8.8 1.2 1.8 2.5 3 2.4 1.2 0 1.7-.8 3.1-.8s1.9.8 3.2.8c1.3 0 2.1-1.2 2.9-2.4a10 10 0 0 0 1.3-2.7 4.2 4.2 0 0 1-2.3-4Zm-2.4-7A4.3 4.3 0 0 0 15 2.5a4.4 4.4 0 0 0-2.9 1.5 4.1 4.1 0 0 0-1 3c1.1.1 2.2-.5 2.9-1.4Z"/></svg>
               <h3>Mac · Apple Silicon</h3>
             </div>
             <p class="req">M1, M2, M3, M4 işlemcili Mac'ler · macOS 12+</p>
             <div class="btns">
-              <a class="btn primary" data-file="Kanki-mac-arm64.dmg">Kanki-mac-arm64.dmg</a>
+              <a class="btn" data-file="Kanki-mac-arm64.dmg">Kanki-mac-arm64.dmg</a>
             </div>
           </div>
           <div class="dl" id="dl-mac-intel">
-            <span class="tag">Senin için önerilen</span>
             <div class="dl-head">
               <svg viewBox="0 0 24 24"><path d="M16.4 12.6c0-2.4 2-3.6 2.1-3.6a4.5 4.5 0 0 0-3.6-1.9c-1.5-.2-3 .9-3.7.9-.8 0-2-.9-3.2-.9a4.8 4.8 0 0 0-4 2.4c-1.7 3-.4 7.4 1.2 9.8.8 1.2 1.8 2.5 3 2.4 1.2 0 1.7-.8 3.1-.8s1.9.8 3.2.8c1.3 0 2.1-1.2 2.9-2.4a10 10 0 0 0 1.3-2.7 4.2 4.2 0 0 1-2.3-4Zm-2.4-7A4.3 4.3 0 0 0 15 2.5a4.4 4.4 0 0 0-2.9 1.5 4.1 4.1 0 0 0-1 3c1.1.1 2.2-.5 2.9-1.4Z"/></svg>
               <h3>Mac · Intel</h3>
@@ -344,24 +342,25 @@
         <div class="panel" id="panel-win" role="tabpanel" aria-labelledby="tab-win">
           <ol class="steps">
             <li>
-              <h3>Kurulum dosyasını indir</h3>
-              <p>Yukarıdan <b>Kanki-Setup.exe</b> dosyasını indir ve çift tıklayarak çalıştır.</p>
+              <h3>Kanki-Portable.exe dosyasını indir</h3>
+              <p>Yukarıdaki <b>Windows için indir</b> düğmesine bas. Kurulum gerekmeyen tek bir .exe dosyası iner.</p>
+              <div class="note">Tarayıcı indirmeyi engellerse indirmeler listesinde dosyanın yanındaki <b>⋯</b> menüsünden <b>Sakla / Koru</b> seçeneğini seç.</div>
             </li>
             <li>
-              <h3>"Windows bilgisayarınızı korudu" uyarısını geç</h3>
-              <p>Mavi bir SmartScreen penceresi çıkarsa önce <span class="kbd">Ek bilgi</span> yazısına, ardından <span class="kbd">Yine de çalıştır</span> düğmesine tıkla.</p>
-              <div class="note">Tarayıcı indirmeyi engellerse indirmeler listesinde dosyanın yanındaki <b>⋯</b> menüsünden <b>Koru / Sakla</b> seçeneğini seç.</div>
+              <h3>Dosyayı kalıcı bir yere taşı</h3>
+              <p>İndirilenler klasöründen <b>Masaüstü</b>'ne ya da istediğin bir klasöre taşı. Kanki'yi her seferinde bu dosyaya çift tıklayarak açacaksın.</p>
             </li>
             <li>
-              <h3>Kurulumu tamamla</h3>
-              <p>Kurulum yerini istersen değiştir, <span class="kbd">Yükle</span> ve ardından <span class="kbd">Son</span>. Kanki masaüstüne ve Başlat menüsüne eklenir.</p>
+              <h3>Çift tıkla ve "Windows bilgisayarınızı korudu" uyarısını geç</h3>
+              <p>Mavi bir SmartScreen penceresi çıkarsa önce <span class="kbd">Ek bilgi</span> yazısına, ardından <span class="kbd">Yine de çalıştır</span> düğmesine tıkla. Bu uyarı sadece ilk açılışta çıkar.</p>
+              <div class="note">Kurulumsuz sürüm her açılışta kendini geçici olarak açtığı için ilk ekranın gelmesi birkaç saniye sürebilir; bu normal.</div>
             </li>
             <li>
               <h3>İzinleri ver</h3>
-              <p>İlk açılışta Windows Güvenlik Duvarı izin isterse <b>Özel ağlar</b> kutusu işaretliyken <span class="kbd">Erişime izin ver</span> de. Mikrofon izni sorulursa onayla.</p>
+              <p>Windows Güvenlik Duvarı izin isterse <b>Özel ağlar</b> kutusu işaretliyken <span class="kbd">Erişime izin ver</span> de. Mikrofon izni sorulursa onayla.</p>
             </li>
           </ol>
-          <div class="tip">Kurulum yapmak istemiyorsan <b>Kurulumsuz sürüm</b>'ü indir. Tek bir .exe dosyası; çift tıklaman yeterli, aynı SmartScreen adımı geçerli.</div>
+          <div class="tip"><b>Kurulumlu sürümü mü tercih edersin?</b> <a data-file="Kanki-Setup.exe">Kanki-Setup.exe</a>'yi indir. Aynı SmartScreen adımından sonra kurulum sihirbazında <span class="kbd">Yükle</span> → <span class="kbd">Son</span>; Kanki Başlat menüsüne ve masaüstüne eklenir, açılışı biraz daha hızlı olur.</div>
         </div>
 
         <div class="panel" id="panel-mac" role="tabpanel" aria-labelledby="tab-mac" hidden>
@@ -485,41 +484,7 @@
         a.href = BASE + a.getAttribute('data-file');
       });
 
-      // İşletim sistemi tahmini
-      var ua = navigator.userAgent || '';
-      var plat = (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || '';
-      var isMac = /Mac/i.test(plat) || /Macintosh/i.test(ua);
-      var isWin = /Win/i.test(plat) || /Windows/i.test(ua);
-      var isMobile = /Android|iPhone|iPad|iPod/i.test(ua);
-
-      function macIsIntel() {
-        // Apple Silicon'da WebGL çizici adı "Apple M..." olur; Intel Mac'lerde "Intel"/"AMD" geçer
-        try {
-          var gl = document.createElement('canvas').getContext('webgl');
-          var ext = gl && gl.getExtension('WEBGL_debug_renderer_info');
-          var r = ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : '';
-          return /Intel|AMD|Radeon/i.test(r) && !/Apple M/i.test(r);
-        } catch (e) { return false; }
-      }
-
-      var hero = document.getElementById('hero-download');
-      var heroText = document.getElementById('hero-download-text');
-      var rec = null;
-      if (isMobile) {
-        heroText.textContent = 'Bilgisayardan indir';
-      } else if (isWin) {
-        rec = 'dl-win';
-        hero.href = BASE + 'Kanki-Setup.exe';
-        heroText.textContent = 'Windows için indir (.exe)';
-      } else if (isMac) {
-        var intel = macIsIntel();
-        rec = intel ? 'dl-mac-intel' : 'dl-mac-arm';
-        hero.href = BASE + (intel ? 'Kanki-mac-x64.dmg' : 'Kanki-mac-arm64.dmg');
-        heroText.textContent = intel ? 'Mac (Intel) için indir' : 'Mac için indir';
-      }
-      if (rec) document.getElementById(rec).classList.add('rec');
-
-      // Kurulum sekmeleri
+      // Kurulum sekmeleri (varsayılan: Windows)
       var tabs = { win: document.getElementById('tab-win'), mac: document.getElementById('tab-mac') };
       var panels = { win: document.getElementById('panel-win'), mac: document.getElementById('panel-mac') };
       function show(k) {
@@ -530,7 +495,6 @@
       }
       tabs.win.addEventListener('click', function () { show('win'); });
       tabs.mac.addEventListener('click', function () { show('mac'); });
-      if (isMac) show('mac');
 
       // Kopyala düğmeleri
       document.querySelectorAll('[data-copy]').forEach(function (b) {
