@@ -102,6 +102,13 @@ const DEFAULT_SETTINGS = {
   userVolumes: {},
   localMutes: {},
   sfxVolume: 50, // ses efektlerinin sende ne kadar yüksek çalacağı (0 = kapalı)
+  showGame: true, // oynadığım oyunu adımın altında göster
+  showMusic: true, // Spotify'da dinlediğimi göster
+  rnnoise: false, // yapay zekâ gürültü engelleme
+  overlay: false, // konuşanlar katmanı
+  overlayOnly: false,
+  overlayPos: 'tl',
+  keybinds: [], // kendi kısayolların: { id, action, sid?, who?, accel }
   share: { res: '1080', fps: '60', hint: 'motion', bitrate: '0', audio: true },
   recent: [],
   host: { name: '', port: 4455 },
@@ -230,8 +237,18 @@ async function startMic() {
       },
       video: false,
     });
-    audio.micStream = stream;
-    audio.micTrack = stream.getAudioTracks()[0];
+    audio.rawMicStream = stream;
+    let useStream = stream;
+    if (settings.rnnoise) {
+      try {
+        useStream = await rnnoiseStream(stream); // yapay zekâ gürültü engelleme
+      } catch (e) {
+        log('rnnoise', e);
+        toast('Yapay zekâ gürültü engelleme açılamadı', String(e.message || e), 'err');
+      }
+    }
+    audio.micStream = useStream;
+    audio.micTrack = useStream.getAudioTracks()[0];
     audio.micTrack.contentHint = 'speech';
     audio.analysisTrack = audio.micTrack.clone();
     audio.analysisTrack.enabled = true;
@@ -254,6 +271,8 @@ async function startMic() {
 
 function stopMic() {
   audio.micTrack?.stop();
+  audio.rawMicStream?.getTracks().forEach((t) => t.stop());
+  stopRnnoise();
   audio.analysisTrack?.stop();
   audio.micStream = audio.micTrack = audio.analysisTrack = audio.micAnalyser = null;
 }
@@ -1386,6 +1405,7 @@ function buildTile(key) {
   video.addEventListener('dblclick', () => !isControlling(key) && tileFullscreen(key));
   for (const ev of ['loadeddata', 'playing']) video.addEventListener(ev, () => el.classList.remove('waiting'));
   bringFront(el, key);
+  decorateTile(el, key, video); // yayına işaret, birlikte izle kontrolleri
   return el;
 }
 
@@ -1745,6 +1765,8 @@ function onMessage(m) {
       $('#me-avatar').replaceWith(Object.assign(av, { id: 'me-avatar' }));
       S.isAdmin = !!m.admin;
       S.features = new Set(m.features || []);
+      S.token = m.token || '';
+      S.isMod = !!m.mod;
       applyAdminUi();
       setTimeout(() => KankiSfx.BUILTIN.forEach((x) => KankiSfx.builtin(x.sid)), 1500); // ilk basışta gecikme olmasın
       break;
@@ -1755,6 +1777,7 @@ function onMessage(m) {
         else if (S.chatView && !S.textLoaded.has(S.chatView)) send({ t: 'openText', channelId: S.chatView });
       });
       const prevUsers = S.users;
+      S.afk = m.afk || null;
       S.serverName = m.serverName;
       S.channels = m.channels;
       S.users = new Map(m.users.map((u) => [u.id, u]));
@@ -1807,6 +1830,7 @@ function onMessage(m) {
       S.knownShares = liveKeys;
       for (const id of audio.remote.keys()) applyRemoteVolume(id);
       renderAll();
+      onStateExtras(prevUsers, prevChannel);
       break;
     }
     case 'signal': {
@@ -1909,15 +1933,17 @@ function onMessage(m) {
       if (effectivePresence() === 'dnd') {
         // Rahatsız Etmeyin: titreşim ve ses yok, sadece sessiz bir not
         toast(`${m.name} seni dürttü`, (m.text ? m.text + ' · ' : '') + 'Rahatsız Etmeyin açık olduğu için sessiz.', 'poke', 6000);
+        logEvent('👉', `${m.name} seni dürttü${m.text ? ': ' + m.text : ''}`);
         break;
       }
       nudge(true);
+      logEvent('👉', `${m.name} seni dürttü${m.text ? ': ' + m.text : ''}`, { hot: true });
       toast(`${m.name} seni dürttü!`, m.text || '', 'poke', 8000);
       kanki.flash();
       kanki.notify(`${m.name} seni dürttü`, m.text || '');
       break;
     case 'kicked': {
-      const msg = `${m.by} seni sunucudan attı${m.reason ? ': ' + m.reason : '.'}`;
+      const msg = `${m.by} seni sunucudan ${m.banned ? 'yasakladı' : 'attı'}${m.reason ? ': ' + m.reason : '.'}`;
       disconnect();
       setConnectError(msg);
       break;
@@ -1926,7 +1952,8 @@ function onMessage(m) {
       toast('Kanalın değiştirildi', `${m.by} seni başka bir kanala taşıdı.`);
       break;
     case 'forceMute':
-      if (!S.muted) toggleMute();
+      if (m.until) S.voteMutedUntil = m.until;
+      if (!S.muted) toggleMute(true);
       toast('Mikrofonun kapatıldı', `${m.by} mikrofonunu kapattı. İstediğinde tekrar açabilirsin.`);
       break;
     case 'adminInfo':
@@ -1936,11 +1963,18 @@ function onMessage(m) {
       toast(m.message);
       break;
     case 'error':
-      toast('Hata', m.message, 'err');
+      if (m.code === 'banned') {
+        disconnect();
+        setConnectError(m.message);
+        break;
+      }
+      toast(m.code === 'info' || m.code === 'channel_full' ? m.message : 'Hata', m.code === 'info' || m.code === 'channel_full' ? '' : m.message, 'err');
       break;
     case 'pong':
       updatePing(Math.round(performance.now() - m.ts));
       break;
+    default:
+      onExtraMessage(m);
   }
 }
 
@@ -1997,12 +2031,13 @@ function renderTree() {
             row.classList.remove('drop');
             const dragged = e.dataTransfer.getData('text/kanki-user');
             if (dragged === S.myId) joinChannel(ch.id);
-            else if (dragged && S.isAdmin) send({ t: 'move', to: dragged, channelId: ch.id });
+            else if (dragged && (S.isAdmin || S.isMod)) send({ t: 'move', to: dragged, channelId: ch.id });
           },
         },
         h('span', { class: 'ch-ico' }),
         h('span', { class: 'ch-name' }, ch.name),
-        members.length ? h('span', { class: 'ch-count' }, String(members.length)) : null
+        ch.locked ? h('span', { class: 'ch-lock', title: 'Şifreli kanal' }, '🔒') : null,
+        members.length || ch.limit ? h('span', { class: 'ch-count', title: ch.limit ? `En fazla ${ch.limit} kişi` : '' }, ch.limit ? `${members.length}/${ch.limit}` : String(members.length)) : null
       );
       row.querySelector('.ch-ico').outerHTML = ICON.channel;
       row.style.paddingLeft = 8 + depth * 16 + 'px';
@@ -2042,6 +2077,8 @@ function userRow(u, depth) {
   if (sfb) badges.prepend(h('span', { class: 'sfx-badge', title: `${sfb.it.name} çaldı`, style: `animation-delay:-${sfb.age}ms` }, sfb.it.emoji));
   if (u.bot) badges.append(h('span', { class: 'bot-tag', title: 'Müzik botu — !yardım' }, 'BOT'));
   if (u.admin) badges.append(h('span', { class: 'crown', title: 'Yönetici' }, ICON_CROWN()));
+  else if (u.mod) badges.append(h('span', { class: 'mod-badge', title: 'Moderatör' }, '🛡️'));
+  activityBadge(u, badges);
   if (u.muted) badges.insertAdjacentHTML('beforeend', ICON.micOff);
   if (u.deafened) badges.insertAdjacentHTML('beforeend', ICON.headOff);
   if (settings.localMutes[u.name] && u.id !== S.myId) badges.insertAdjacentHTML('beforeend', ICON.speaker);
@@ -2273,6 +2310,7 @@ function renderChat() {
   $('#new-msgs').classList.add('hidden');
   if (S.editing) focusEditBox();
   renderComposerExtras();
+  renderChatExtras();
 }
 // Tepki/düzenleme/silme sonrası: sohbeti yeniden çiz, okunan yer kaymasın
 function refreshChat() {
@@ -2390,6 +2428,7 @@ function channelMenu(e, ch) {
     ch.id !== S.channelId && { label: 'Kanala katıl', run: () => joinChannel(ch.id) },
     { label: 'Alt kanal oluştur', run: () => promptChannel(ch.id) },
     { label: 'Yeniden adlandır', run: () => renameChannel(ch) },
+    feat('chpass') && ch.type !== 'text' && { label: 'Şifre ve kişi sınırı…', run: () => channelSettings(ch) },
     '-',
     { label: 'Kanalı sil', danger: true, run: () => send({ t: 'deleteChannel', channelId: ch.id }) },
   ]);
@@ -2441,10 +2480,11 @@ function userMenu(e, u) {
         pokeUser(u),
     },
     !sameChannel && { label: 'Kanalına git', run: () => joinChannel(u.channelId) },
-    ...(S.isAdmin
+    ...voteItems(u),
+    ...(S.isAdmin || S.isMod
       ? [
           '-',
-          { html: '<div class="ctx-label">Yönetici</div>' },
+          { html: `<div class="ctx-label">${S.isAdmin ? 'Yönetici' : 'Moderatör'}</div>` },
           {
             label: 'Kanala taşı',
             submenu: S.channels.filter((c) => c.id !== u.channelId).map((c) => ({ label: c.name, run: () => send({ t: 'move', to: u.id, channelId: c.id }) })),
@@ -2455,6 +2495,7 @@ function userMenu(e, u) {
             danger: true,
             run: () => inlinePrompt(`${u.name} sunucudan atılsın mı?`, '', (reason) => send({ t: 'kick', to: u.id, reason }), true, 'Sebep yazabilirsin (opsiyonel). Atılan kişi tekrar bağlanabilir.'),
           },
+          ...adminUserItems(u),
         ]
       : []),
   ]);
@@ -2590,7 +2631,12 @@ $$('.modal').forEach((m) => {
 });
 
 // ---------- Mikrofon / hoparlör ----------
-function toggleMute() {
+function toggleMute(force) {
+  // Oylamayla susturulduysan süre dolana kadar mikrofon açılamaz
+  if (force !== true && S.muted && (S.voteMutedUntil || 0) > Date.now()) {
+    const min = Math.ceil((S.voteMutedUntil - Date.now()) / 60000);
+    return toast('Mikrofonun kilitli', `Kanal oylamasıyla susturuldun. ${min} dakika sonra açabilirsin.`, 'err');
+  }
   if (S.deafened) {
     // Hoparlör kapalıyken mikrofona basmak: ikisini de aç (Discord gibi)
     S.deafened = false;
@@ -3250,6 +3296,7 @@ function renderAdminInfo(m) {
     );
   }
   void chName;
+  renderAdminExtras(m);
 }
 
 $('#btn-admin').addEventListener('click', openAdminPanel);
@@ -3427,6 +3474,8 @@ $('#server-menu-btn').addEventListener('click', (e) => {
         toast('Davet adresi kopyalandı', `Arkadaşların Kanki'de bu adresi yazarak bağlanır: ${a}`);
       },
     },
+    { label: 'Davet bağlantısını kopyala', run: () => copyInviteLink(false) },
+    S.password && { label: 'Şifre dahil davet bağlantısı', run: () => copyInviteLink(true) },
     S.isAdmin && { label: 'Sunucu yönetimi', run: openAdminPanel },
     S.isAdmin && { label: 'Kanal oluştur', run: () => promptChannel(null) },
     '-',
@@ -3445,6 +3494,7 @@ function pokeUser(u) {
     '',
     (text) => {
       send({ t: 'poke', to: u.id, text });
+      logEvent('👉', `${u.name} kişisini dürttün${text ? ': ' + text : ''}`, { dim: true });
       toast(`${u.name} dürtüldü`, 'Onun ekranı şu an titriyor.');
       nudge(false);
     },
@@ -3482,6 +3532,7 @@ function openProfile(uid, anchor) {
     { class: 'pf-body' },
     h('div', { class: 'pf-name' }, nameEl(u.name, styleOfUser(u)), isMe ? ' (sen)' : ''),
     statusText ? h('div', { class: 'pf-custom' }, statusText) : null,
+    activityText(u) ? h('div', { class: 'pf-activity' }, activityText(u)) : null,
     h('div', { class: 'pf-status' }, h('span', { class: `status-dot inline ${pres}` }), PRESENCE[pres].label, ch ? h('span', { class: 'muted' }, ` · ${ch.name}`) : null),
     tags
   );
@@ -3568,7 +3619,9 @@ $$('.chat-tab').forEach((b) =>
     $$('.chat-tab').forEach((x) => x.classList.toggle('active', x === b));
     $('#chat-pane').classList.toggle('hidden', rightTab !== 'chat');
     $('#members').classList.toggle('hidden', rightTab !== 'members');
+    $('#log-pane').classList.toggle('hidden', rightTab !== 'log');
     if (rightTab === 'members') renderMembers();
+    if (rightTab === 'log') renderLog();
   })
 );
 function renderMembers() {
@@ -3587,12 +3640,12 @@ function renderMembers() {
       const av = u.bot ? botAvatar() : withDot(avatar(u.name), u);
       av.dataset.av = u.id;
       const custom = u.id === S.myId ? settings.statusText : u.statusText;
-      const sub = custom || (screenSharesOf(u).length ? 'Ekran paylaşıyor' : camShareOf(u) ? 'Kamerası açık' : pres !== 'online' ? PRESENCE[pres].label : u.muted ? 'Mikrofon kapalı' : '');
+      const sub = custom || activityText(u) || (screenSharesOf(u).length ? 'Ekran paylaşıyor' : camShareOf(u) ? 'Kamerası açık' : pres !== 'online' ? PRESENCE[pres].label : u.muted ? 'Mikrofon kapalı' : '');
       const row = h(
         'div',
         { class: `member ${pres}`, onclick: () => openProfile(u.id, row), oncontextmenu: (e) => userMenu(e, u) },
         av,
-        h('div', { class: 'member-text' }, h('div', { class: 'member-name' }, nameEl(u.name, styleOfUser(u)), u.admin ? h('span', { class: 'crown' }, ICON_CROWN()) : null), sub ? h('div', { class: 'member-sub' }, sub) : null)
+        h('div', { class: 'member-text' }, h('div', { class: 'member-name' }, nameEl(u.name, styleOfUser(u)), u.admin ? h('span', { class: 'crown' }, ICON_CROWN()) : u.mod ? h('span', { class: 'mod-badge', title: 'Moderatör' }, '🛡️') : null), sub ? h('div', { class: 'member-sub' }, sub) : null)
       );
       if (!styleOfUser(u)) row.querySelector('.member-name').style.color = colorFor(u.name);
       box.append(row);
@@ -3777,6 +3830,7 @@ function msgContent(m) {
   } else if (m.imageExpired) {
     c.append(h('div', { class: 'msg-img-gone' }, 'Resim artık sunucuda tutulmuyor (çok eski).'));
   }
+  extraContent(m, c);
   const reacts = Object.entries(m.reactions || {});
   if (reacts.length) {
     const row = h('div', { class: 'msg-reacts' });
@@ -3835,7 +3889,8 @@ function msgMenu(e, m) {
   showCtx(e, [
     { html: `<div class="ctx-react">${QUICK_REACTS.concat(['🔥', '🎉']).map((x) => `<button type="button" data-em="${x}">${x}</button>`).join('')}</div>` },
     { label: 'Yanıtla', run: () => startReply(m) },
-    mine && m.text !== undefined && { label: 'Düzenle', run: () => startEdit(m) },
+    mine && m.text !== undefined && !m.poll && !m.wheel && !m.teams && { label: 'Düzenle', run: () => startEdit(m) },
+    (mine || S.isAdmin || S.isMod) && { label: m.pinned ? 'Sabitlemeyi kaldır' : 'Sabitle', run: () => send({ t: 'pin', id: m.id, on: !m.pinned, channelId: chatChannel() }) },
     m.text && {
       label: 'Metni kopyala',
       run: () => {
@@ -3973,9 +4028,9 @@ const blobToDataUrl = (b) =>
 // Resmi gönderilecek boyuta getirir: en uzun kenar 1920 px, WebP; hareketli GIF'ler küçükse olduğu gibi gider
 async function prepareImage(file) {
   if (!file) return;
-  if (!/^image\//.test(file.type)) return toast('Sadece resim gönderilebilir', 'PNG, JPG, GIF ya da WebP dosyası seç.');
+  if (!/^image\//.test(file.type) || /svg/.test(file.type)) return uploadFile(file); // resim değilse dosya olarak gönder
   if (!S.channelId) return;
-  if (file.size > 40 * 1024 * 1024) return toast('Resim çok büyük', '40 MB’tan küçük bir resim seç.', 'err');
+  if (file.size > 40 * 1024 * 1024) return uploadFile(file);
   try {
     const bmp = await createImageBitmap(file);
     let w = bmp.width;
@@ -4108,13 +4163,13 @@ $('#chat-input').addEventListener('keydown', (e) => {
   }
 });
 $('#chat-input').addEventListener('paste', (e) => {
-  const item = [...(e.clipboardData?.items || [])].find((i) => i.kind === 'file' && i.type.startsWith('image/'));
+  const item = [...(e.clipboardData?.items || [])].find((i) => i.kind === 'file');
   if (item) {
     e.preventDefault();
     prepareImage(item.getAsFile());
   }
 });
-$('#btn-attach').addEventListener('click', () => $('#file-input').click());
+$('#btn-attach').addEventListener('click', (e) => attachMenu(e));
 $('#file-input').addEventListener('change', (e) => {
   prepareImage(e.target.files[0]);
   e.target.value = '';
@@ -4343,6 +4398,7 @@ function renderCallBar() {
   set('#cb-share', ICON.screen, screens ? 'Bir ekran daha paylaş' : 'Ekranını paylaş', screens ? 'on' : '');
   if (!S.channelId) $('#sfx-pop').classList.add('hidden');
   set('#cb-sfx', ICON_SFX, 'Ses efektleri', $('#sfx-pop').classList.contains('hidden') ? '' : 'on');
+  set('#cb-watch', ICON_WATCH, 'Birlikte izle: YouTube ya da video dosyası', myWatchShare() ? 'on' : '');
   set('#cb-mic', S.muted ? ICON.micOff : ICON.mic, S.muted ? 'Mikrofonu aç (Ctrl+Shift+M)' : 'Mikrofonu kapat (Ctrl+Shift+M)', S.muted ? 'off' : '');
   set('#cb-deafen', S.deafened ? ICON.headOff : ICON.head, S.deafened ? 'Sesi aç (Ctrl+Shift+D)' : 'Sesi kapat (Ctrl+Shift+D)', S.deafened ? 'off' : '');
   set('#cb-leave', ICON.power, 'Bağlantıyı kes', 'leave');
@@ -4481,6 +4537,7 @@ function sendSfx(sid) {
   sfx.coolUntil = now + SFX_COOLDOWN;
   if (sfxSupported()) send({ t: 'sfx', sid });
   markSfx(S.myId, sid);
+  logEvent(SFX_BY_ID.get(sid).emoji, `${SFX_BY_ID.get(sid).name} sesini çaldın`, { dim: true });
   playSfxLocal(S.myId, sid, sfxGain(S.myId));
   const pop = $('#sfx-pop');
   pop.classList.remove('cool');
@@ -4496,6 +4553,7 @@ function sendSfx(sid) {
 function onSfx(m) {
   if (!SFX_BY_ID.has(m.sid) || m.from === S.myId) return;
   markSfx(m.from, m.sid);
+  logEvent(SFX_BY_ID.get(m.sid).emoji, `${userName(m.from)} ses efekti çaldı: ${SFX_BY_ID.get(m.sid).name}`);
   playSfxLocal(m.from, m.sid, sfxGain(m.from));
 }
 // Sağ tık: sadece kendin dinle (kanala gitmez, hoparlörün kapalı olsa da çalar)
@@ -5330,6 +5388,8 @@ $('#btn-release-notes').addEventListener('click', () => showWhatsNew('0.0.0', S.
 //  Başlangıç
 // =====================================================================
 (async function init() {
+  // Önce bütün betikler (extras.js dahil) yüklensin; arayüz onların işlevlerini de kullanıyor
+  if (document.readyState === 'loading') await new Promise((r) => document.addEventListener('DOMContentLoaded', r, { once: true }));
   const info = await kanki.info();
   S.appVersion = info.version;
   checkWhatsNew(info.version);

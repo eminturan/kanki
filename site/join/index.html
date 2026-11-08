@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Kanki daveti</title>
+  <link rel="icon" href="../favicon.png" />
+  <style>
+    :root { --bg: #0d0f13; --card: #161a21; --line: #262c38; --text: #e6ebe8; --muted: #8b96a3; --accent: #22d47e; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 16px; background: var(--bg); color: var(--text); font: 15px/1.5 -apple-system, "Segoe UI", Roboto, sans-serif; }
+    .card { width: 100%; max-width: 440px; padding: 28px; border-radius: 14px; background: var(--card); border: 1px solid var(--line); text-align: center; }
+    img { width: 64px; height: 64px; border-radius: 16px; }
+    h1 { margin: 14px 0 4px; font-size: 22px; }
+    p { margin: 8px 0; color: var(--muted); }
+    .addr { margin: 14px 0; padding: 10px; border-radius: 8px; background: #0b0d10; border: 1px solid var(--line); font: 14px ui-monospace, Menlo, Consolas, monospace; color: var(--text); word-break: break-all; }
+    a.btn { display: inline-block; margin: 6px 4px; padding: 10px 18px; border-radius: 8px; background: var(--accent); color: #04140b; font-weight: 700; text-decoration: none; }
+    a.btn.alt { background: #232937; color: var(--text); }
+    .small { font-size: 13px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <img src="../icon.png" alt="" />
+    <h1 id="title">Kanki'ye davet edildin</h1>
+    <p id="sub">Kanki açılıyor…</p>
+    <div class="addr" id="addr" hidden></div>
+    <div>
+      <a class="btn" id="open" href="#">Kanki'de aç</a>
+    </div>
+    <p class="small">Kanki kurulu değil mi? Önce indir, sonra bu sayfadaki "Kanki'de aç" düğmesine bas.</p>
+    <div>
+      <a class="btn alt" href="https://github.com/kanki-app/kanki-app.github.io/releases/latest/download/Kanki-Setup.exe">Windows</a>
+      <a class="btn alt" href="https://github.com/kanki-app/kanki-app.github.io/releases/latest/download/Kanki-mac-arm64.dmg">Mac (M1 ve üstü)</a>
+      <a class="btn alt" href="https://github.com/kanki-app/kanki-app.github.io/releases/latest/download/Kanki-mac-x64.dmg">Mac (Intel)</a>
+    </div>
+  </div>
+  <script>
+    // Davet bilgisi adresin # kısmında durur (sunucuya hiç gönderilmez)
+    var d = (location.hash || '').slice(1).replace(/[^A-Za-z0-9_-]/g, '');
+    var info = null;
+    try {
+      info = JSON.parse(decodeURIComponent(escape(atob(d.replace(/-/g, '+').replace(/_/g, '/')))));
+    } catch (e) {}
+    var deep = 'kanki://join?d=' + d;
+    document.getElementById('open').href = deep;
+    if (info && info.a) {
+      document.getElementById('title').textContent = (info.n || 'Bir sunucu') + ' seni bekliyor';
+      var a = document.getElementById('addr');
+      a.textContent = info.a;
+      a.hidden = false;
+      document.getElementById('sub').textContent = 'Kanki açılıp bu sunucuya bağlanacak. Açılmazsa aşağıdaki düğmeye bas ya da adresi Kanki’ye elle yaz.';
+      setTimeout(function () { location.href = deep; }, 400);
+    } else {
+      document.getElementById('sub').textContent = 'Davet bağlantısı eksik ya da bozuk.';
+    }
+  </script>
+</body>
+</html>

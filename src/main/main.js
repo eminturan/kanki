@@ -12,9 +12,13 @@ const {
   powerMonitor,
   screen,
   globalShortcut,
+  dialog,
 } = require('electron');
 const remoteInput = require('./remote-input');
 const music = require('./music');
+const activity = require('./activity');
+const http = require('http');
+const https = require('https');
 const path = require('path');
 const os = require('os');
 const fs = require('fs');
@@ -52,6 +56,40 @@ if (process.env.KANKI_FAKE_MEDIA) {
 }
 if (process.env.KANKI_USER_DATA) app.setPath('userData', process.env.KANKI_USER_DATA);
 
+// --- Davet bağlantısı: kanki://join?d=... tıklanınca Kanki açılır ve sunucuya bağlanır ---
+const inviteFrom = (s) => (/^kanki:\/\/join\/?\?d=([A-Za-z0-9_-]+)/i.exec(String(s || '')) || /^kanki:\/\/join\/([A-Za-z0-9_-]+)/i.exec(String(s || '')) || [])[1] || null;
+let pendingInvite = process.argv.map(inviteFrom).find(Boolean) || null;
+function deliverInvite(p) {
+  if (!p) return;
+  if (win && !win.webContents.isLoading()) {
+    win.webContents.send('invite', p);
+    if (win.isMinimized()) win.restore();
+    win.show();
+    win.focus();
+  } else pendingInvite = p;
+}
+if (!process.env.KANKI_AUTOTEST) {
+  try {
+    if (process.defaultApp) app.setAsDefaultProtocolClient('kanki', process.execPath, [path.resolve(process.argv[1] || '.')]);
+    else app.setAsDefaultProtocolClient('kanki');
+  } catch {}
+  // Tek kopya: ikinci açılış (ör. davet bağlantısı) açık olan pencereye gider
+  if (!app.requestSingleInstanceLock()) app.quit();
+  else
+    app.on('second-instance', (_e, argv) => {
+      const p = argv.map(inviteFrom).find(Boolean);
+      if (p) deliverInvite(p);
+      else if (win) {
+        if (win.isMinimized()) win.restore();
+        win.focus();
+      }
+    });
+}
+app.on('open-url', (e, url) => {
+  e.preventDefault();
+  deliverInvite(inviteFrom(url));
+});
+
 let win = null;
 let hostedServer = null;
 let pendingSource = null; // { id, audio: 'clean' | 'plain' | false }
@@ -76,6 +114,9 @@ function createWindow() {
     },
   });
   win.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
+  win.webContents.once('did-finish-load', () => {
+    if (pendingInvite) setTimeout(() => deliverInvite(pendingInvite) || (pendingInvite = null), 1500);
+  });
   win.webContents.setWindowOpenHandler(({ url, frameName }) => {
     // Yayını ayrı pencerede açma: boş sayfa, içeriğini ana pencere doldurur
     if (frameName.startsWith('kanki-pop-') && (url === 'about:blank' || url === '')) {
@@ -148,8 +189,19 @@ app.whenReady().then(() => {
     if (/^wss?:/i.test(details.url)) {
       details.requestHeaders['ngrok-skip-browser-warning'] = '1';
       details.requestHeaders['User-Agent'] = `Kanki/${app.getVersion()}`;
+    } else if (/^https:\/\/[^/]*\.googlevideo\.com\//i.test(details.url)) {
+      // Birlikte izle: YouTube akışı yt-dlp'nin verdiği başlıklarla istenir
+      for (const [k, v] of Object.entries(watchHeaders)) if (/^(user-agent|referer|accept-language)$/i.test(k)) details.requestHeaders[k] = v;
+      delete details.requestHeaders.Origin;
     }
     cb({ requestHeaders: details.requestHeaders });
+  });
+  // Birlikte izle: YouTube görüntüsü yayına aktarılabilsin (aksi halde tarayıcı "başka kaynak" diye engeller)
+  session.defaultSession.webRequest.onHeadersReceived({ urls: ['https://*.googlevideo.com/*'] }, (details, cb) => {
+    const headers = { ...details.responseHeaders };
+    for (const k of Object.keys(headers)) if (/^access-control-allow-origin$/i.test(k)) delete headers[k];
+    headers['Access-Control-Allow-Origin'] = ['*'];
+    cb({ responseHeaders: headers });
   });
 
   // getDisplayMedia çağrısını kendi seçicimizin seçtiği kaynağa yönlendir
@@ -621,6 +673,255 @@ function localAddresses() {
   }
   return out;
 }
+
+// =====================================================================
+//  Ek özellikler: dosya gönder/indir, oyun/Spotify durumu, kısayollar, konuşanlar katmanı,
+//  yayına işaret, birlikte izle (YouTube), RNNoise dosyası
+// =====================================================================
+function httpReq(url, { method = 'GET', headers = {}, body = null } = {}) {
+  const u = new URL(url);
+  const lib = u.protocol === 'https:' ? https : http;
+  return lib.request(u, { method, headers: { 'ngrok-skip-browser-warning': '1', 'User-Agent': `Kanki/${app.getVersion()}`, ...headers } });
+}
+ipcMain.handle('file:upload', (_e, { url, token, name, type, data }) =>
+  new Promise((resolve) => {
+    const buf = Buffer.from(data);
+    const req = httpReq(url, { method: 'POST', headers: { 'x-kanki-token': token, 'x-file-name': encodeURIComponent(name), 'content-type': type || 'application/octet-stream', 'content-length': buf.length } });
+    req.on('response', (res) => {
+      let d = '';
+      res.on('data', (c) => (d += c));
+      res.on('end', () => {
+        try {
+          resolve(JSON.parse(d));
+        } catch {
+          resolve({ error: `Sunucu yanıtı anlaşılamadı (${res.statusCode})` });
+        }
+      });
+    });
+    req.on('error', (e) => resolve({ error: e.message }));
+    req.setTimeout(10 * 60 * 1000, () => req.destroy(new Error('Zaman aşımı')));
+    req.end(buf);
+  })
+);
+ipcMain.handle('file:download', async (_e, { url, name }) => {
+  const safe = String(name || 'dosya').replace(/[\\/:*?"<>|]/g, '_');
+  const r = await dialog.showSaveDialog(win, { defaultPath: path.join(app.getPath('downloads'), safe) });
+  if (r.canceled || !r.filePath) return { canceled: true };
+  return new Promise((resolve) => {
+    const req = httpReq(url);
+    req.on('response', (res) => {
+      if (res.statusCode !== 200) {
+        let d = '';
+        res.on('data', (c) => (d += c));
+        res.on('end', () => {
+          let msg = `Sunucu ${res.statusCode} döndü`;
+          try {
+            msg = JSON.parse(d).error || msg;
+          } catch {}
+          resolve({ error: msg });
+        });
+        return;
+      }
+      const out = fs.createWriteStream(r.filePath);
+      res.pipe(out);
+      out.on('finish', () => resolve({ ok: true, path: r.filePath }));
+      out.on('error', (e) => resolve({ error: e.message }));
+    });
+    req.on('error', (e) => resolve({ error: e.message }));
+    req.end();
+  });
+});
+ipcMain.handle('activity:scan', (_e, o) => activity.scan(o || {}).catch(() => ({ game: '', music: '' })));
+
+// Kendi kısayolların (global: oyundayken de çalışır)
+let userKeybinds = [];
+ipcMain.handle('keys:set', (_e, list) => {
+  for (const b of userKeybinds)
+    try {
+      globalShortcut.unregister(b.accel);
+    } catch {}
+  userKeybinds = [];
+  const failed = [];
+  for (const b of Array.isArray(list) ? list.slice(0, 40) : []) {
+    try {
+      if (b.accel === RC_STOP_KEY) throw new Error('reserved');
+      if (globalShortcut.register(b.accel, () => win?.webContents.send('keybind', b.id))) userKeybinds.push(b);
+      else failed.push(b.id);
+    } catch {
+      failed.push(b.id);
+    }
+  }
+  return { failed };
+});
+app.on('will-quit', () => globalShortcut.unregisterAll());
+
+// Konuşanlar katmanı: ekranın köşesinde, her şeyin üstünde, tıklanamaz küçük pencere
+let overlayWin = null;
+let overlayReady = false;
+let overlayLast = null;
+const OVERLAY_W = 240;
+const OVERLAY_H = 320;
+const OVERLAY_HTML = `<!doctype html><meta charset="utf-8"><style>
+html,body{margin:0;height:100%;background:transparent;overflow:hidden;font:600 13px -apple-system,"Segoe UI",sans-serif;color:#fff}
+#l{display:flex;flex-direction:column;gap:4px;padding:6px;height:100%;box-sizing:border-box}
+body.b #l{justify-content:flex-end}
+body.r #l{align-items:flex-end}
+.u{display:flex;align-items:center;gap:7px;padding:3px 10px 3px 3px;border-radius:14px;background:rgba(8,10,11,.72);max-width:226px;opacity:.75;transition:opacity .1s}
+.u.s{opacity:1;background:rgba(8,10,11,.88)}
+.a{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-size:11px;color:#081009;flex:none;box-shadow:0 0 0 2px transparent}
+.u.s .a{box-shadow:0 0 0 2px #22d47e}
+.n{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-shadow:0 1px 2px #000}
+.i{font-size:11px;opacity:.85}
+.c{font:600 10px ui-monospace,Menlo,Consolas,monospace;color:#9fb3aa;padding:0 6px;text-shadow:0 1px 2px #000}
+</style><body><div id="l"></div><script>
+function upd(p){document.body.className=(p.pos[0]==='b'?'b ':'')+(p.pos[1]==='r'?'r':'');
+var l=document.getElementById('l');l.innerHTML='';
+if(p.channel&&p.items.length){var c=document.createElement('div');c.className='c';c.textContent=p.channel;l.appendChild(c);}
+p.items.forEach(function(x){var d=document.createElement('div');d.className='u'+(x.speaking?' s':'');
+var a=document.createElement('div');a.className='a';a.style.background=x.color;a.textContent=(x.name[0]||'?').toUpperCase();
+var n=document.createElement('span');n.className='n';n.textContent=x.name;d.appendChild(a);d.appendChild(n);
+if(x.muted||x.deaf){var i=document.createElement('span');i.className='i';i.textContent=x.deaf?'🔇':'🎙️✕';d.appendChild(i);}l.appendChild(d);});}
+</script>`;
+function placeOverlay(pos) {
+  if (!overlayWin || overlayWin.isDestroyed()) return;
+  const b = screen.getPrimaryDisplay().workArea;
+  const x = pos[1] === 'r' ? b.x + b.width - OVERLAY_W - 8 : b.x + 8;
+  const y = pos[0] === 'b' ? b.y + b.height - OVERLAY_H - 8 : b.y + 8;
+  overlayWin.setBounds({ x, y, width: OVERLAY_W, height: OVERLAY_H });
+}
+ipcMain.on('overlay:update', (_e, p) => {
+  overlayLast = p;
+  if (!p?.on) {
+    if (overlayWin && !overlayWin.isDestroyed()) overlayWin.destroy();
+    overlayWin = null;
+    return;
+  }
+  if (!overlayWin || overlayWin.isDestroyed()) {
+    overlayReady = false;
+    overlayWin = new BrowserWindow({
+      width: OVERLAY_W,
+      height: OVERLAY_H,
+      frame: false,
+      transparent: true,
+      resizable: false,
+      movable: false,
+      skipTaskbar: true,
+      focusable: false,
+      alwaysOnTop: true,
+      hasShadow: false,
+      show: false,
+      webPreferences: { sandbox: true, contextIsolation: true },
+    });
+    overlayWin.setAlwaysOnTop(true, 'screen-saver');
+    overlayWin.setVisibleOnAllWorkspaces?.(true, { visibleOnFullScreen: true });
+    overlayWin.setIgnoreMouseEvents(true);
+    overlayWin.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+    overlayWin.webContents.on('will-navigate', (e) => e.preventDefault());
+    overlayWin.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(OVERLAY_HTML));
+    overlayWin.webContents.once('did-finish-load', () => {
+      overlayReady = true;
+      if (overlayLast?.on) overlayWin.webContents.executeJavaScript(`upd(${JSON.stringify(overlayLast)})`).catch(() => {});
+      overlayWin.showInactive();
+      if (process.env.KANKI_OVERLAY_SHOT) setTimeout(async () => overlayWin && fs.writeFileSync(process.env.KANKI_OVERLAY_SHOT, (await overlayWin.webContents.capturePage()).toPNG()), 800);
+    });
+  }
+  placeOverlay(p.pos || 'tl');
+  if (overlayReady) overlayWin.webContents.executeJavaScript(`upd(${JSON.stringify(p)})`).catch(() => {});
+});
+
+// Yayına işaret: yayıncının ekranının üstünde şeffaf, tıklanamaz bir katman
+const markWins = new Map(); // display id -> { win, timer, ready, queue }
+const MARK_HTML = `<!doctype html><meta charset="utf-8"><style>
+html,body{margin:0;height:100%;background:transparent;overflow:hidden}
+svg{position:absolute;inset:0;width:100%;height:100%}
+.f{transition:opacity .7s;opacity:0}
+text{font:700 15px -apple-system,"Segoe UI",sans-serif;fill:#fff;paint-order:stroke;stroke:#000;stroke-width:3px}
+@keyframes r{from{r:10;opacity:1}to{r:46;opacity:0}}
+.ring{fill:none;stroke-width:4;animation:r 1s ease-out 3}
+</style><body><svg id="s"></svg><script>
+var NS='http://www.w3.org/2000/svg';
+function draw(m){var s=document.getElementById('s'),W=innerWidth,H=innerHeight,g=document.createElementNS(NS,'g');
+if(m.kind==='ping'){var x=m.pts[0][0]*W,y=m.pts[0][1]*H;
+var r=document.createElementNS(NS,'circle');r.setAttribute('cx',x);r.setAttribute('cy',y);r.setAttribute('r',10);r.setAttribute('class','ring');r.setAttribute('stroke',m.color);g.appendChild(r);
+var d=document.createElementNS(NS,'circle');d.setAttribute('cx',x);d.setAttribute('cy',y);d.setAttribute('r',9);d.setAttribute('fill',m.color);d.setAttribute('stroke','#000');d.setAttribute('stroke-width','2');g.appendChild(d);
+var t=document.createElementNS(NS,'text');t.setAttribute('x',x+16);t.setAttribute('y',y-14);t.textContent=m.name;g.appendChild(t);}
+else{var p=document.createElementNS(NS,'polyline');p.setAttribute('points',m.pts.map(function(q){return q[0]*W+','+q[1]*H}).join(' '));
+p.setAttribute('fill','none');p.setAttribute('stroke',m.color);p.setAttribute('stroke-width','5');p.setAttribute('stroke-linecap','round');p.setAttribute('stroke-linejoin','round');g.appendChild(p);}
+s.appendChild(g);setTimeout(function(){g.setAttribute('class','f')},2600);setTimeout(function(){g.remove()},3400);}
+</script>`;
+ipcMain.handle('mark:show', async (_e, m) => {
+  const display = await displayForSource(m?.sourceId);
+  if (!display) return false;
+  let mw = markWins.get(display.id);
+  if (!mw || mw.win.isDestroyed()) {
+    const b = display.bounds;
+    const w = new BrowserWindow({
+      x: b.x,
+      y: b.y,
+      width: b.width,
+      height: b.height,
+      frame: false,
+      transparent: true,
+      resizable: false,
+      movable: false,
+      skipTaskbar: true,
+      focusable: false,
+      alwaysOnTop: true,
+      hasShadow: false,
+      enableLargerThanScreen: true,
+      show: false,
+      webPreferences: { sandbox: true, contextIsolation: true },
+    });
+    w.setAlwaysOnTop(true, 'screen-saver');
+    w.setVisibleOnAllWorkspaces?.(true, { visibleOnFullScreen: true });
+    w.setIgnoreMouseEvents(true);
+    w.setContentProtection(true); // izleyenler işareti zaten kendi görüntülerinde görüyor; yayına iki kez girmesin
+    w.webContents.on('will-navigate', (e) => e.preventDefault());
+    mw = { win: w, ready: false, queue: [], timer: null };
+    markWins.set(display.id, mw);
+    w.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(MARK_HTML));
+    w.webContents.once('did-finish-load', () => {
+      mw.ready = true;
+      w.showInactive();
+      for (const q of mw.queue.splice(0)) w.webContents.executeJavaScript(`draw(${JSON.stringify(q)})`).catch(() => {});
+    });
+  }
+  const msg = { kind: m.kind === 'line' ? 'line' : 'ping', pts: (m.pts || []).slice(0, 80), name: String(m.name || '').slice(0, 40), color: /^#[0-9a-f]{3,8}$|^hsl\([\d.,% ]+\)$/i.test(m.color) ? m.color : '#22d47e' };
+  if (mw.ready) mw.win.webContents.executeJavaScript(`draw(${JSON.stringify(msg)})`).catch(() => {});
+  else mw.queue.push(msg);
+  clearTimeout(mw.timer);
+  mw.timer = setTimeout(() => {
+    if (!mw.win.isDestroyed()) mw.win.destroy();
+    markWins.delete(display.id);
+  }, 6000);
+  return true;
+});
+
+// Birlikte izle: YouTube videosunun görüntü ve ses adresleri (yt-dlp)
+let watchHeaders = {};
+ipcMain.handle('watch:resolve', async (_e, url) => {
+  try {
+    const r = await music.video(String(url || ''));
+    watchHeaders = r.headers || {};
+    return r;
+  } catch (e) {
+    return { error: String(e.message || e).slice(0, 300) };
+  }
+});
+// RNNoise (yapay zekâ gürültü engelleme) WebAssembly dosyası
+ipcMain.handle('asset:read', (_e, name) => {
+  if (name !== 'rnnoise') return null;
+  const dir = path.join(__dirname, '..', 'renderer', 'vendor', 'rnnoise');
+  let file = path.join(dir, 'rnnoise_simd.wasm');
+  try {
+    const b = fs.readFileSync(file);
+    return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength);
+  } catch {
+    file = path.join(dir, 'rnnoise.wasm');
+    const b = fs.readFileSync(file);
+    return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength);
+  }
+});
 
 // ---------------- Global Bas-Konuş (uiohook) ----------------
 let uiohookMod;

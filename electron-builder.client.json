@@ -42,7 +42,8 @@
       "NSMicrophoneUsageDescription": "Kanki, arkadaşlarınla konuşabilmen için mikrofona erişmek istiyor.",
       "NSCameraUsageDescription": "Kanki, kanaldaki arkadaşlarına kameranı gösterebilmen için kameraya erişmek istiyor.",
       "NSScreenCaptureUsageDescription": "Kanki, ekranını paylaşabilmen için ekran kaydı iznine ihtiyaç duyar.",
-      "NSAudioCaptureUsageDescription": "Kanki, ekran paylaşırken sistem sesini iletebilmek için ses kaydı iznine ihtiyaç duyar."
+      "NSAudioCaptureUsageDescription": "Kanki, ekran paylaşırken sistem sesini iletebilmek için ses kaydı iznine ihtiyaç duyar.",
+      "NSAppleEventsUsageDescription": "Kanki, Spotify'da çalan şarkıyı adının altında gösterebilmek için Spotify'a hangi şarkının çaldığını sorar."
     }
   },
   "dmg": {
@@ -74,6 +75,14 @@
       "owner": "kanki-app",
       "repo": "kanki-app.github.io",
       "releaseType": "release"
+    }
+  ],
+  "protocols": [
+    {
+      "name": "Kanki",
+      "schemes": [
+        "kanki"
+      ]
     }
   ]
 }

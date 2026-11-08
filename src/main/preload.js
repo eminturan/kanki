@@ -30,5 +30,16 @@ contextBridge.exposeInMainWorld('kanki', {
   rcStop: () => ipcRenderer.invoke('rc:stop'),
   onRcStopped: (cb) => ipcRenderer.on('rc:stopped-locally', (_e, reason) => cb(reason)),
   onUpdate: (cb) => ipcRenderer.on('update', (_e, state) => cb(state)),
+  // Ek özellikler
+  uploadFile: (o) => ipcRenderer.invoke('file:upload', o),
+  downloadFile: (o) => ipcRenderer.invoke('file:download', o),
+  scanActivity: (o) => ipcRenderer.invoke('activity:scan', o),
+  setKeybinds: (list) => ipcRenderer.invoke('keys:set', list),
+  onKeybind: (cb) => ipcRenderer.on('keybind', (_e, id) => cb(id)),
+  overlay: (p) => ipcRenderer.send('overlay:update', p),
+  showMark: (m) => ipcRenderer.invoke('mark:show', m),
+  watchResolve: (url) => ipcRenderer.invoke('watch:resolve', url),
+  readAsset: (name) => ipcRenderer.invoke('asset:read', name),
+  onInvite: (cb) => ipcRenderer.on('invite', (_e, p) => cb(p)),
   autotest: process.env.KANKI_AUTOTEST ? JSON.parse(process.env.KANKI_AUTOTEST) : null,
 });

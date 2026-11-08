@@ -185,4 +185,26 @@ async function streamNow(pageUrl, onStatus) {
   return { ...toItem(info), url: fmt.url, headers: fmt.http_headers || info.http_headers || {}, availableAt: availableAt(fmt, info) };
 }
 
-module.exports = { resolve, stream, ensureYtDlp, isDirect: (u) => isUrl(u) && !isYouTube(u) && DIRECT_AUDIO.test(u) };
+// Birlikte izle: en fazla 720p görüntü + ayrı ses (YouTube'da 360p üstü ses ve görüntü ayrı gelir)
+const VIDEO_FORMAT =
+  'bestvideo[height<=720][vcodec^=avc1][protocol^=http]+bestaudio[acodec=opus][protocol^=http]/bestvideo[height<=720][protocol^=http]+bestaudio[protocol^=http]/best[height<=720][protocol^=http]/best[protocol^=http]';
+async function video(pageUrl, onStatus) {
+  if (!isUrl(pageUrl)) throw new Error('Geçerli bir bağlantı değil.');
+  await ensureYtDlp(onStatus);
+  const info = JSON.parse(await ytdlp(['-J', '--no-playlist', '-f', VIDEO_FORMAT, pageUrl]));
+  if (info.is_live) throw new Error('Canlı yayınlar açılamıyor.');
+  const fmts = info.requested_formats || [info];
+  const v = fmts.find((f) => f.vcodec && f.vcodec !== 'none') || fmts[0];
+  const a = fmts.find((f) => f !== v && f.acodec && f.acodec !== 'none') || null;
+  if (!v?.url) throw new Error('Video akışı bulunamadı.');
+  return {
+    title: info.title || '',
+    duration: info.duration || 0,
+    video: v.url,
+    audio: a ? a.url : null,
+    headers: v.http_headers || info.http_headers || {},
+    availableAt: Math.max(availableAt(v, info), a ? availableAt(a, info) : 0),
+  };
+}
+
+module.exports = { resolve, stream, video, ensureYtDlp, isDirect: (u) => isUrl(u) && !isYouTube(u) && DIRECT_AUDIO.test(u) };

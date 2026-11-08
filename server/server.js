@@ -19,6 +19,9 @@
  * sadece doğru yönetici anahtarıyla bağlanan kullanıcılara verilir.
  */
 const http = require('http');
+const https = require('https');
+const dns = require('dns');
+const net = require('net');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
@@ -98,7 +101,33 @@ function startServer(opts = {}) {
     fs.writeFileSync(textMarker, '1');
   } catch {}
   const isText = (cid) => channels.find((c) => c.id === cid)?.type === 'text';
-  const lobbyId = () => channels.find((c) => c.type !== 'text')?.id;
+  const lobbyId = () => channels.find((c) => c.type !== 'text' && !c.pwHash)?.id || channels.find((c) => c.type !== 'text')?.id;
+
+  // ---------- Kalıcı sunucu ayarları (sohbet değil): moderatörler, yasaklar, AFK, GIF anahtarı ----------
+  const confFile = path.join(dataDir, 'server-config.json');
+  let conf = { roles: {}, bans: [], afkChannelId: null, afkMinutes: 15, gifProvider: 'klipy', gifKey: '' };
+  try {
+    conf = { ...conf, ...JSON.parse(fs.readFileSync(confFile, 'utf8')) };
+  } catch {}
+  function saveConf() {
+    try {
+      fs.mkdirSync(dataDir, { recursive: true });
+      fs.writeFileSync(confFile, JSON.stringify(conf, null, 2));
+    } catch (e) {
+      log('Ayarlar kaydedilemedi:', e.message);
+    }
+  }
+  const afkId = () => (channels.find((c) => c.id === conf.afkChannelId && c.type !== 'text') || channels.find((c) => c.type !== 'text' && /^afk$/i.test(c.name)))?.id || null;
+  const isModUser = (u) => !!u && !u.bot && conf.roles[u.clientKey]?.role === 'mod';
+  const isMod = (u) => !!u && (u.admin || isModUser(u));
+  const hashPw = (salt, pw) => crypto.scryptSync(String(pw), String(salt), 32).toString('hex');
+  // Kanal şifresinin özeti kimseye gönderilmez; sadece "kilitli" bilgisi gider
+  const publicChannel = (c) => {
+    const { pwHash, salt, ...rest } = c;
+    if (pwHash) rest.locked = true;
+    return rest;
+  };
+  const voiceCount = (cid) => [...users.values()].filter((u) => u.channelId === cid && !u.bot).length;
 
   // ---------- Kullanıcılar ----------
   /** @type {Map<string, {id,name,channelId,muted,deafened,sharing,ws,alive}>} */
@@ -129,7 +158,10 @@ function startServer(opts = {}) {
     nameStyle: u.nameStyle || null,
     hasAvatar: !!u.avatar,
     admin: !!u.admin,
+    mod: isModUser(u),
     bot: !!u.bot,
+    activity: u.activity || null,
+    voteMuted: (u.voteMutedUntil || 0) > Date.now(),
   });
   const findBot = () => [...users.values()].find((u) => u.bot);
   // Sadece botun anladığı komutlar iletilir ("!!!" gibi mesajlar bota gitmesin)
@@ -182,8 +214,9 @@ function startServer(opts = {}) {
     broadcast({
       t: 'state',
       serverName,
-      channels,
+      channels: channels.map(publicChannel),
       users: [...users.values()].map(publicUser),
+      afk: { channelId: afkId(), minutes: conf.afkMinutes },
     });
   }
   function systemChat(channelId, text) {
@@ -195,7 +228,7 @@ function startServer(opts = {}) {
     if (!chatHistory.has(channelId)) chatHistory.set(channelId, []);
     const arr = chatHistory.get(channelId);
     arr.push(msg);
-    if (arr.length > 200) arr.shift();
+    if (arr.length > 200) arr.splice(Math.max(0, arr.findIndex((x) => !x.pinned)), 1); // sabitlenmiş mesajlar silinmez
     // Bellek şişmesin: kanal başına en yeni 30 resim saklanır, eskilerinin yerine not kalır
     const withImg = arr.filter((x) => x.image);
     for (const x of withImg.slice(0, Math.max(0, withImg.length - 30))) {
@@ -211,13 +244,272 @@ function startServer(opts = {}) {
     u.channelId = channelId;
     u.sharing = false;
     u.shares = [];
-    if (old) systemChat(old, `${u.name} kanaldan ayrıldı`);
-    systemChat(channelId, `${u.name} kanala katıldı`);
+    // Giriş/çıkış sohbete yazılmaz; uygulamadaki "Geçmiş" sekmesine düşer
+    activity({ kind: 'move', id: u.id, name: u.name, from: old || null, to: channelId });
+    for (const v of votes.values()) if (v.targetId === u.id) endVote(v, false);
     send(u.ws, { t: 'history', channelId, messages: (chatHistory.get(channelId) || []).map(pubMsg) });
     broadcastState();
   }
 
+  function activity(ev, filter) {
+    broadcast({ t: 'activity', ts: Date.now(), ...ev }, filter || ((u) => !u.bot));
+  }
+  const newMsg = (me, cid, text = '') => {
+    const msg = { t: 'chat', id: crypto.randomUUID(), channelId: cid, from: me.id, name: me.name, text, ts: Date.now(), _k: me.clientKey };
+    if (me.nameStyle) msg.ns = me.nameStyle;
+    return msg;
+  };
+  const postMsg = (cid, msg) => {
+    pushHistory(cid, msg);
+    broadcast(pubMsg(msg), audience(cid));
+  };
+  const updateMsg = (cid, msg) => broadcast({ t: 'chatUpdate', channelId: cid, msg: pubMsg(msg) }, audience(cid));
+  const errorTo = (u, message, code = 'info') => send(u.ws, { t: 'error', code, message });
+
+  // ---------- Oylamayla susturma / AFK'ya gönderme ----------
+  const votes = new Map(); // hedef kullanıcı id -> oylama
+  const votePublic = (v) => ({ id: v.id, targetId: v.targetId, targetName: v.targetName, action: v.action, by: v.by, yes: v.yes.size, no: v.no.size, required: v.required, until: v.until });
+  const sendVote = (v) => broadcast({ t: 'vote', vote: votePublic(v) }, (u) => u.channelId === v.channelId && !u.bot);
+  function endVote(v, passed) {
+    if (votes.get(v.targetId) !== v) return;
+    clearTimeout(v.timer);
+    votes.delete(v.targetId);
+    broadcast({ t: 'voteEnd', id: v.id, passed, action: v.action, targetName: v.targetName }, (u) => u.channelId === v.channelId && !u.bot);
+    activity({ kind: 'vote', passed, action: v.action, name: v.targetName, by: v.by, channelId: v.channelId });
+    const target = users.get(v.targetId);
+    if (!passed || !target || target.channelId !== v.channelId) return;
+    if (v.action === 'mute') {
+      target.voteMutedUntil = Date.now() + 10 * 60 * 1000;
+      target.muted = true;
+      send(target.ws, { t: 'forceMute', by: 'Kanal oylaması', until: target.voteMutedUntil });
+      setTimeout(() => broadcastState(), 10 * 60 * 1000 + 500);
+      broadcastState();
+    } else if (afkId()) {
+      send(target.ws, { t: 'moved', by: 'Kanal oylaması' });
+      moveUser(target, afkId());
+    }
+  }
+
+  // ---------- Bağlantı önizlemesi (yerel ağ adreslerine istek atılmaz) ----------
+  const privateIp = (ip) => {
+    ip = String(ip || '').toLowerCase();
+    const v4 = ip.startsWith('::ffff:') ? ip.slice(7) : ip;
+    if (net.isIPv4(v4)) {
+      const [a, b] = v4.split('.').map(Number);
+      return a === 0 || a === 10 || a === 127 || a >= 224 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 100 && b >= 64 && b <= 127);
+    }
+    return ip === '::1' || ip === '::' || ip.startsWith('fc') || ip.startsWith('fd') || ip.startsWith('fe80');
+  };
+  const safeLookup = (host, opts, cb) => {
+    dns.lookup(host, { all: true }, (err, list) => {
+      if (err) return cb(err);
+      list = list.filter((a) => !privateIp(a.address));
+      if (!list.length) return cb(new Error('blocked'));
+      if (opts && opts.all) cb(null, list);
+      else cb(null, list[0].address, list[0].family);
+    });
+  };
+  const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0 Safari/537.36 KankiPreview/1.0';
+  function fetchText(url, max = 600 * 1024, hops = 0, accept = 'text/html,application/xhtml+xml') {
+    return new Promise((resolve, reject) => {
+      let u;
+      try {
+        u = new URL(url);
+      } catch {
+        return reject(new Error('url'));
+      }
+      if (!/^https?:$/.test(u.protocol) || (u.port && !['80', '443'].includes(u.port))) return reject(new Error('url'));
+      const lib = u.protocol === 'https:' ? https : http;
+      const req = lib.get(u, { lookup: safeLookup, timeout: 6000, headers: { 'User-Agent': UA, Accept: accept, 'Accept-Language': 'tr,en;q=0.8' } }, (res) => {
+        if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location && hops < 4) {
+          res.resume();
+          return fetchText(new URL(res.headers.location, u).href, max, hops + 1, accept).then(resolve, reject);
+        }
+        if (res.statusCode !== 200) {
+          res.resume();
+          return reject(new Error('status ' + res.statusCode));
+        }
+        const chunks = [];
+        let got = 0;
+        res.on('data', (c) => {
+          chunks.push(c);
+          got += c.length;
+          if (got > max) res.destroy();
+        });
+        const done = () => resolve({ buf: Buffer.concat(chunks), type: String(res.headers['content-type'] || ''), url: u.href });
+        res.on('end', done);
+        res.on('close', done);
+        res.on('error', reject);
+      });
+      req.on('timeout', () => req.destroy(new Error('timeout')));
+      req.on('error', reject);
+    });
+  }
+  const decodeEntities = (t) =>
+    String(t || '')
+      .replace(/&#x([0-9a-f]+);/gi, (_, x) => String.fromCodePoint(parseInt(x, 16)))
+      .replace(/&#(\d+);/g, (_, x) => String.fromCodePoint(Number(x)))
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;|&apos;/g, "'")
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/\s+/g, ' ')
+      .trim();
+  const previewCache = new Map();
+  async function linkPreview(url) {
+    if (previewCache.has(url)) return previewCache.get(url);
+    let out = null;
+    try {
+      const host = new URL(url).hostname.replace(/^www\.|^m\./, '');
+      if (/^(youtube\.com|youtu\.be|music\.youtube\.com)$/.test(host)) {
+        const r = await fetchText(`https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(url)}`, 64 * 1024, 0, 'application/json');
+        const j = JSON.parse(r.buf.toString('utf8'));
+        out = { url, site: 'YouTube', title: String(j.title || '').slice(0, 200), desc: String(j.author_name || '').slice(0, 120), image: /^https:/.test(j.thumbnail_url) ? j.thumbnail_url : '', big: true };
+      } else {
+        const r = await fetchText(url);
+        if (/^image\//.test(r.type)) out = r.url.startsWith('https:') ? { url, image: r.url, imageOnly: true } : null;
+        else if (/html/.test(r.type)) {
+          let cs = (/charset=([\w-]+)/i.exec(r.type) || /<meta[^>]+charset=["']?([\w-]+)/i.exec(r.buf.toString('latin1').slice(0, 4000)) || [])[1] || 'utf-8';
+          let html;
+          try {
+            html = new TextDecoder(cs.toLowerCase()).decode(r.buf);
+          } catch {
+            html = r.buf.toString('utf8');
+          }
+          const meta = (name) => {
+            const tag = new RegExp(`<meta[^>]+(?:property|name)=["']${name}["'][^>]*>`, 'i').exec(html)?.[0];
+            return tag ? decodeEntities(/content=(["'])([\s\S]*?)\1/i.exec(tag)?.[2] || '') : '';
+          };
+          const title = meta('og:title') || meta('twitter:title') || decodeEntities(/<title[^>]*>([\s\S]*?)<\/title>/i.exec(html)?.[1] || '');
+          const desc = meta('og:description') || meta('twitter:description') || meta('description');
+          let image = meta('og:image') || meta('og:image:url') || meta('twitter:image');
+          try {
+            image = image ? new URL(image, r.url).href : '';
+          } catch {
+            image = '';
+          }
+          if (title || desc)
+            out = {
+              url,
+              site: (meta('og:site_name') || new URL(r.url).hostname.replace(/^www\./, '')).slice(0, 60),
+              title: title.slice(0, 200),
+              desc: desc.slice(0, 300),
+              image: image.startsWith('https:') ? image.slice(0, 1000) : '',
+              big: meta('twitter:card') === 'summary_large_image',
+            };
+        }
+      }
+    } catch {}
+    previewCache.set(url, out);
+    if (previewCache.size > 300) previewCache.delete(previewCache.keys().next().value);
+    return out;
+  }
+
+  // ---------- GIF arama (anahtar sunucuda durur, herkes kullanabilir) ----------
+  async function gifSearch(q) {
+    const key = conf.gifKey;
+    if (!key) return { error: 'nokey' };
+    const giphy = conf.gifProvider === 'giphy';
+    const url = giphy
+      ? `https://api.giphy.com/v1/gifs/${q ? 'search' : 'trending'}?api_key=${encodeURIComponent(key)}&limit=24&rating=pg-13&lang=tr${q ? '&q=' + encodeURIComponent(q) : ''}`
+      : `https://api.klipy.com/api/v1/${encodeURIComponent(key)}/gifs/${q ? 'search' : 'trending'}?per_page=24&page=1&locale=tr&customer_id=kanki${q ? '&q=' + encodeURIComponent(q) : ''}`;
+    const r = await fetchText(url, 2 * 1024 * 1024, 0, 'application/json');
+    const j = JSON.parse(r.buf.toString('utf8'));
+    const pick = (o) => (o && o.url ? { url: o.url, w: Number(o.width) || 0, h: Number(o.height) || 0 } : null);
+    const items = giphy ? j.data || [] : j.data?.data || j.data || [];
+    return {
+      results: items
+        .map((it) => {
+          if (giphy) {
+            const full = pick(it.images?.fixed_height) || pick(it.images?.original);
+            const prev = pick(it.images?.fixed_height_small) || full;
+            return full && { url: full.url, w: full.w, h: full.h, preview: prev.url, title: String(it.title || '').slice(0, 80) };
+          }
+          const f = it.file || {};
+          const full = pick(f.md?.gif) || pick(f.sm?.gif) || pick(f.hd?.gif) || pick(f.md?.webp);
+          const prev = pick(f.sm?.gif) || pick(f.xs?.gif) || pick(f.sm?.webp) || full;
+          return full && { url: full.url, w: full.w, h: full.h, preview: prev.url, title: String(it.title || '').slice(0, 80) };
+        })
+        .filter((x) => x && /^https:\/\//.test(x.url)),
+    };
+  }
+  const gifHostOk = (url) => {
+    try {
+      const u = new URL(url);
+      return u.protocol === 'https:' && /(^|\.)(giphy\.com|klipy\.com)$/.test(u.hostname);
+    } catch {
+      return false;
+    }
+  };
+
+  // ---------- Dosya gönderme: dosyalar sadece bellekte durur, sunucu kapanınca silinir ----------
+  const FILE_MAX = 50 * 1024 * 1024;
+  const FILES_TOTAL = 400 * 1024 * 1024;
+  const files = new Map(); // id -> { buf, name, type, size, by, at }
+  const userByToken = (tok) => (tok ? [...users.values()].find((u) => u.token && safeEqual(u.token, tok)) : null);
+  function trimFiles() {
+    let total = 0;
+    for (const f of files.values()) total += f.size;
+    for (const [id, f] of files) {
+      if (total <= FILES_TOTAL && Date.now() - f.at < 12 * 3600 * 1000) break;
+      files.delete(id);
+      total -= f.size;
+    }
+  }
+  const cleanFileName = (n) => String(n || 'dosya').replace(/[\\/:*?"<>|\u0000-\u001f]/g, '_').trim().slice(0, 120) || 'dosya';
+
   const httpServer = http.createServer((req, res) => {
+    const u = new URL(req.url, 'http://x');
+    const json = (code, obj) => {
+      res.writeHead(code, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(obj));
+    };
+    if (req.method === 'POST' && u.pathname === '/upload') {
+      const user = userByToken(String(req.headers['x-kanki-token'] || ''));
+      const size = Number(req.headers['content-length'] || 0);
+      if (!user) {
+        req.resume();
+        return json(403, { error: 'Yetkisiz' });
+      }
+      if (!size || size > FILE_MAX) {
+        req.resume();
+        return json(413, { error: 'Dosya en fazla 50 MB olabilir.' });
+      }
+      const chunks = [];
+      let got = 0;
+      req.on('data', (c) => {
+        got += c.length;
+        if (got > FILE_MAX) return req.destroy();
+        chunks.push(c);
+      });
+      req.on('end', () => {
+        const buf = Buffer.concat(chunks);
+        const id = crypto.randomBytes(18).toString('base64url');
+        let name = 'dosya';
+        try {
+          name = cleanFileName(decodeURIComponent(String(req.headers['x-file-name'] || 'dosya')));
+        } catch {}
+        files.set(id, { buf, name, type: String(req.headers['content-type'] || 'application/octet-stream').slice(0, 100), size: buf.length, by: user.id, at: Date.now() });
+        trimFiles();
+        json(200, { id, name, size: buf.length });
+      });
+      return;
+    }
+    const fm = /^\/f\/([A-Za-z0-9_-]{20,40})$/.exec(u.pathname);
+    if (req.method === 'GET' && fm) {
+      const f = files.get(fm[1]);
+      if (!userByToken(u.searchParams.get('k') || '')) return json(403, { error: 'Yetkisiz' });
+      if (!f) return json(404, { error: 'Dosya artık sunucuda yok (sunucu yeniden başlamış ya da süresi dolmuş olabilir).' });
+      res.writeHead(200, {
+        'Content-Type': 'application/octet-stream',
+        'Content-Length': f.size,
+        'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(f.name)}`,
+        'X-Content-Type-Options': 'nosniff',
+      });
+      return res.end(f.buf);
+    }
     res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
     res.end(`${serverName} çalışıyor. Bağlı kullanıcı: ${users.size}\n`);
   });
@@ -244,6 +536,12 @@ function startServer(opts = {}) {
           send(ws, { t: 'error', code: 'bad_password', message: 'Sunucu şifresi hatalı.' });
           return ws.close();
         }
+        const ck = String(m.clientKey || '').slice(0, 64);
+        const banned = !isAdmin && !isBot && conf.bans.find((b) => (ck && b.key === ck) || (b.ip && b.ip === ip));
+        if (banned) {
+          send(ws, { t: 'error', code: 'banned', message: `Bu sunucudan yasaklandın${banned.reason ? ': ' + banned.reason : '.'}` });
+          return ws.close();
+        }
         let name = isBot ? 'Müzik Botu' : String(m.name || '').trim().slice(0, 32) || 'Misafir';
         const taken = new Set([...users.values()].map((u) => u.name.toLowerCase()));
         let n = 2;
@@ -265,6 +563,7 @@ function startServer(opts = {}) {
           clientKey: String(m.clientKey || '').slice(0, 64) || crypto.randomUUID(), // mesaj düzenleme/silme yetkisi için
           admin: isAdmin,
           bot: isBot,
+          token: crypto.randomBytes(18).toString('base64url'), // dosya yükleme/indirme için
           ip,
           connectedAt: Date.now(),
           ws,
@@ -273,7 +572,17 @@ function startServer(opts = {}) {
         users.set(me.id, me);
         log(`Bağlandı: ${name} (${ip})${isAdmin ? ' [yönetici]' : ''}`);
         if (m.adminKey && !isAdmin) send(ws, { t: 'error', code: 'bad_admin_key', message: 'Yönetici anahtarı hatalı; normal kullanıcı olarak bağlandın.' });
-        send(ws, { t: 'welcome', id: me.id, name, serverName, iceServers, admin: isAdmin, features: ['sfx'] });
+        send(ws, {
+          t: 'welcome',
+          id: me.id,
+          name,
+          serverName,
+          iceServers,
+          admin: isAdmin,
+          mod: isModUser(me),
+          token: me.token,
+          features: ['sfx', 'activity', 'log', 'pins', 'polls', 'votes', 'files', 'preview', 'gif', 'roles', 'chpass', 'afk', 'bans', 'marks', 'watch'],
+        });
         const avatars = {};
         for (const u of users.values()) if (u.avatar) avatars[u.id] = u.avatar;
         send(ws, { t: 'avatars', avatars });
@@ -284,23 +593,43 @@ function startServer(opts = {}) {
           return;
         }
         send(ws, { t: 'botState', state: botState });
-        const wanted = channels.find((c) => c.id === m.channelId) ? m.channelId : lobbyId();
+        const wch = channels.find((c) => c.id === m.channelId && c.type !== 'text');
+        // Şifreli ya da dolu kanala yeniden bağlanırken Lobi'ye düşülür
+        const wanted = wch && (isAdmin || (!wch.pwHash && !(wch.limit && voiceCount(wch.id) >= wch.limit))) ? wch.id : lobbyId();
         moveUser(me, wanted);
         return;
       }
 
-      const ADMIN_ONLY = ['createChannel', 'renameChannel', 'deleteChannel', 'kick', 'move', 'setServer', 'adminInfo', 'serverMute'];
-      if (ADMIN_ONLY.includes(m.t) && !me.admin) {
+      const ADMIN_ONLY = ['createChannel', 'renameChannel', 'deleteChannel', 'setServer', 'adminInfo', 'setRole', 'ban', 'unban', 'channelSettings', 'setConfig'];
+      const MOD_OK = ['kick', 'move', 'serverMute']; // moderatör de yapabilir
+      if ((ADMIN_ONLY.includes(m.t) && !me.admin) || (MOD_OK.includes(m.t) && !isMod(me))) {
         send(ws, { t: 'error', code: 'forbidden', message: 'Bu işlem için yönetici yetkisi gerekiyor.' });
         return;
       }
 
       switch (m.t) {
-        case 'join':
-          moveUser(me, m.channelId);
+        case 'join': {
+          const ch = channels.find((c) => c.id === m.channelId);
+          if (!ch || ch.type === 'text' || ch.id === me.channelId) break;
+          if (!isMod(me)) {
+            if (ch.limit && voiceCount(ch.id) >= ch.limit) {
+              errorTo(me, `${ch.name} dolu (en fazla ${ch.limit} kişi).`, 'channel_full');
+              break;
+            }
+            if (ch.pwHash && !me.unlocked?.has(ch.id)) {
+              const tried = typeof m.password === 'string';
+              if (!tried || !safeEqual(hashPw(ch.salt, m.password.slice(0, 100)), ch.pwHash)) {
+                send(ws, { t: 'needPassword', channelId: ch.id, name: ch.name, wrong: tried });
+                break;
+              }
+              (me.unlocked ||= new Set()).add(ch.id);
+            }
+          }
+          moveUser(me, ch.id);
           break;
+        }
         case 'status':
-          if ('muted' in m) me.muted = !!m.muted;
+          if ('muted' in m) me.muted = !!m.muted || (me.voteMutedUntil || 0) > Date.now();
           if ('deafened' in m) me.deafened = !!m.deafened;
           if ('sharing' in m) me.sharing = !!m.sharing;
           if (Array.isArray(m.shares)) {
@@ -333,7 +662,9 @@ function startServer(opts = {}) {
           const text = String(m.text || '').slice(0, 2000).trim();
           const image = isImageData(m.image, IMAGE_MAX) ? m.image : null;
           const cid = chatTarget(me, m.channelId);
-          if ((!text && !image) || !cid) break;
+          const file = m.file && files.get(String(m.file));
+          const gif = m.gif && gifHostOk(m.gif.url) ? { url: String(m.gif.url).slice(0, 1000), w: Math.min(2000, Number(m.gif.w) || 0), h: Math.min(2000, Number(m.gif.h) || 0) } : null;
+          if ((!text && !image && !(file && file.by === me.id) && !gif) || !cid) break;
           const msg = { t: 'chat', id: crypto.randomUUID(), channelId: cid, from: me.id, name: me.name, text, ts: Date.now(), _k: me.clientKey };
           if (me.nameStyle) msg.ns = me.nameStyle; // isim stili mesajla saklanır (kişi çıkınca da görünsün)
           if (image) {
@@ -344,8 +675,18 @@ function startServer(opts = {}) {
           // Yanıt: alıntılanan mesajın kısa bir özeti mesajla birlikte saklanır
           const orig = m.replyTo && findMsg(cid, m.replyTo);
           if (orig && !orig.system) msg.replyTo = { id: orig.id, name: orig.name, text: String(orig.text || '').slice(0, 140), image: !!orig.image };
+          if (file && file.by === me.id) msg.file = { id: String(m.file), name: file.name, size: file.size, type: file.type };
+          if (gif) msg.gif = gif;
           pushHistory(cid, msg);
           broadcast(pubMsg(msg), audience(cid));
+          // İlk bağlantının önizlemesi arkadan gelir (başlık, açıklama, resim)
+          const link = /(https?:\/\/[^\s<>]+)/.exec(text)?.[1]?.replace(/[)\].,!?;:'"]+$/, '');
+          if (link && !gif)
+            linkPreview(link).then((pv) => {
+              if (!pv || !findMsg(cid, msg.id)) return;
+              msg.preview = pv;
+              updateMsg(cid, msg);
+            });
           // Sohbet komutu: "!çal şarkı adı" → müzik botuna
           const cm = !me.bot && /^!([^\s!]+)\s*([\s\S]*)$/.exec(text);
           if (cm && BOT_WORDS.has(cm[1].toLocaleLowerCase('tr'))) forwardToBot(me, cm[1].toLocaleLowerCase('tr'), cm[2].trim());
@@ -375,7 +716,7 @@ function startServer(opts = {}) {
           if (!me.bot || !me.channelId) break;
           const old = me.channelId;
           me.channelId = null;
-          systemChat(old, `${me.name} kanaldan ayrıldı`);
+          activity({ kind: 'move', id: me.id, name: me.name, from: old, to: null });
           broadcastState();
           break;
         }
@@ -432,6 +773,162 @@ function startServer(opts = {}) {
             const aud = cid && audience(cid);
             if (cid) broadcast({ t: 'typing', from: me.id, name: me.name, channelId: cid }, (u) => aud(u) && u.id !== me.id);
           }
+          break;
+        case 'pin': {
+          const cid = chatTarget(me, m.channelId);
+          const msg = findMsg(cid, m.id);
+          if (!msg || msg.system || (!isMod(me) && msg._k !== me.clientKey)) break;
+          if (m.on) {
+            msg.pinned = true;
+            msg.pinnedBy = me.name;
+          } else {
+            delete msg.pinned;
+            delete msg.pinnedBy;
+          }
+          updateMsg(cid, msg);
+          break;
+        }
+        case 'poll': {
+          const cid = chatTarget(me, m.channelId);
+          const q = String(m.question || '').trim().slice(0, 200);
+          const opts = (Array.isArray(m.options) ? m.options : []).map((x) => String(x || '').trim().slice(0, 80)).filter(Boolean).slice(0, 10);
+          if (!cid || !q || opts.length < 2) break;
+          const msg = newMsg(me, cid);
+          msg.poll = { q, options: opts.map((text) => ({ text, votes: [] })), multi: !!m.multi, closed: false };
+          postMsg(cid, msg);
+          break;
+        }
+        case 'pollVote': {
+          const cid = chatTarget(me, m.channelId);
+          const msg = findMsg(cid, m.id);
+          const p = msg?.poll;
+          const i = Number(m.option);
+          if (!p || p.closed || !p.options[i]) break;
+          const had = p.options[i].votes.includes(me.name);
+          if (!p.multi) for (const o of p.options) o.votes = o.votes.filter((n) => n !== me.name);
+          else p.options[i].votes = p.options[i].votes.filter((n) => n !== me.name);
+          if (!had) p.options[i].votes.push(me.name);
+          updateMsg(cid, msg);
+          break;
+        }
+        case 'pollClose': {
+          const cid = chatTarget(me, m.channelId);
+          const msg = findMsg(cid, m.id);
+          if (!msg?.poll || (msg._k !== me.clientKey && !isMod(me))) break;
+          msg.poll.closed = true;
+          updateMsg(cid, msg);
+          break;
+        }
+        case 'wheel': {
+          // Çark: sonucu sunucu seçer, herkes aynı sonucu görür
+          const cid = chatTarget(me, m.channelId);
+          const opts = (Array.isArray(m.options) ? m.options : []).map((x) => String(x || '').trim().slice(0, 40)).filter(Boolean).slice(0, 24);
+          if (!cid || opts.length < 2) break;
+          const msg = newMsg(me, cid);
+          msg.wheel = { title: String(m.title || '').trim().slice(0, 100), options: opts, result: crypto.randomInt(opts.length) };
+          postMsg(cid, msg);
+          break;
+        }
+        case 'teams': {
+          // Takım kur: ses kanalındakileri rastgele N takıma böler
+          if (!me.channelId) break;
+          const cid = chatTarget(me, m.channelId);
+          const count = Math.max(2, Math.min(4, Math.floor(Number(m.count) || 2)));
+          const names = [...users.values()].filter((u) => u.channelId === me.channelId && !u.bot).map((u) => u.name);
+          if (names.length < count) {
+            errorTo(me, `Takım kurmak için kanalda en az ${count} kişi olmalı.`);
+            break;
+          }
+          for (let i = names.length - 1; i > 0; i--) {
+            const j = crypto.randomInt(i + 1);
+            [names[i], names[j]] = [names[j], names[i]];
+          }
+          const teams = Array.from({ length: count }, () => []);
+          names.forEach((n, i) => teams[i % count].push(n));
+          const msg = newMsg(me, cid);
+          msg.teams = { teams, channel: channels.find((c) => c.id === me.channelId)?.name || '' };
+          postMsg(cid, msg);
+          break;
+        }
+        case 'voteStart': {
+          const target = users.get(m.to);
+          const action = m.action === 'afk' ? 'afk' : 'mute';
+          if (!target || target.bot || target.id === me.id || !me.channelId || target.channelId !== me.channelId) break;
+          if (isMod(target)) {
+            errorTo(me, 'Yönetici ve moderatörler oylamayla susturulamaz ya da taşınamaz.');
+            break;
+          }
+          if (votes.has(target.id)) break;
+          if (action === 'afk' && (!afkId() || target.channelId === afkId())) {
+            errorTo(me, 'Bu sunucuda AFK kanalı yok.');
+            break;
+          }
+          if (Date.now() - (me.voteAt || 0) < 60000) {
+            errorTo(me, 'Yeni bir oylama için 1 dakika beklemelisin.');
+            break;
+          }
+          const voters = [...users.values()].filter((u) => u.channelId === me.channelId && !u.bot && u.id !== target.id);
+          if (voters.length < 2) {
+            errorTo(me, 'Oylama için kanalda senden başka en az bir kişi daha olmalı.');
+            break;
+          }
+          me.voteAt = Date.now();
+          const v = { id: crypto.randomUUID(), targetId: target.id, targetName: target.name, action, by: me.name, channelId: me.channelId, yes: new Set([me.id]), no: new Set(), required: Math.max(2, Math.ceil(voters.length * 0.75)), total: voters.length, until: Date.now() + 60000 };
+          v.timer = setTimeout(() => endVote(v, false), 60000);
+          votes.set(target.id, v);
+          sendVote(v);
+          break;
+        }
+        case 'vote': {
+          const v = [...votes.values()].find((x) => x.id === m.id);
+          if (!v || me.bot || me.channelId !== v.channelId || me.id === v.targetId) break;
+          (m.yes ? v.yes : v.no).add(me.id);
+          (m.yes ? v.no : v.yes).delete(me.id);
+          if (v.yes.size >= v.required) endVote(v, true);
+          else if (v.total - v.no.size < v.required) endVote(v, false);
+          else sendVote(v);
+          break;
+        }
+        case 'activity': {
+          // Oynadığı oyun / dinlediği şarkı
+          const game = String(m.game || '').slice(0, 60);
+          const music = String(m.music || '').slice(0, 120);
+          const next = game || music ? { game, music } : null;
+          if (JSON.stringify(next) !== JSON.stringify(me.activity || null)) {
+            me.activity = next;
+            broadcastState();
+          }
+          break;
+        }
+        case 'gifSearch':
+          gifSearch(String(m.q || '').trim().slice(0, 100))
+            .then((r) => send(ws, { t: 'gifResults', q: m.q, ...r }))
+            .catch(() => send(ws, { t: 'gifResults', q: m.q, error: 'fail' }));
+          break;
+        case 'mark': {
+          // Yayına işaret: izleyenin tıkladığı nokta herkesin görüntüsünde ve yayıncının ekranında kısa süre görünür
+          const now = Date.now();
+          const owner = users.get(m.owner);
+          if (!owner || !me.channelId || owner.channelId !== me.channelId || now - (me.markAt || 0) < 60) break;
+          me.markAt = now;
+          const clamp = (x) => Math.max(0, Math.min(1, Number(x) || 0));
+          const pts = (Array.isArray(m.pts) ? m.pts : [[m.x, m.y]]).slice(0, 80).map((p) => [clamp(p?.[0]), clamp(p?.[1])]);
+          broadcast({ t: 'mark', from: me.id, name: me.name, owner: owner.id, share: String(m.share || '').slice(0, 40), kind: m.kind === 'line' ? 'line' : 'ping', pts, stroke: String(m.stroke || '').slice(0, 40) }, (u) => u.channelId === me.channelId && !u.bot);
+          break;
+        }
+        case 'watchCtl': {
+          // Birlikte izle: izleyenin durdur/oynat/sar isteği yayıncıya gider
+          const owner = users.get(m.owner);
+          if (!owner || !me.channelId || owner.channelId !== me.channelId) break;
+          send(owner.ws, { t: 'watchCtl', from: me.id, name: me.name, share: String(m.share || '').slice(0, 40), act: String(m.act || '').slice(0, 12), time: Number(m.time) || 0 });
+          break;
+        }
+        case 'watchState':
+          if (!me.channelId) break;
+          broadcast(
+            { t: 'watchState', owner: me.id, share: String(m.share || '').slice(0, 40), paused: !!m.paused, time: Number(m.time) || 0, duration: Number(m.duration) || 0, title: String(m.title || '').slice(0, 200), by: String(m.by || '').slice(0, 40), at: Date.now() },
+            (u) => u.channelId === me.channelId && u.id !== me.id && !u.bot
+          );
           break;
         case 'poke': {
           const target = users.get(m.to);
@@ -496,7 +993,7 @@ function startServer(opts = {}) {
           const reason = String(m.reason || '').slice(0, 200);
           send(target.ws, { t: 'kicked', by: me.name, reason });
           log(`${me.name}, ${target.name} kullanıcısını attı${reason ? ': ' + reason : ''}`);
-          if (target.channelId) systemChat(target.channelId, `${target.name} sunucudan atıldı${reason ? ' (' + reason + ')' : ''}`);
+          activity({ kind: 'kick', name: target.name, by: me.name, reason });
           setTimeout(() => target.ws.close(4001, 'kicked'), 100);
           break;
         }
@@ -510,6 +1007,70 @@ function startServer(opts = {}) {
         case 'serverMute': {
           const target = users.get(m.to);
           if (target && target.id !== me.id) send(target.ws, { t: 'forceMute', by: me.name });
+          break;
+        }
+        case 'setRole': {
+          if (m.key) {
+            delete conf.roles[String(m.key)];
+          } else {
+            const target = users.get(m.to);
+            if (!target || target.bot || target.admin) break;
+            if (m.role === 'mod') conf.roles[target.clientKey] = { role: 'mod', name: target.name };
+            else delete conf.roles[target.clientKey];
+            send(target.ws, { t: 'role', mod: m.role === 'mod', by: me.name });
+          }
+          saveConf();
+          broadcastState();
+          break;
+        }
+        case 'ban': {
+          const target = users.get(m.to);
+          if (!target || target.id === me.id || target.admin || target.bot) break;
+          const reason = String(m.reason || '').slice(0, 200);
+          conf.bans.push({ id: crypto.randomUUID(), key: target.clientKey, ip: privateIp(target.ip) ? '' : target.ip, name: target.name, reason, by: me.name, at: Date.now() });
+          saveConf();
+          send(target.ws, { t: 'kicked', by: me.name, reason, banned: true });
+          activity({ kind: 'kick', name: target.name, by: me.name, reason, banned: true });
+          log(`${me.name}, ${target.name} kullanıcısını yasakladı${reason ? ': ' + reason : ''}`);
+          setTimeout(() => target.ws.close(4003, 'banned'), 100);
+          break;
+        }
+        case 'unban':
+          conf.bans = conf.bans.filter((b) => b.id !== m.id);
+          saveConf();
+          send(ws, { t: 'adminNotice', message: 'Yasak kaldırıldı.' });
+          break;
+        case 'channelSettings': {
+          const ch = channels.find((c) => c.id === m.channelId && c.type !== 'text');
+          if (!ch) break;
+          if ('limit' in m) {
+            const n = Math.max(0, Math.min(99, Math.floor(Number(m.limit) || 0)));
+            if (n) ch.limit = n;
+            else delete ch.limit;
+          }
+          if (typeof m.password === 'string') {
+            if (m.password) {
+              ch.salt = crypto.randomBytes(8).toString('hex');
+              ch.pwHash = hashPw(ch.salt, m.password.slice(0, 100));
+              for (const u of users.values()) u.unlocked?.delete(ch.id);
+            } else {
+              delete ch.salt;
+              delete ch.pwHash;
+            }
+          }
+          saveChannels();
+          broadcastState();
+          send(ws, { t: 'adminNotice', message: `${ch.name} kanalının ayarları kaydedildi.` });
+          break;
+        }
+        case 'setConfig': {
+          if ('afkMinutes' in m) conf.afkMinutes = Math.max(0, Math.min(240, Math.floor(Number(m.afkMinutes) || 0)));
+          if ('afkChannelId' in m) conf.afkChannelId = channels.find((c) => c.id === m.afkChannelId && c.type !== 'text') ? m.afkChannelId : null;
+          if (typeof m.gifKey === 'string') conf.gifKey = m.gifKey.trim().slice(0, 200);
+          if (['klipy', 'giphy'].includes(m.gifProvider)) conf.gifProvider = m.gifProvider;
+          saveConf();
+          broadcastState();
+          send(ws, { t: 'adminNotice', message: 'Sunucu ayarları kaydedildi.' });
           break;
         }
         case 'setServer': {
@@ -528,6 +1089,14 @@ function startServer(opts = {}) {
             startedAt,
             now: Date.now(),
             users: [...users.values()].map((u) => ({ ...publicUser(u), ip: u.ip, connectedAt: u.connectedAt })),
+            bans: conf.bans.map((b) => ({ id: b.id, name: b.name, reason: b.reason, by: b.by, at: b.at, ip: !!b.ip })),
+            mods: Object.entries(conf.roles)
+              .filter(([, r]) => r.role === 'mod')
+              .map(([key, r]) => ({ key, name: r.name, online: [...users.values()].some((u) => u.clientKey === key) })),
+            afkMinutes: conf.afkMinutes,
+            afkChannelId: afkId(),
+            gifProvider: conf.gifProvider,
+            hasGifKey: !!conf.gifKey,
           });
           break;
         case 'ping':
@@ -545,7 +1114,8 @@ function startServer(opts = {}) {
         botState = null;
         broadcast({ t: 'botState', state: null });
       }
-      if (me.channelId) systemChat(me.channelId, `${me.name} sunucudan ayrıldı`);
+      activity({ kind: 'leave', id: me.id, name: me.name, from: me.channelId || null });
+      for (const v of votes.values()) if (v.targetId === me.id) endVote(v, false);
       broadcast({ t: 'left', id: me.id });
       broadcastState();
     });

@@ -2,7 +2,7 @@
 <html lang="tr">
 <head>
   <meta charset="utf-8" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob: https://i.ytimg.com https://*.ytimg.com https://*.ggpht.com https://*.sndcdn.com; media-src 'self' blob: mediastream:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src ws: wss: http: https:" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob: https:; media-src 'self' blob: mediastream: https:; style-src 'self' 'unsafe-inline'; script-src 'self' 'wasm-unsafe-eval'; connect-src ws: wss: http: https:" />
   <title>Kanki</title>
   <link rel="stylesheet" href="fonts/fonts.css" />
   <link rel="stylesheet" href="styles.css" />
@@ -223,10 +223,12 @@
           <div class="mp-vol sfx-vol"><span>Efekt sesi <em>(sadece sende)</em></span><input type="range" id="sfx-vol" min="0" max="100" /><b id="sfx-vol-v"></b></div>
           <div class="sfx-hint">Sağ tık: sadece sen dinle</div>
         </div>
+        <div class="vote-box" id="vote-box"></div>
         <div class="call-bar hidden" id="call-bar">
           <button class="cb-btn" id="cb-camera"></button>
           <button class="cb-btn" id="cb-share"></button>
           <button class="cb-btn" id="cb-sfx"></button>
+          <button class="cb-btn" id="cb-watch"></button>
           <span class="cb-sep"></span>
           <button class="cb-btn" id="cb-mic"></button>
           <button class="cb-btn" id="cb-deafen"></button>
@@ -238,6 +240,10 @@
       <aside class="chat">
         <div class="chat-head">
           <span class="chat-title" id="chat-head"># Lobi</span>
+          <div class="chat-tools">
+            <button class="chat-tool" id="btn-pins" title="Sabitlenmiş mesajlar"><svg viewBox="0 0 24 24"><path d="M16 3v2h-1v6l2 3v2h-4v5l-1 1-1-1v-5H7v-2l2-3V5H8V3h8Z"/></svg><span class="pin-n" id="pin-n"></span></button>
+            <button class="chat-tool" id="btn-chat-search" title="Sohbette ara (Ctrl+F)"><svg viewBox="0 0 24 24"><path d="M10 3a7 7 0 0 1 5.6 11.2l5.1 5.1-1.4 1.4-5.1-5.1A7 7 0 1 1 10 3Zm0 2a5 5 0 1 0 0 10 5 5 0 0 0 0-10Z"/></svg></button>
+          </div>
           <div class="chat-tabs">
             <button class="chat-tab active" data-tab="chat" title="Kanal sohbeti">
               <svg viewBox="0 0 24 24"><path d="M4 4h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H8l-4 4V6a2 2 0 0 1 2-2Z" transform="translate(-1 0)"/></svg>
@@ -246,21 +252,36 @@
               <svg viewBox="0 0 24 24"><path d="M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm7 0a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM9 13c-3.3 0-7 1.6-7 4v2h14v-2c0-2.4-3.7-4-7-4Zm7 0c-.5 0-1 0-1.5.1 1.5.9 2.5 2.2 2.5 3.9v2h5v-2c0-2.4-3.2-4-6-4Z"/></svg>
               <span class="member-count" id="member-count"></span>
             </button>
+            <button class="chat-tab" data-tab="log" title="Geçmiş: kim geldi, kim gitti, dürtmeler, ses efektleri">
+              <svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20Zm0 2a8 8 0 1 0 0 16 8 8 0 0 0 0-16Zm1 3v4.6l3.4 3.4-1.4 1.4-4-4V7h2Z"/></svg>
+              <span class="log-dot hidden" id="log-dot"></span>
+            </button>
           </div>
         </div>
         <div class="chat-pane" id="chat-pane">
+          <div class="chat-search hidden" id="chat-search">
+            <input id="search-input" placeholder="Ara… (from:isim, has:resim, has:dosya, has:link)" autocomplete="off" />
+            <button class="cx-x" id="search-close" title="Kapat (Esc)"><svg viewBox="0 0 24 24"><path d="M6.4 5 5 6.4 10.6 12 5 17.6 6.4 19l5.6-5.6 5.6 5.6 1.4-1.4-5.6-5.6L19 6.4 17.6 5 12 10.6z"/></svg></button>
+          </div>
+          <div class="search-results hidden" id="search-results"></div>
+          <div class="pins-pop hidden" id="pins-pop"></div>
           <div class="chat-log" id="chat-log"></div>
           <button class="new-msgs hidden" id="new-msgs">Yeni mesajlar ↓</button>
           <form class="chat-form" id="chat-form">
             <div class="mention-pop hidden" id="mention-pop"></div>
             <div class="emoji-pop hidden" id="emoji-pop"></div>
+            <div class="gif-pop hidden" id="gif-pop">
+              <input id="gif-q" placeholder="GIF ara (KLIPY / GIPHY)" autocomplete="off" />
+              <div class="gif-grid" id="gif-grid"></div>
+            </div>
             <div class="compose-extra hidden" id="compose-extra"></div>
             <div class="chat-input-wrap">
-              <button type="button" class="attach-btn" id="btn-attach" title="Resim ekle (yapıştırabilir ya da sürükleyip bırakabilirsin)">
+              <button type="button" class="attach-btn" id="btn-attach" title="Dosya, resim, anket, çark, takım">
                 <svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm5 11h-4v4h-2v-4H7v-2h4V7h2v4h4v2Z"/></svg>
               </button>
-              <input type="file" id="file-input" accept="image/*" hidden />
+              <input type="file" id="file-input" hidden />
               <textarea id="chat-input" rows="1" placeholder="Mesaj gönder" autocomplete="off" maxlength="2000"></textarea>
+              <button type="button" class="gif-btn" id="btn-gif" title="GIF ara">GIF</button>
               <button type="button" class="emoji-btn" id="btn-emoji" title="Emoji">
                 <svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm0 18a8 8 0 1 1 0-16 8 8 0 0 1 0 16Zm-3.5-9a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Zm7 0a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3ZM12 17.5c2.3 0 4.3-1.4 5-3.5H7c.7 2.1 2.7 3.5 5 3.5Z"/></svg>
               </button>
@@ -269,6 +290,10 @@
           </form>
         </div>
         <div class="members hidden" id="members"></div>
+        <div class="log-pane hidden" id="log-pane">
+          <div class="log-head"><span>Geçmiş</span><span class="log-sub">bu oturumda, sadece sende</span><button class="btn sm" id="log-clear">Temizle</button></div>
+          <div class="log-list" id="log-list"></div>
+        </div>
       </aside>
     </div>
     <div class="banner hidden" id="reconnect-banner">Bağlantı koptu, yeniden bağlanılıyor…</div>
@@ -349,6 +374,7 @@
         <button class="snav" data-pane="share">Ekran paylaşımı</button>
         <button class="snav" data-pane="notify">Bildirimler</button>
         <button class="snav" data-pane="keys">Kısayollar</button>
+        <button class="snav" data-pane="overlay">Oyun içi katman</button>
         <div class="settings-nav-sep"></div>
         <button class="snav" data-pane="about">Hakkında</button>
       </nav>
@@ -368,6 +394,10 @@
                 </div>
                 <label class="field"><span>Durum yazısı</span><input id="set-status-text" maxlength="80" placeholder="Ör. 🎮 Oyun oynuyor" autocomplete="off" /></label>
                 <p class="hint">Fotoğrafın ve durum yazın kanal listesinde, üye listesinde, sohbette ve profil kartında görünür. Fotoğraf sadece bu bilgisayarda saklanır, bağlandığın sunucuya gönderilir.</p>
+                <div class="checks one">
+                  <label class="check"><input type="checkbox" id="set-show-game" /><span>Oynadığım oyunu adımın altında göster</span></label>
+                  <label class="check"><input type="checkbox" id="set-show-music" /><span>Spotify'da dinlediğim şarkıyı göster</span></label>
+                </div>
                 <div class="field"><span>Görünen ad</span><div class="pe-nick-line">Bağlanırken yazdığın ad: <b id="pe-nick"></b></div></div>
               </div>
               <div class="pe-preview">
@@ -428,6 +458,7 @@
             <div class="cam-preview-box" id="cam-preview-box"><video id="cam-preview" autoplay playsinline muted></video><span>Önizleme kapalı</span></div>
             <h3>Ses işleme</h3>
             <div class="checks">
+              <label class="check"><input type="checkbox" id="set-rnnoise" /><span>Yapay zekâ ile gürültü engelleme (RNNoise)</span></label>
               <label class="check"><input type="checkbox" id="set-ns" /><span>Gürültü bastırma</span></label>
               <label class="check"><input type="checkbox" id="set-ec" /><span>Yankı engelleme</span></label>
               <label class="check"><input type="checkbox" id="set-agc" /><span>Otomatik kazanç</span></label>
@@ -470,6 +501,26 @@
               <div class="key-row"><span>Uzaktan kontrolü durdur (ekranın kontrol edilirken)</span><span><kbd class="mod"></kbd><kbd>Shift</kbd><kbd>X</kbd></span></div>
               <div class="key-row"><span>Bas-konuş</span><span id="keys-ptt" class="muted">Ses ve görüntü bölümünden atanır</span></div>
             </div>
+            <h3>Kendi kısayolların</h3>
+            <p class="hint">Ses efekti çalmak, birini dürtmek, AFK kanalına geçmek gibi işler için kısayol ata. Bu kısayollar oyundayken de çalışır (Kanki arka plandayken bile). Atadığın tuş başka programlarda çalışmaz, o yüzden <kbd>Ctrl</kbd>/<kbd>Alt</kbd>/<kbd>Shift</kbd> ile birlikte ya da F tuşlarını seç.</p>
+            <div class="kb-list" id="kb-list"></div>
+            <button class="btn" id="kb-add">Kısayol ekle</button>
+          </section>
+          <section class="settings-pane hidden" data-pane="overlay">
+            <h2>Oyun içi katman</h2>
+            <p class="hint">Oyun oynarken ekranın köşesinde kimin konuştuğunu gösteren küçük, her zaman üstte duran bir kutu. Fareyle tıklanamaz, oyunu engellemez. Tam ekran (özel) moddaki oyunlarda görünmeyebilir; oyunu "kenarlıksız pencere" moduna al.</p>
+            <div class="checks one">
+              <label class="check"><input type="checkbox" id="set-overlay" /><span>Konuşanlar katmanını göster</span></label>
+              <label class="check"><input type="checkbox" id="set-overlay-only" /><span>Sadece konuşanları göster</span></label>
+            </div>
+            <label class="field" style="max-width:280px"><span>Konum</span>
+              <select id="set-overlay-pos">
+                <option value="tl">Sol üst</option>
+                <option value="tr">Sağ üst</option>
+                <option value="bl">Sol alt</option>
+                <option value="br">Sağ alt</option>
+              </select>
+            </label>
           </section>
           <section class="settings-pane hidden" data-pane="about">
             <h2>Hakkında</h2>
@@ -520,6 +571,29 @@
           <button class="btn primary" id="adm-save">Kaydet</button>
         </div>
         <label class="check" style="margin-top:10px"><input type="checkbox" id="adm-nopass" /><span>Şifreyi kaldır (herkes şifresiz girebilsin)</span></label>
+      </div>
+
+      <div class="admin-section">
+        <h3>AFK ve GIF</h3>
+        <div class="admin-form wrap">
+          <label class="field compact"><span>AFK kanalı</span><select id="adm-afk-ch"></select></label>
+          <label class="field compact"><span>Boşta kalınca taşı <em>(dakika, 0 = kapalı)</em></span><input id="adm-afk-min" type="number" min="0" max="240" /></label>
+          <label class="field compact"><span>GIF servisi</span><select id="adm-gif-prov"><option value="klipy">KLIPY</option><option value="giphy">GIPHY</option></select></label>
+          <label class="field compact"><span>GIF API anahtarı <em id="adm-gif-state"></em></span><input id="adm-gif-key" type="password" autocomplete="off" placeholder="boş bırakırsan değişmez" /></label>
+          <button class="btn primary" id="adm-save-extra">Kaydet</button>
+        </div>
+        <p class="hint">GIF araması için ücretsiz bir KLIPY anahtarı al (klipy.com › Developers) ya da GIPHY anahtarı gir. Anahtar sunucuda saklanır, arkadaşların anahtarsız arar.</p>
+      </div>
+
+      <div class="admin-section">
+        <h3>Moderatörler</h3>
+        <div class="adm-list" id="adm-mods"></div>
+        <p class="hint">Moderatörler kişileri taşıyabilir, atabilir, mikrofonunu kapatabilir ve mesaj sabitleyebilir; sunucu ayarlarına, kanallara ve yasaklara dokunamaz. Moderatör yapmak için kişiye sağ tıkla.</p>
+      </div>
+
+      <div class="admin-section">
+        <h3>Yasaklılar</h3>
+        <div class="adm-list" id="adm-bans"></div>
       </div>
 
       <div class="admin-section">
@@ -602,11 +676,24 @@
     </div>
   </div>
 
+  <!-- ================= GENEL FORM PENCERESİ (anket, çark, kanal ayarları…) ================= -->
+  <div class="modal hidden" id="form-modal">
+    <div class="modal-card form-card">
+      <div class="modal-head">
+        <h2 id="fm-title"></h2>
+        <button class="icon-btn" data-close><svg viewBox="0 0 24 24"><path d="M6.4 5 5 6.4 10.6 12 5 17.6 6.4 19l5.6-5.6 5.6 5.6 1.4-1.4-5.6-5.6L19 6.4 17.6 5 12 10.6z"/></svg></button>
+      </div>
+      <p class="muted fm-desc" id="fm-desc"></p>
+      <form id="fm-form"></form>
+    </div>
+  </div>
+
   <div class="ctx hidden" id="ctx"></div>
   <div class="toasts" id="toasts"></div>
 
   <script src="changelog.js"></script>
   <script src="sfx.js"></script>
   <script src="app.js"></script>
+  <script src="extras.js"></script>
 </body>
 </html>
