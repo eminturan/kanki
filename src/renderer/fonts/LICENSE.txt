@@ -1,0 +1,6 @@
+Bu klasördeki yazı tipleri Google Fonts üzerinden alınmıştır ve SIL Open Font License 1.1
+(https://openfontlicense.org) ile lisanslanmıştır. Her biri kendi yazarlarına aittir:
+
+Audiowide (Astigmatic), Bangers (Vernon Adams), Caveat (Impallari Type), Cinzel (Natanael Gama),
+Fredoka (Milena Brandão, Hafontia), Lobster (Pablo Impallari), Pacifico (Vernon Adams, Jacques Le Bailly),
+Press Start 2P (CodeMan38), Righteous (Astigmatic), Rubik Glitch (Hubert & Fischer, NaN).

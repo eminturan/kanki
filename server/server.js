@@ -38,6 +38,9 @@ function startServer(opts = {}) {
   let serverName = opts.name || process.env.SERVER_NAME || 'Kanki Sunucusu';
   let password = opts.password ?? process.env.SERVER_PASSWORD ?? '';
   const adminKey = opts.adminKey || process.env.ADMIN_KEY || crypto.randomBytes(18).toString('base64url');
+  // Müzik botu (Kanki Admin içinde çalışır) bu gizli anahtarla bağlanır
+  const botKey = opts.botKey || crypto.randomBytes(18).toString('base64url');
+  let botState = null; // botun son durumu (çalan şarkı, kuyruk) — herkese gönderilir
   const startedAt = Date.now();
   const safeEqual = (a, b) => {
     const x = Buffer.from(String(a || ''));
@@ -99,15 +102,39 @@ function startServer(opts = {}) {
     away: u.away,
     presence: u.presence || 'online',
     statusText: u.statusText || '',
+    nameStyle: u.nameStyle || null,
     hasAvatar: !!u.avatar,
     admin: !!u.admin,
+    bot: !!u.bot,
   });
+  const findBot = () => [...users.values()].find((u) => u.bot);
+  // Sadece botun anladığı komutlar iletilir ("!!!" gibi mesajlar bota gitmesin)
+  const BOT_WORDS = new Set(
+    'çal cal play p oynat geç gec skip s sonraki next duraklat pause bekle devam resume dur stop durdur kuyruk queue q liste sıra temizle clear çıkar cikar remove sil ses volume vol şimdi simdi np çalan calan gel katıl katil join ayrıl ayril leave git çık karıştır karistir shuffle tekrar loop döngü yardım yardim help komutlar'.split(' ')
+  );
+  // "!çal ..." gibi sohbet komutlarını ya da müzik panelinden gelen komutları bota ilet
+  function forwardToBot(me, cmd, arg) {
+    const bot = findBot();
+    if (!bot) return send(me.ws, { t: 'botReply', text: 'Bu sunucuda müzik botu çalışmıyor. Botu sunucuyu kuran kişinin Kanki Admin uygulaması çalıştırır.' });
+    send(bot.ws, { t: 'botCmd', from: me.id, name: me.name, channelId: me.channelId, cmd: String(cmd || '').slice(0, 24).toLocaleLowerCase('tr'), arg: String(arg || '').slice(0, 500) });
+  }
 
   // Profil fotoğrafı: küçük bir resim (data URL). Durum yayınlarını şişirmesin diye ayrı mesajla gider.
   const AVATAR_MAX = 60 * 1024;
   const IMAGE_MAX = 3 * 1024 * 1024;
   const isImageData = (s, max) => typeof s === 'string' && s.length <= max && /^data:image\/(png|jpeg|webp|gif);base64,[A-Za-z0-9+/=]+$/.test(s);
   const cleanStatus = (s) => String(s || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+  // İsim stili (yazı tipi, efekt, renkler): sadece bilinen değerler kabul edilir
+  const NS_FONTS = ['default', 'audiowide', 'pixel', 'pacifico', 'bangers', 'righteous', 'lobster', 'caveat', 'glitch', 'cinzel', 'fredoka', 'mono'];
+  const NS_FX = ['none', 'gradient', 'neon', 'shimmer', 'rainbow', 'pulse', 'fire'];
+  const hex = (c) => (/^#[0-9a-f]{6}$/i.test(String(c || '')) ? String(c).toLowerCase() : '');
+  const cleanNameStyle = (st) => {
+    if (!st || typeof st !== 'object') return null;
+    const font = NS_FONTS.includes(st.font) ? st.font : 'default';
+    const effect = NS_FX.includes(st.effect) ? st.effect : 'none';
+    const out = { font, effect, c1: hex(st.c1), c2: hex(st.c2), inMessages: !!st.inMessages };
+    return font === 'default' && effect === 'none' && !out.c1 ? null : out;
+  };
 
   // Sohbet mesajı herkese giderken gizli alanlar (yazarın anahtarı) çıkarılır
   const pubMsg = (m) => {
@@ -187,11 +214,12 @@ function startServer(opts = {}) {
       if (!me) {
         if (m.t !== 'hello') return;
         const isAdmin = !!m.adminKey && safeEqual(m.adminKey, adminKey);
-        if (password && !isAdmin && m.password !== password) {
+        const isBot = !!m.botKey && safeEqual(m.botKey, botKey);
+        if (password && !isAdmin && !isBot && m.password !== password) {
           send(ws, { t: 'error', code: 'bad_password', message: 'Sunucu şifresi hatalı.' });
           return ws.close();
         }
-        let name = String(m.name || '').trim().slice(0, 32) || 'Misafir';
+        let name = isBot ? 'Müzik Botu' : String(m.name || '').trim().slice(0, 32) || 'Misafir';
         const taken = new Set([...users.values()].map((u) => u.name.toLowerCase()));
         let n = 2;
         const base = name;
@@ -207,9 +235,11 @@ function startServer(opts = {}) {
           away: false,
           presence: ['online', 'idle', 'dnd'].includes(m.presence) ? m.presence : 'online',
           statusText: cleanStatus(m.statusText),
+          nameStyle: cleanNameStyle(m.nameStyle),
           avatar: isImageData(m.avatar, AVATAR_MAX) ? m.avatar : null,
           clientKey: String(m.clientKey || '').slice(0, 64) || crypto.randomUUID(), // mesaj düzenleme/silme yetkisi için
           admin: isAdmin,
+          bot: isBot,
           ip,
           connectedAt: Date.now(),
           ws,
@@ -223,6 +253,12 @@ function startServer(opts = {}) {
         for (const u of users.values()) if (u.avatar) avatars[u.id] = u.avatar;
         send(ws, { t: 'avatars', avatars });
         if (me.avatar) broadcast({ t: 'avatar', id: me.id, data: me.avatar }, (u) => u.id !== me.id);
+        if (isBot) {
+          // Bot bir kanala çağrılana kadar hiçbir kanalda durmaz
+          broadcastState();
+          return;
+        }
+        send(ws, { t: 'botState', state: botState });
         const wanted = channels.find((c) => c.id === m.channelId) ? m.channelId : lobbyId();
         moveUser(me, wanted);
         return;
@@ -273,6 +309,7 @@ function startServer(opts = {}) {
           const image = isImageData(m.image, IMAGE_MAX) ? m.image : null;
           if ((!text && !image) || !me.channelId) break;
           const msg = { t: 'chat', id: crypto.randomUUID(), channelId: me.channelId, from: me.id, name: me.name, text, ts: Date.now(), _k: me.clientKey };
+          if (me.nameStyle) msg.ns = me.nameStyle; // isim stili mesajla saklanır (kişi çıkınca da görünsün)
           if (image) {
             msg.image = image;
             msg.imageW = Math.max(0, Math.min(10000, Number(m.imageW) || 0));
@@ -283,6 +320,33 @@ function startServer(opts = {}) {
           if (orig && !orig.system) msg.replyTo = { id: orig.id, name: orig.name, text: String(orig.text || '').slice(0, 140), image: !!orig.image };
           pushHistory(me.channelId, msg);
           broadcast(pubMsg(msg), (u) => u.channelId === me.channelId);
+          // Sohbet komutu: "!çal şarkı adı" → müzik botuna
+          const cm = !me.bot && /^!([^\s!]+)\s*([\s\S]*)$/.exec(text);
+          if (cm && BOT_WORDS.has(cm[1].toLocaleLowerCase('tr'))) forwardToBot(me, cm[1].toLocaleLowerCase('tr'), cm[2].trim());
+          break;
+        }
+        case 'botCmd':
+          // Müzik panelindeki düğmelerden gelen komutlar (sohbete yazılmaz)
+          if (!me.bot) forwardToBot(me, m.cmd, m.arg);
+          break;
+        case 'botState':
+          if (!me.bot) break;
+          botState = JSON.stringify(m.state || null).length < 20000 ? m.state || null : botState;
+          broadcast({ t: 'botState', state: botState }, (u) => !u.bot);
+          break;
+        case 'botReplyTo': {
+          // Bot kanalda değilken (ya da sadece isteyene) kısa yanıt
+          if (!me.bot) break;
+          const target = users.get(m.to);
+          if (target) send(target.ws, { t: 'botReply', text: String(m.text || '').slice(0, 300) });
+          break;
+        }
+        case 'botLeave': {
+          if (!me.bot || !me.channelId) break;
+          const old = me.channelId;
+          me.channelId = null;
+          systemChat(old, `${me.name} kanaldan ayrıldı`);
+          broadcastState();
           break;
         }
         case 'chatEdit': {
@@ -317,6 +381,7 @@ function startServer(opts = {}) {
         case 'profile': {
           // Profil fotoğrafı ve özel durum yazısı
           if ('statusText' in m) me.statusText = cleanStatus(m.statusText);
+          if ('nameStyle' in m) me.nameStyle = cleanNameStyle(m.nameStyle);
           if ('avatar' in m) {
             const next = isImageData(m.avatar, AVATAR_MAX) ? m.avatar : null;
             if (next !== me.avatar) {
@@ -425,6 +490,10 @@ function startServer(opts = {}) {
       if (!me) return;
       users.delete(me.id);
       log(`Ayrıldı: ${me.name}`);
+      if (me.bot) {
+        botState = null;
+        broadcast({ t: 'botState', state: null });
+      }
       if (me.channelId) systemChat(me.channelId, `${me.name} sunucudan ayrıldı`);
       broadcast({ t: 'left', id: me.id });
       broadcastState();
@@ -451,6 +520,7 @@ function startServer(opts = {}) {
       resolve({
         port,
         adminKey,
+        botKey,
         close: () =>
           new Promise((r) => {
             clearInterval(heartbeat);

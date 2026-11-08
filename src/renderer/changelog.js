@@ -6,6 +6,18 @@
  */
 const CHANGELOG = [
   {
+    version: '1.0.14',
+    date: '2026-11-09',
+    title: 'Müzik botu ve yazı stilleri',
+    added: [
+      'Müzik botu: sohbete `!çal <YouTube linki ya da şarkı adı>` yaz; bot kanala gelir ve şarkıyı herkese çalar. Kuyruk, geçme, duraklatma, ses ve tekrar komutları var (`!yardım`).',
+      'Sahnede çalan şarkı çubuğu (kapak, ilerleme, duraklat/geç/durdur) ve şarkı eklenen, kuyruğun düzenlendiği müzik paneli.',
+      'Doğrudan ses dosyası ve internet radyosu bağlantıları da çalınır.',
+      'Ayarlar › Yazı stili: adın için 12 yazı tipi, 7 efekt (gradyan, neon, parıltı, gökkuşağı, nabız, ateş) ve renkler. İstersen mesajlarında da kullanılır.',
+    ],
+    changed: ['Müzik botu sunucuyu kuran kişinin Kanki Admin uygulamasında çalışır; bota mikrofon sesi gönderilmez.'],
+  },
+  {
     version: '1.0.13',
     date: '2026-11-08',
     title: 'Uzaktan kontrol',

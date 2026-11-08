@@ -14,6 +14,7 @@ const {
   globalShortcut,
 } = require('electron');
 const remoteInput = require('./remote-input');
+const music = require('./music');
 const path = require('path');
 const os = require('os');
 const fs = require('fs');
@@ -311,6 +312,64 @@ ipcMain.handle('screen:get-sources', async () => {
 });
 
 // =====================================================================
+//  Müzik botu: sunucuyu kuran Kanki Admin'de görünmez bir pencerede çalışan kullanıcı
+// =====================================================================
+let botWin = null;
+let botHeaders = {}; // YouTube ses akışı için gereken istek başlıkları (yt-dlp'den)
+function startMusicBot() {
+  if (!hostedServer || botWin || process.env.KANKI_NO_BOT) return;
+  const ses = session.fromPartition('kanki-bot');
+  ses.webRequest.onBeforeSendHeaders({ urls: ['*://*.googlevideo.com/*'] }, (d, cb) => {
+    for (const [k, v] of Object.entries(botHeaders)) if (/^(user-agent|referer|origin|accept-language)$/i.test(k)) d.requestHeaders[k] = v;
+    cb({ requestHeaders: d.requestHeaders });
+  });
+  botWin = new BrowserWindow({
+    show: false,
+    width: 320,
+    height: 200,
+    skipTaskbar: true,
+    webPreferences: {
+      preload: path.join(__dirname, '..', 'bot', 'bot-preload.js'),
+      partition: 'kanki-bot',
+      backgroundThrottling: false,
+      autoplayPolicy: 'no-user-gesture-required',
+      webSecurity: false, // farklı kaynaktan gelen müziğin WebRTC'ye aktarılabilmesi için (sadece botun kendi sayfası yüklenir)
+    },
+  });
+  botWin.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  botWin.webContents.on('will-navigate', (e) => e.preventDefault());
+  if (process.env.KANKI_AUTOTEST)
+    botWin.webContents.on('console-message', (e) => /\[bot\]|Error/i.test(e.message) && process.stdout.write(`[bot] ${e.message}\n`));
+  botWin.loadFile(path.join(__dirname, '..', 'bot', 'bot.html'), { query: { ws: `ws://127.0.0.1:${hostedServer.port}`, key: hostedServer.botKey } });
+  botWin.on('closed', () => (botWin = null));
+}
+function stopMusicBot() {
+  if (botWin && !botWin.isDestroyed()) botWin.destroy();
+  botWin = null;
+}
+const fromBot = (e) => botWin && e.sender === botWin.webContents;
+const botStatus = (text) => botWin && !botWin.isDestroyed() && botWin.webContents.send('bot:status', text);
+ipcMain.handle('bot:resolve', async (e, query) => {
+  if (!fromBot(e)) return { ok: false, error: 'izin yok' };
+  try {
+    return { ok: true, items: await music.resolve(query, botStatus) };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+});
+ipcMain.handle('bot:stream', async (e, url) => {
+  if (!fromBot(e)) return { ok: false, error: 'izin yok' };
+  try {
+    const st = await music.stream(url, botStatus);
+    botHeaders = st.headers || {};
+    return { ok: true, ...st };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+});
+app.on('will-quit', () => stopMusicBot());
+
+// =====================================================================
 //  Uzaktan kontrol (yayıncı tarafı): izleyen kişinin fare/klavyesini bu bilgisayara uygular
 // =====================================================================
 let rcBar = null;
@@ -444,6 +503,7 @@ ipcMain.handle('server:host', async (_e, opts) => {
       adminKey: loadAdminKey(),
       dataDir: path.join(app.getPath('userData'), 'server-data'),
     });
+    startMusicBot();
     return { ok: true, port: hostedServer.port, adminKey: hostedServer.adminKey, addresses: localAddresses() };
   } catch (e) {
     hostedServer = null;
@@ -452,6 +512,7 @@ ipcMain.handle('server:host', async (_e, opts) => {
 });
 
 ipcMain.handle('server:stop', async () => {
+  stopMusicBot();
   await stopTunnel();
   if (hostedServer) await hostedServer.close();
   hostedServer = null;

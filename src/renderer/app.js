@@ -95,6 +95,7 @@ const DEFAULT_SETTINGS = {
   autoIdle: true,
   presence: 'online', // online | idle | dnd (kullanıcının seçtiği)
   statusText: '', // özel durum yazısı (ör. "🎮 Valorant")
+  nameStyle: null, // isim stili: { font, effect, c1, c2, inMessages }
   avatar: null, // profil fotoğrafı (küçük data URL)
   cameraId: 'default',
   chatHidden: false,
@@ -172,6 +173,7 @@ const S = {
   rcPending: null, // bekleyen kontrol isteği: { peerId, shareId, timer }
   rcView: null, // benim kontrol ettiğim yayın: { key, peerId, shareId, state: 'pending' | 'active', timer }
   rcFocus: false, // klavye karşı tarafa gidiyor mu (görüntüye tıklanınca)
+  botState: null, // müzik botunun durumu (çalan şarkı, kuyruk)
 };
 
 // =====================================================================
@@ -228,7 +230,7 @@ async function startMic() {
     src.connect(audio.micAnalyser);
     audio.micTrack.enabled = false;
     // Mevcut eşlere yeni izi ver
-    for (const p of S.peers.values()) p.setMicTrack(audio.micTrack, audio.micStream);
+    for (const p of S.peers.values()) if (!p.isBot) p.setMicTrack(audio.micTrack, audio.micStream);
     audio.micTrack.addEventListener('ended', () => toast('Mikrofon bağlantısı kesildi', 'Ayarlardan başka bir mikrofon seç.', 'err'));
     return true;
   } catch (e) {
@@ -511,7 +513,8 @@ class Peer {
     };
     pc.ontrack = (e) => this.onTrack(e);
 
-    if (audio.micTrack) this.setMicTrack(audio.micTrack, audio.micStream);
+    this.isBot = !!S.users.get(id)?.bot;
+    if (audio.micTrack && !this.isBot) this.setMicTrack(audio.micTrack, audio.micStream);
     else pc.addTransceiver('audio', { direction: 'recvonly' });
 
     // Bekçi: bağlantı 12 sn içinde kurulamazsa ICE'ı yeniden başlat (aynı anda katılmalarda
@@ -1506,6 +1509,7 @@ function connect(url, password) {
           deafened: S.deafened,
           presence: effectivePresence(),
           statusText: settings.statusText || '',
+          nameStyle: settings.nameStyle || undefined,
           avatar: settings.avatar || undefined,
           clientKey: CLIENT_KEY,
         })
@@ -1593,6 +1597,7 @@ function onMessage(m) {
       setConnText('Bağlı', 'ok');
       $('#reconnect-banner').classList.add('hidden');
       $('#me-name').textContent = m.name;
+      renderMeName();
       const av = avatar(m.name);
       av.dataset.av = m.id;
       $('#me-avatar').replaceWith(Object.assign(av, { id: 'me-avatar' }));
@@ -1600,6 +1605,7 @@ function onMessage(m) {
       applyAdminUi();
       break;
     case 'state': {
+      queueMicrotask(renderMusic);
       const prevUsers = S.users;
       S.serverName = m.serverName;
       S.channels = m.channels;
@@ -1710,6 +1716,13 @@ function onMessage(m) {
       if (m.channelId === S.channelId) refreshChat();
       break;
     }
+    case 'botState':
+      S.botState = m.state || null;
+      renderMusic();
+      break;
+    case 'botReply':
+      toast('🎵 Müzik Botu', m.text, '', 6000);
+      break;
     case 'avatars':
       S.avatars = new Map(Object.entries(m.avatars || {}));
       refreshAvatars();
@@ -1839,7 +1852,7 @@ function renderTree() {
 }
 
 function userRow(u, depth) {
-  const av = withDot(avatar(u.name), u);
+  const av = u.bot ? botAvatar() : withDot(avatar(u.name), u);
   av.dataset.av = u.id;
   if (u.id === S.myId ? S.transmitting : audio.remote.get(u.id)?.speaking) av.classList.add('speaking');
   const badges = h('span', { class: 'badges' });
@@ -1857,6 +1870,7 @@ function userRow(u, depth) {
         nShares > 1 ? `CANLI ${nShares}` : 'CANLI'
       )
     );
+  if (u.bot) badges.append(h('span', { class: 'bot-tag', title: 'Müzik botu — !yardım' }, 'BOT'));
   if (u.admin) badges.append(h('span', { class: 'crown', title: 'Yönetici' }, ICON_CROWN()));
   if (u.muted) badges.insertAdjacentHTML('beforeend', ICON.micOff);
   if (u.deafened) badges.insertAdjacentHTML('beforeend', ICON.headOff);
@@ -1877,7 +1891,7 @@ function userRow(u, depth) {
       ondblclick: () => screenSharesOf(u).length && u.id !== S.myId && u.channelId === S.channelId && watchUser(u.id, true),
     },
     av,
-    h('span', { class: 'uname' }, u.name),
+    applyNameStyle(h('span', { class: 'uname' }, u.name), styleOfUser(u), u.name),
     badges
   );
   row.style.paddingLeft = 30 + depth * 16 + 'px';
@@ -2009,7 +2023,7 @@ function renderParticipants(members, strip = false) {
     box.style.setProperty('--tile-w', Math.floor(Math.max(180, Math.min(pick.tw - 2, 640))) + 'px');
   }
   for (const u of members.sort((a, b) => a.name.localeCompare(b.name, 'tr'))) {
-    const av = avatar(u.name); // büyük kutularda durum noktası yok (Discord'daki gibi)
+    const av = u.bot ? botAvatar() : avatar(u.name); // büyük kutularda durum noktası yok (Discord'daki gibi)
     av.dataset.av = u.id;
     const isOther = u.id !== S.myId;
     const nS = screenSharesOf(u).length;
@@ -2040,6 +2054,7 @@ function renderParticipants(members, strip = false) {
     box.append(card);
   }
   cleanupCams(usedCams);
+  renderStageBotCard();
 }
 function cleanupCams(used) {
   for (const [uid, v] of camVideos) {
@@ -2060,6 +2075,7 @@ function renderControls() {
   $('#btn-disconnect').innerHTML = ICON.power;
   const modeTxt = { vad: 'Sesle etkinleştirme', ptt: `Bas-konuş${settings.pttLabel ? ' (' + settings.pttLabel + ')' : ''}`, open: 'Sürekli açık' }[settings.mode];
   const pres = effectivePresence();
+  renderMeName();
   $('#me-status').textContent = S.deafened ? 'Ses kapalı' : S.muted ? 'Mikrofon kapalı' : settings.statusText || (pres !== 'online' ? PRESENCE[pres].label : modeTxt);
   const me = $('#me-avatar');
   if (me) {
@@ -2151,7 +2167,7 @@ function appendChat(m, scroll = true) {
   } else if (!m.replyTo && lastMsgFrom === m.name && m.ts - lastMsgTs < 7 * 60 * 1000) {
     el = h('div', { class: 'msg cont', title: time }, h('span', { class: 'cont-time' }, time), msgContent(m));
   } else {
-    const av = avatar(m.name);
+    const av = S.users.get(m.from)?.bot || m.name === 'Müzik Botu' ? botAvatar() : avatar(m.name);
     av.classList.add('clickable');
     av.addEventListener('click', () => openProfileByName(m, av));
     el = h(
@@ -2161,7 +2177,9 @@ function appendChat(m, scroll = true) {
       h('div', { class: 'msg-body' }, h('div', { class: 'msg-head' }, h('span', { class: 'msg-name' }, m.name), h('span', { class: 'msg-time' }, time)), msgContent(m))
     );
     const nm = el.querySelector('.msg-name');
-    nm.style.color = colorFor(m.name);
+    const nst = nameStyleFor(m.name, m.ns);
+    if (nst) applyNameStyle(nm, nst, m.name);
+    else nm.style.color = colorFor(m.name);
     nm.addEventListener('click', () => openProfileByName(m, nm));
     if (m.replyTo) {
       el.classList.add('has-reply');
@@ -2440,6 +2458,7 @@ async function openSettings(pane) {
   if (!devices.some((d) => d.kind === 'videoinput')) $('#set-camera').innerHTML = '<option value="default">Kamera bulunamadı</option>';
   $('#set-status-text').value = settings.statusText || '';
   renderProfilePreview();
+  renderNameStyleUi();
   $('#set-mode').value = settings.mode;
   $('#set-vad').value = settings.vad;
   $('#set-ns').checked = settings.ns;
@@ -3286,7 +3305,7 @@ function openProfile(uid, anchor) {
   const body = h(
     'div',
     { class: 'pf-body' },
-    h('div', { class: 'pf-name' }, u.name + (isMe ? ' (sen)' : '')),
+    h('div', { class: 'pf-name' }, nameEl(u.name, styleOfUser(u)), isMe ? ' (sen)' : ''),
     statusText ? h('div', { class: 'pf-custom' }, statusText) : null,
     h('div', { class: 'pf-status' }, h('span', { class: `status-dot inline ${pres}` }), PRESENCE[pres].label, ch ? h('span', { class: 'muted' }, ` · ${ch.name}`) : null),
     tags
@@ -3334,7 +3353,7 @@ function openProfile(uid, anchor) {
     const acts = h('div', { class: 'pf-actions' });
     const act = (label, fn, cls = '') => acts.append(h('button', { class: `btn sm ${cls}`, onclick: () => (closeProfile(), fn()) }, label));
     if (nScr && u.channelId === S.channelId) act(isWatchingUser(uid) ? 'İzlemeyi bırak' : 'Yayını izle', () => watchUser(uid, !isWatchingUser(uid)), 'primary');
-    act('Dürt', () => pokeUser(u));
+    if (!u.bot) act('Dürt', () => pokeUser(u));
     act(settings.localMutes[u.name] ? 'Sesini aç' : 'Sustur', () => {
       if (settings.localMutes[u.name]) delete settings.localMutes[u.name];
       else settings.localMutes[u.name] = true;
@@ -3390,7 +3409,7 @@ function renderMembers() {
     box.append(h('div', { class: 'member-group' }, `${ch.name} — ${list.length}`));
     for (const u of list.sort((a, b) => a.name.localeCompare(b.name, 'tr'))) {
       const pres = presenceOf(u);
-      const av = withDot(avatar(u.name), u);
+      const av = u.bot ? botAvatar() : withDot(avatar(u.name), u);
       av.dataset.av = u.id;
       const custom = u.id === S.myId ? settings.statusText : u.statusText;
       const sub = custom || (screenSharesOf(u).length ? 'Ekran paylaşıyor' : camShareOf(u) ? 'Kamerası açık' : pres !== 'online' ? PRESENCE[pres].label : u.muted ? 'Mikrofon kapalı' : '');
@@ -3398,9 +3417,9 @@ function renderMembers() {
         'div',
         { class: `member ${pres}`, onclick: () => openProfile(u.id, row), oncontextmenu: (e) => userMenu(e, u) },
         av,
-        h('div', { class: 'member-text' }, h('div', { class: 'member-name' }, u.name, u.admin ? h('span', { class: 'crown' }, ICON_CROWN()) : null), sub ? h('div', { class: 'member-sub' }, sub) : null)
+        h('div', { class: 'member-text' }, h('div', { class: 'member-name' }, nameEl(u.name, styleOfUser(u)), u.admin ? h('span', { class: 'crown' }, ICON_CROWN()) : null), sub ? h('div', { class: 'member-sub' }, sub) : null)
       );
-      row.querySelector('.member-name').style.color = colorFor(u.name);
+      if (!styleOfUser(u)) row.querySelector('.member-name').style.color = colorFor(u.name);
       box.append(row);
     }
   }
@@ -3568,6 +3587,7 @@ function msgContent(m) {
   } else if (m.text) {
     const t = h('div', { class: 'msg-text' });
     t.innerHTML = formatText(m.text) + (m.edited ? `<span class="edited" title="${esc(new Date(m.edited).toLocaleString('tr-TR'))}">(düzenlendi)</span>` : '');
+    applyMessageStyle(t, nameStyleFor(m.name, m.ns));
     c.append(t);
   }
   if (m.image) {
@@ -3988,7 +4008,7 @@ function renderProfilePreview() {
     h(
       'div',
       { class: 'pf-body' },
-      h('div', { class: 'pf-name' }, name),
+      h('div', { class: 'pf-name' }, nameEl(name, hasNameStyle(settings.nameStyle) ? settings.nameStyle : null)),
       h('div', { class: `pf-custom ${settings.statusText ? '' : 'muted'}` }, settings.statusText || 'Durum yazısı yok'),
       h('div', { class: 'pf-status' }, h('span', { class: `status-dot inline ${pres}` }), PRESENCE[pres].label)
     )
@@ -4177,6 +4197,327 @@ $('#btn-toggle-chat').addEventListener('click', () => {
     if (!settings.chatHidden) $('#chat-log').scrollTop = $('#chat-log').scrollHeight;
   });
 });
+
+// =====================================================================
+//  Yazı stili: isimler için yazı tipi, efekt ve renkler (Ayarlar › Yazı stili)
+// =====================================================================
+const NAME_FONTS = [
+  ['default', 'Varsayılan'],
+  ['audiowide', 'Teknolojik'],
+  ['pixel', 'Piksel'],
+  ['pacifico', 'El yazısı'],
+  ['bangers', 'Çizgi roman'],
+  ['righteous', 'Retro'],
+  ['lobster', 'Şık'],
+  ['caveat', 'Kalem'],
+  ['glitch', 'Glitch'],
+  ['cinzel', 'Klasik'],
+  ['fredoka', 'Yumuşak'],
+  ['mono', 'Terminal'],
+];
+const NAME_FX = [
+  ['none', 'Düz'],
+  ['gradient', 'Gradyan'],
+  ['neon', 'Neon'],
+  ['shimmer', 'Parıltı'],
+  ['rainbow', 'Gökkuşağı'],
+  ['pulse', 'Nabız'],
+  ['fire', 'Ateş'],
+];
+const NS_PRESETS = [
+  ['#22d47e', '#3d8bfd'],
+  ['#ff4d5e', '#f0b232'],
+  ['#a855f7', '#ec4899'],
+  ['#06b6d4', '#22c55e'],
+  ['#f97316', '#eab308'],
+  ['#3d8bfd', '#a855f7'],
+  ['#ffffff', '#9fb0a8'],
+];
+const NS_DEFAULT = { font: 'default', effect: 'none', c1: '', c2: '', inMessages: false };
+const myNameStyle = () => ({ ...NS_DEFAULT, ...(settings.nameStyle || {}) });
+const hasNameStyle = (st) => !!st && (st.font !== 'default' || st.effect !== 'none' || !!st.c1);
+const styleOfUser = (u) => (!u ? null : u.id === S.myId ? (hasNameStyle(settings.nameStyle) ? settings.nameStyle : null) : u.nameStyle || null);
+// Kişi çevrimiçiyse güncel stili, değilse mesajla saklanan stili kullan
+function nameStyleFor(name, fallback = null) {
+  if (name && name === S.myName) return hasNameStyle(settings.nameStyle) ? settings.nameStyle : null;
+  const u = [...S.users.values()].find((x) => x.name === name);
+  return u ? styleOfUser(u) : fallback;
+}
+function applyNameStyle(el, st, name) {
+  el.className = el.className.replace(/\bns(-[fx]-\S+)?\b/g, '').trim();
+  if (!hasNameStyle(st)) return el;
+  const f = NAME_FONTS.some(([id]) => id === st.font) ? st.font : 'default';
+  const fx = NAME_FX.some(([id]) => id === st.effect) ? st.effect : 'none';
+  el.classList.add('ns', `ns-f-${f}`, `ns-x-${fx}`);
+  el.style.setProperty('--n1', st.c1 || colorFor(name || '?'));
+  el.style.setProperty('--n2', st.c2 || '#22d47e');
+  return el;
+}
+const nameEl = (name, st, cls = '') => applyNameStyle(h('span', { class: cls }, name), st, name);
+// Mesaj metni: kişi "mesajlarımda da kullan" dediyse yazı tipi ve 1. renk (efektsiz, okunaklı kalsın)
+function applyMessageStyle(textEl, st) {
+  if (!st?.inMessages) return;
+  if (st.font && st.font !== 'default') textEl.classList.add(`ns-f-${st.font}`, 'ns-msg');
+  if (st.c1) textEl.style.color = st.c1;
+}
+function renderMeName() {
+  const el = $('#me-name');
+  if (!el || !S.myName) return;
+  el.innerHTML = '';
+  el.append(nameEl(S.myName, styleOfUser(S.users.get(S.myId)) || (hasNameStyle(settings.nameStyle) ? settings.nameStyle : null)));
+}
+
+// ---------- Ayarlar sekmesi ----------
+let nsSendTimer = null;
+function setNameStyle(patch) {
+  const next = { ...myNameStyle(), ...patch };
+  settings.nameStyle = hasNameStyle(next) || next.inMessages ? next : null;
+  saveSettings();
+  renderNameStyleUi();
+  clearTimeout(nsSendTimer);
+  nsSendTimer = setTimeout(() => {
+    send({ t: 'profile', nameStyle: settings.nameStyle });
+    if (S.myId) {
+      renderMeName();
+      renderTree();
+      renderMembers();
+      refreshChat();
+    }
+    renderProfilePreview();
+  }, 300);
+}
+function renderNameStyleUi() {
+  const st = myNameStyle();
+  const name = S.myName || settings.nick || 'Kanki';
+  const shown = hasNameStyle(st) ? st : null;
+  // Önizleme: sohbet mesajı + üye listesi satırı
+  const pv = $('#ns-preview');
+  pv.innerHTML = '';
+  const nm = nameEl(name, shown, 'msg-name');
+  if (!shown) nm.style.color = colorFor(name);
+  const txt = h('div', { class: 'msg-text' }, 'Selam! Yeni yazı stilim nasıl? ✨');
+  applyMessageStyle(txt, st);
+  pv.append(
+    h('div', { class: 'ns-pv-label' }, 'Önizleme'),
+    h('div', { class: 'msg ns-pv-msg' }, avatar(name), h('div', { class: 'msg-body' }, h('div', { class: 'msg-head' }, nm, h('span', { class: 'msg-time' }, 'şimdi')), txt)),
+    h('div', { class: 'member ns-pv-member' }, withDot(avatar(name), { id: S.myId }), h('div', { class: 'member-text' }, h('div', { class: 'member-name' }, nameEl(name, shown)), settings.statusText ? h('div', { class: 'member-sub' }, settings.statusText) : null))
+  );
+  // Yazı tipleri: her biri kendi yazı tipiyle örnek gösterir
+  const fonts = $('#ns-fonts');
+  fonts.innerHTML = '';
+  for (const [id, label] of NAME_FONTS)
+    fonts.append(
+      h(
+        'button',
+        { class: `ns-font ${st.font === id ? 'active' : ''}`, onclick: () => setNameStyle({ font: id }) },
+        applyNameStyle(h('span', { class: 'ns-font-sample' }, 'Aa ' + name.slice(0, 10)), { ...st, font: id, effect: 'none', c1: st.c1 || '#dfe8e3' }, name),
+        h('span', { class: 'ns-font-label' }, label)
+      )
+    );
+  const fxBox = $('#ns-effects');
+  fxBox.innerHTML = '';
+  for (const [id, label] of NAME_FX)
+    fxBox.append(
+      h(
+        'button',
+        { class: `ns-fx ${st.effect === id ? 'active' : ''}`, onclick: () => setNameStyle({ effect: id }) },
+        applyNameStyle(h('span', {}, label), { ...st, effect: id, font: 'default', c1: st.c1 || colorFor(name) }, name)
+      )
+    );
+  $('#ns-c1').value = st.c1 || colorFor(name);
+  $('#ns-c2').value = st.c2 || '#22d47e';
+  const pr = $('#ns-presets');
+  if (!pr.childElementCount)
+    for (const [a, b] of NS_PRESETS) {
+      const sw = h('button', { class: 'ns-preset', title: `${a} → ${b}`, onclick: () => setNameStyle({ c1: a, c2: b }) });
+      sw.style.background = `linear-gradient(135deg, ${a} 50%, ${b} 50%)`;
+      pr.append(sw);
+    }
+  $('#ns-inmsg').checked = !!st.inMessages;
+}
+$('#ns-c1').addEventListener('input', (e) => setNameStyle({ c1: e.target.value }));
+$('#ns-c2').addEventListener('input', (e) => setNameStyle({ c2: e.target.value }));
+$('#ns-inmsg').addEventListener('change', (e) => setNameStyle({ inMessages: e.target.checked }));
+$('#ns-reset').addEventListener('click', () => {
+  settings.nameStyle = null;
+  saveSettings();
+  setNameStyle({ ...NS_DEFAULT });
+});
+
+// =====================================================================
+//  Müzik botu: çalan şarkı çubuğu, kuyruk paneli, komutlar
+// =====================================================================
+const ICON_MUSIC = '<svg viewBox="0 0 24 24"><path d="M12 3v10.55A4 4 0 1 0 14 17V7h4V3h-6Z"/></svg>';
+const ICON_PLAY = '<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7L8 5Z"/></svg>';
+const ICON_PAUSE = '<svg viewBox="0 0 24 24"><path d="M6 5h4v14H6V5Zm8 0h4v14h-4V5Z"/></svg>';
+const ICON_NEXT = '<svg viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12Zm10-12v12h2V6h-2Z"/></svg>';
+const ICON_STOP = '<svg viewBox="0 0 24 24"><path d="M6 6h12v12H6V6Z"/></svg>';
+const ICON_LIST = '<svg viewBox="0 0 24 24"><path d="M3 6h12v2H3V6Zm0 5h12v2H3v-2Zm0 5h8v2H3v-2Zm14-2v-4h2v4h3l-4 5-4-5h3Z"/></svg>';
+const fmtTime = (s) => {
+  s = Math.max(0, Math.floor(s || 0));
+  const hh = Math.floor(s / 3600);
+  const mm = Math.floor((s % 3600) / 60);
+  const ss = String(s % 60).padStart(2, '0');
+  return hh ? `${hh}:${String(mm).padStart(2, '0')}:${ss}` : `${mm}:${ss}`;
+};
+const botUser = () => [...S.users.values()].find((u) => u.bot) || null;
+const botHere = () => !!S.botState && !!S.channelId && S.botState.channelId === S.channelId;
+const botCmd = (cmd, arg = '') => send({ t: 'botCmd', cmd, arg: String(arg) });
+const botPosition = () => {
+  const st = S.botState;
+  if (!st?.current) return 0;
+  const p = (st.position || 0) + (st.paused ? 0 : (Date.now() - (st.at || Date.now())) / 1000);
+  return st.current.duration ? Math.min(p, st.current.duration) : p;
+};
+
+function renderMusic() {
+  const st = S.botState;
+  const here = botHere();
+  const cur = here ? st.current : null;
+  // Sahne başlığındaki düğme: bot bu kanalda çalıyorsa yeşil
+  const btn = $('#btn-music');
+  btn.classList.toggle('hidden', !S.myId);
+  btn.classList.toggle('playing', !!cur && !st.paused);
+  // Çalan şarkı çubuğu
+  const bar = $('#music-bar');
+  bar.classList.toggle('hidden', !cur);
+  if (cur) {
+    const img = bar.querySelector('.mb-thumb');
+    if (img.dataset.src !== (cur.thumbnail || '')) {
+      img.dataset.src = cur.thumbnail || '';
+      img.style.backgroundImage = cur.thumbnail ? `url("${cur.thumbnail.replace(/"/g, '%22')}")` : '';
+    }
+    bar.querySelector('.mb-title').textContent = cur.title;
+    bar.querySelector('.mb-title').title = cur.title;
+    bar.querySelector('.mb-by').textContent = `isteyen: ${cur.by}`;
+    const pp = bar.querySelector('[data-act="pp"]');
+    pp.innerHTML = st.paused ? ICON_PLAY : ICON_PAUSE;
+    pp.title = st.paused ? 'Devam et (!devam)' : 'Duraklat (!duraklat)';
+    bar.querySelector('.mb-queue-n').textContent = st.queueLength ? String(st.queueLength) : '';
+    tickMusic();
+  }
+  if (!$('#music-pop').classList.contains('hidden')) renderMusicPop();
+  renderStageBotCard();
+}
+function tickMusic() {
+  const st = S.botState;
+  if (!botHere() || !st.current) return;
+  const bar = $('#music-bar');
+  const pos = botPosition();
+  const dur = st.current.duration || 0;
+  bar.querySelector('.mb-time').textContent = dur ? `${fmtTime(pos)} / ${fmtTime(dur)}` : fmtTime(pos);
+  bar.querySelector('.mb-progress i').style.width = dur ? `${Math.min(100, (pos / dur) * 100)}%` : '0%';
+}
+setInterval(tickMusic, 500);
+
+function renderMusicPop() {
+  const pop = $('#music-pop');
+  const st = S.botState;
+  const bot = botUser();
+  const here = botHere();
+  const ch = st?.channelId && S.channels.find((c) => c.id === st.channelId);
+  pop.querySelector('.mp-where').textContent = !bot ? 'çalışmıyor' : here ? 'bu kanalda' : ch ? `${ch.name} kanalında` : 'boşta';
+  pop.querySelector('.mp-nobot').classList.toggle('hidden', !!bot);
+  pop.querySelector('#mp-form').classList.toggle('hidden', !bot);
+  // Kuyruk
+  const q = pop.querySelector('.mp-queue');
+  q.innerHTML = '';
+  if (here && st.current) {
+    q.append(
+      h(
+        'div',
+        { class: 'mp-row now' },
+        h('span', { class: 'mp-idx' }, st.paused ? '⏸' : '▶'),
+        h('span', { class: 'mp-t' }, st.current.title),
+        h('span', { class: 'mp-d' }, st.current.duration ? fmtTime(st.current.duration) : 'canlı')
+      )
+    );
+  }
+  (here ? st.queue || [] : []).forEach((x, i) => {
+    const rm = h('button', { class: 'mp-rm', title: 'Kuyruktan çıkar', onclick: () => botCmd('çıkar', i + 1) });
+    rm.innerHTML = ICON_X;
+    q.append(h('div', { class: 'mp-row' }, h('span', { class: 'mp-idx' }, String(i + 1)), h('span', { class: 'mp-t', title: `${x.title} · ${x.by}` }, x.title), h('span', { class: 'mp-d' }, x.duration ? fmtTime(x.duration) : ''), rm));
+  });
+  if (here && st.queueLength > (st.queue || []).length) q.append(h('div', { class: 'mp-more' }, `… ve ${st.queueLength - st.queue.length} şarkı daha`));
+  if (!q.childElementCount) q.append(h('div', { class: 'mp-empty' }, bot ? (here ? 'Kuyruk boş. Yukarıdan şarkı ekle.' : 'Şarkı eklediğinde bot bu kanala gelir.') : ''));
+  // Düğmeler
+  const acts = pop.querySelector('.mp-actions');
+  acts.classList.toggle('hidden', !bot);
+  acts.querySelector('[data-cmd="join"]').classList.toggle('hidden', here);
+  for (const k of ['shuffle', 'loop', 'clear', 'leave']) acts.querySelector(`[data-cmd="${k}"]`).classList.toggle('hidden', !here);
+  acts.querySelector('[data-cmd="loop"]').classList.toggle('on', !!(here && st.loop));
+  const vol = pop.querySelector('#mp-vol');
+  pop.querySelector('.mp-vol').classList.toggle('hidden', !here);
+  if (here && document.activeElement !== vol) vol.value = st.volume ?? 70;
+}
+function toggleMusicPop(force) {
+  const pop = $('#music-pop');
+  const open = force ?? pop.classList.contains('hidden');
+  pop.classList.toggle('hidden', !open);
+  if (open) {
+    renderMusicPop();
+    setTimeout(() => $('#mp-input').focus(), 30);
+  }
+}
+$('#btn-music').addEventListener('click', (e) => {
+  e.stopPropagation();
+  toggleMusicPop();
+});
+document.addEventListener('mousedown', (e) => {
+  if (!e.target.closest('#music-pop, #btn-music, #music-bar [data-act="list"]')) $('#music-pop').classList.add('hidden');
+});
+$('#mp-form').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const v = $('#mp-input').value.trim();
+  if (!v) return;
+  botCmd('çal', v);
+  $('#mp-input').value = '';
+});
+$$('#music-pop .mp-actions [data-cmd]').forEach((b) => b.addEventListener('click', () => botCmd(b.dataset.cmd === 'leave' ? 'ayrıl' : b.dataset.cmd === 'join' ? 'gel' : b.dataset.cmd)));
+let volTimer = null;
+$('#mp-vol').addEventListener('input', (e) => {
+  clearTimeout(volTimer);
+  volTimer = setTimeout(() => botCmd('ses', e.target.value), 250);
+});
+(function buildMusicBar() {
+  const bar = $('#music-bar');
+  const set = (act, icon, title, fn) => {
+    const b = bar.querySelector(`[data-act="${act}"]`);
+    b.innerHTML = icon;
+    b.title = title;
+    b.addEventListener('click', fn);
+  };
+  set('pp', ICON_PAUSE, 'Duraklat', () => botCmd(S.botState?.paused ? 'devam' : 'duraklat'));
+  set('next', ICON_NEXT, 'Sonraki şarkı (!geç)', () => botCmd('geç'));
+  set('stop', ICON_STOP, 'Durdur ve kuyruğu temizle (!dur)', () => botCmd('dur'));
+  const lb = bar.querySelector('[data-act="list"]');
+  lb.insertAdjacentHTML('afterbegin', ICON_LIST);
+  lb.title = 'Kuyruk ve şarkı ekle';
+  lb.addEventListener('click', (e) => {
+    e.stopPropagation();
+    toggleMusicPop();
+  });
+  $('#btn-music').innerHTML = ICON_MUSIC;
+})();
+
+// Kanaldaki bot kutusu: kapak resmi ve çalan şarkı
+function renderStageBotCard() {
+  const st = S.botState;
+  const card = st?.id && $(`#participants .p-card[data-uid="${st.id}"]`);
+  if (!card) return;
+  card.classList.add('bot-card');
+  const cur = st.current;
+  card.style.backgroundImage = cur?.thumbnail ? `linear-gradient(rgba(0,0,0,.55), rgba(0,0,0,.75)), url("${cur.thumbnail.replace(/"/g, '%22')}")` : '';
+  let np = card.querySelector('.bot-np');
+  if (!np) card.append((np = h('div', { class: 'bot-np' })));
+  np.textContent = cur ? `${st.paused ? '⏸' : '♪'} ${cur.title}` : 'Şarkı bekliyor · !çal';
+}
+
+function botAvatar() {
+  const av = h('div', { class: 'avatar bot-avatar' });
+  av.innerHTML = ICON_MUSIC;
+  return av;
+}
 
 // =====================================================================
 //  Uzaktan kontrol (TeamViewer / AnyDesk gibi)

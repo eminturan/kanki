@@ -116,6 +116,18 @@ GitHub Actions paketleri derler, Release'e `latest.yml` ile birlikte ekler; kuru
 - **Sohbeti gizle:** Sahnenin sağ üstündeki sohbet düğmesi sağ paneli kapatır, yayınlara daha çok yer kalır; gizliyken gelen mesaj sayısı düğmede görünür.
 - Mesaj kutusu çok satırlıdır: `Enter` gönderir, `Shift+Enter` yeni satır açar.
 
+## Müzik botu
+- Sunucuyu kuran kişinin **Kanki Admin** uygulamasında kendiliğinden çalışır ve kanal listesinde "Müzik Botu" olarak görünür.
+- Sohbete yaz: `!çal <YouTube linki ya da şarkı adı>` (oynatma listesi linki en fazla 50 şarkı ekler), `!geç`, `!duraklat`, `!devam`, `!dur` (kuyruğu da temizler), `!kuyruk`, `!çıkar <sıra>`, `!temizle`, `!karıştır`, `!tekrar`, `!ses <0-100>`, `!şimdi`, `!gel`, `!ayrıl`, `!yardım`.
+- Aynı işler sahnenin sağ üstündeki nota düğmesinden ve çalan şarkı çubuğundan da yapılır. Kişiye özel bot sesi: botun profil kartındaki ses sürgüsü.
+- Kanalda 1 dakika kimse kalmazsa bot durur ve kanaldan ayrılır.
+- YouTube için [yt-dlp](https://github.com/yt-dlp/yt-dlp) kullanılır: ilk kullanımda resmi GitHub sürümünden Kanki Admin'in veri klasörüne indirilir ve haftada bir kendini günceller. Doğrudan ses dosyası ve radyo bağlantıları buna gerek duymaz.
+
+## Yazı stili
+- Ayarlar › Yazı stili: adın için yazı tipi (12 seçenek), efekt (düz, gradyan, neon, parıltı, gökkuşağı, nabız, ateş) ve iki renk. Önizleme anında güncellenir.
+- "Mesajlarımda da kullan" açılırsa mesaj metnin de aynı yazı tipi ve renkle görünür (efektsiz, okunaklı kalsın diye).
+- Yazı tipleri uygulamanın içinde gelir (SIL Open Font License), internet gerekmez.
+
 ## Uzaktan kontrol
 - İzlediğin **tüm ekran** yayınının üst çubuğundaki fare simgesiyle kontrol iste. Yayıncıya onay penceresi çıkar; 30 saniye içinde yanıt vermezse istek reddedilir.
 - İzin verilince görüntüye tıkla: fare (tıklama, sürükleme, tekerlek) ve klavye karşı tarafa gider. Kanki kısayolları da karşıya gider; bitirince yayının altındaki **Bırak** düğmesine bas ya da görüntünün dışına tıkla (klavye sende kalır).

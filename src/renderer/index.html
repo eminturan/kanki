@@ -4,6 +4,7 @@
   <meta charset="utf-8" />
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob:; media-src 'self' blob: mediastream:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src ws: wss: http: https:" />
   <title>Kanki</title>
+  <link rel="stylesheet" href="fonts/fonts.css" />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -161,6 +162,7 @@
               <svg viewBox="0 0 24 24"><path d="M4 4h7v7H4V4Zm9 0h7v7h-7V4ZM4 13h7v7H4v-7Zm9 0h7v7h-7v-7Z"/></svg>
               <span>Izgara</span>
             </button>
+            <button class="icon-btn music-btn hidden" id="btn-music" title="Müzik botu"></button>
             <button class="icon-btn chat-toggle active" id="btn-toggle-chat" title="Sohbeti gizle">
               <svg viewBox="0 0 24 24"><path d="M5 3h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H9l-5 4V5a2 2 0 0 1 2-2Z" transform="translate(-1 0)"/></svg>
               <span class="unread hidden"></span>
@@ -178,6 +180,35 @@
           <div class="participants" id="participants"></div>
         </div>
         <div class="self-shares hidden" id="self-share"></div>
+        <div class="music-bar hidden" id="music-bar">
+          <div class="mb-thumb"></div>
+          <div class="mb-info">
+            <div class="mb-title"></div>
+            <div class="mb-sub"><span class="mb-by"></span><span class="mb-time"></span></div>
+            <div class="mb-progress"><i></i></div>
+          </div>
+          <div class="mb-ctl">
+            <button class="mb-btn" data-act="pp"></button>
+            <button class="mb-btn" data-act="next"></button>
+            <button class="mb-btn" data-act="stop"></button>
+            <button class="mb-btn mb-list" data-act="list"><span class="mb-queue-n"></span></button>
+          </div>
+        </div>
+        <div class="music-pop hidden" id="music-pop">
+          <div class="mp-head"><span>🎵 Müzik Botu</span><span class="mp-where"></span></div>
+          <div class="mp-nobot hidden">Bu sunucuda müzik botu çalışmıyor. Bot, sunucuyu kuran kişinin Kanki Admin uygulamasında (1.0.14 ve üstü) çalışır.</div>
+          <form id="mp-form"><input id="mp-input" placeholder="YouTube linki ya da şarkı adı" autocomplete="off" maxlength="500" /><button class="btn primary" type="submit">Ekle</button></form>
+          <div class="mp-queue"></div>
+          <div class="mp-vol"><span>Bot sesi (herkes için)</span><input type="range" id="mp-vol" min="0" max="100" /></div>
+          <div class="mp-actions">
+            <button class="btn sm" data-cmd="join">Botu bu kanala çağır</button>
+            <button class="btn sm" data-cmd="shuffle">Karıştır</button>
+            <button class="btn sm" data-cmd="loop">Tekrar</button>
+            <button class="btn sm" data-cmd="clear">Kuyruğu temizle</button>
+            <button class="btn sm danger" data-cmd="leave">Botu çıkar</button>
+          </div>
+          <div class="mp-help">Sohbete de yazabilirsin: <code>!çal</code> <code>!geç</code> <code>!duraklat</code> <code>!devam</code> <code>!dur</code> <code>!kuyruk</code> <code>!ses 50</code> <code>!gel</code> <code>!ayrıl</code> <code>!yardım</code></div>
+        </div>
         <div class="call-bar hidden" id="call-bar">
           <button class="cb-btn" id="cb-camera"></button>
           <button class="cb-btn" id="cb-share"></button>
@@ -298,6 +329,7 @@
       <nav class="settings-nav">
         <div class="settings-nav-title">Kullanıcı ayarları</div>
         <button class="snav active" data-pane="profile">Profilim</button>
+        <button class="snav" data-pane="style">Yazı stili</button>
         <button class="snav" data-pane="voice">Ses ve görüntü</button>
         <button class="snav" data-pane="share">Ekran paylaşımı</button>
         <button class="snav" data-pane="notify">Bildirimler</button>
@@ -328,6 +360,23 @@
                 <div class="pe-card" id="pe-card"></div>
               </div>
             </div>
+          </section>
+          <section class="settings-pane hidden" data-pane="style">
+            <h2>Yazı stili</h2>
+            <p class="hint">Adının yazı tipini, rengini ve efektini seç. Kanaldaki herkes seni bu stille görür (sohbette, kanal listesinde, üye listesinde ve profil kartında).</p>
+            <div class="ns-preview" id="ns-preview"></div>
+            <h3>Yazı tipi</h3>
+            <div class="ns-fonts" id="ns-fonts"></div>
+            <h3>Efekt</h3>
+            <div class="ns-effects" id="ns-effects"></div>
+            <h3>Renkler</h3>
+            <div class="ns-colors">
+              <label class="ns-color"><input type="color" id="ns-c1" /><span>Renk 1</span></label>
+              <label class="ns-color"><input type="color" id="ns-c2" /><span>Renk 2</span></label>
+              <div class="ns-presets" id="ns-presets"></div>
+            </div>
+            <label class="check ns-inmsg"><input type="checkbox" id="ns-inmsg" /><span>Mesajlarımda da bu yazı tipini ve rengi kullan</span></label>
+            <div class="ns-actions"><button class="btn" id="ns-reset">Varsayılana dön</button></div>
           </section>
           <section class="settings-pane hidden" data-pane="voice">
             <h2>Ses ve görüntü</h2>
