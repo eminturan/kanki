@@ -735,7 +735,7 @@ async function openPicker() {
   $('#opt-audio').checked = sh.audio;
   $('#picker-note').textContent =
     (S.platform === 'darwin' ? 'macOS 14.2+ gerekir. ' : '') +
-    'Sistem sesi, pencere seçsen de bilgisayarın tüm sesini gönderir (arkadaşlarının sesi dahil).';
+    'Sistem sesi, pencere seçsen de bilgisayarın tüm sesini gönderir; Kanki’den duyduğun arkadaş sesleri hariç.';
   pickerSelected = null;
   $('#btn-go-live').disabled = true;
   $('#sources').innerHTML = '<div class="muted">Kaynaklar yükleniyor…</div>';
@@ -799,25 +799,27 @@ async function goLive() {
   const audioTaken = [...S.myShares.values()].some((x) => x.stream.getAudioTracks().length);
   const wantAudio = sh.audio && !audioTaken;
   let stream = null;
-  const tryCapture = async (withAudio) => {
-    await kanki.selectSource(sourceId, withAudio);
-    const audio = withAudio
+  let audioMode = false;
+  // audioMode: 'clean' = Kanki'nin kendi sesi hariç sistem sesi (yankı yok), 'plain' = tüm sistem sesi, false = sessiz
+  const tryCapture = async (mode) => {
+    await kanki.selectSource(sourceId, mode);
+    const audio = mode
       ? { echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: 2, sampleRate: 48000, suppressLocalAudioPlayback: false }
       : false;
     return navigator.mediaDevices.getDisplayMedia({ video, audio, selfBrowserSurface: 'exclude', systemAudio: 'include' });
   };
-  try {
-    stream = await tryCapture(wantAudio);
-  } catch (e) {
-    log('capture with audio failed', e);
-    if (wantAudio) {
-      try {
-        stream = await tryCapture(false);
-        toast('Sistem sesi paylaşılamadı', 'Yayın sadece görüntü ile başlatıldı.');
-      } catch (e2) {
-        log('capture failed', e2);
-      }
+  for (const mode of wantAudio ? ['clean', 'plain', false] : [false]) {
+    try {
+      stream = await tryCapture(mode);
+      audioMode = mode && stream.getAudioTracks().length ? mode : false;
+      break;
+    } catch (e) {
+      log('capture failed', mode, e?.name, e?.message);
     }
+  }
+  if (stream && wantAudio) {
+    if (audioMode === 'plain') toast('Sistem sesi yankı korumasız', 'Bu bilgisayar Kanki’nin kendi sesini ayıramadı; izleyenler kendi seslerini geri duyabilir. Kulaklık kullanman yankıyı azaltır.', '', 8000);
+    else if (!audioMode) toast('Sistem sesi paylaşılamadı', 'Yayın sadece görüntü ile başlatıldı.');
   }
   if (!stream) {
     toast('Ekran yakalanamadı', S.platform === 'darwin' ? 'Ekran Kaydı iznini kontrol et, ardından uygulamayı yeniden başlat.' : 'Tekrar dene.', 'err', 8000);
@@ -825,7 +827,7 @@ async function goLive() {
     return;
   }
   if (sh.audio && audioTaken) toast('Sistem sesi diğer yayında', 'Ses yankı yapmasın diye sadece ilk yayına ekleniyor.');
-  addShare(stream, { fps, res, bitrate, hint: sh.hint }, label);
+  addShare(stream, { fps, res, bitrate, hint: sh.hint, audioMode }, label);
 }
 
 let shareSeq = 0;
@@ -959,7 +961,8 @@ function renderSelfShare() {
     }
     const st = sh.stream.getVideoTracks()[0]?.getSettings() || {};
     el.querySelector('.ss-label').textContent = sh.label;
-    el.querySelector('.ss-meta').textContent = `${st.width || '?'}×${st.height || '?'} · ${sh.opts.fps} FPS · en fazla ${(sh.opts.bitrate / 1000).toFixed(1)} Mbps${sh.stream.getAudioTracks().length ? ' · sistem sesi açık' : ''}`;
+    const audioTxt = !sh.stream.getAudioTracks().length ? '' : sh.opts.audioMode === 'plain' ? ' · sistem sesi açık (yankı korumasız)' : ' · sistem sesi açık (Kanki sesleri hariç)';
+    el.querySelector('.ss-meta').textContent = `${st.width || '?'}×${st.height || '?'} · ${sh.opts.fps} FPS · en fazla ${(sh.opts.bitrate / 1000).toFixed(1)} Mbps${audioTxt}`;
     const names = [...sh.watchers].map(userName).filter(Boolean);
     el.querySelector('.ss-viewers').textContent = names.length ? `İzleyenler (${names.length}): ${names.join(', ')}` : 'Henüz izleyen yok';
   }
@@ -2731,7 +2734,7 @@ const TIPS = {
   'opt-bitrate':
     'Yayına ayrılan internet hızı. "Otomatik", çözünürlük ve kare hızına göre seçer. Her izleyiciye ayrı gönderilir: 6 Mbps × 3 izleyici = 18 Mbps yükleme hızı gerekir.',
   'opt-audio':
-    'Bilgisayarın sesi de yayına eklenir (oyun, video, müzik). Pencere seçsen bile sadece o pencerenin değil, tüm bilgisayar sesi gider; Kanki’den duyduğun arkadaş sesleri de buna dahil, bu yüzden izleyenler kendi seslerini gecikmeli duyabilir. Oyun sesi gerekmiyorsa kapat. Windows’ta çalışır; macOS’ta 14.2 ve üstü gerekir.',
+    'Bilgisayarın sesi de yayına eklenir (oyun, video, müzik). Pencere seçsen bile sadece o pencerenin değil, tüm bilgisayar sesi gider. Kanki’den duyduğun arkadaş sesleri ve izlediğin yayınlar yayına girmez, böylece izleyenler kendi seslerini geri duymaz (Windows 10 2004 ve üstü). Windows’ta çalışır; macOS’ta 14.2 ve üstü gerekir.',
   // Bağlantı ekranı
   'in-nick': 'Sunucuda arkadaşlarının göreceği adın. Aynı ad kullanılıyorsa sonuna otomatik numara eklenir.',
   'in-address': 'Sunucuyu kuran kişinin verdiği adres, ör. bizim-kanki.ngrok-free.app ya da 192.168.1.20:4455. Başına https:// eklemene gerek yok.',

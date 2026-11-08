@@ -50,7 +50,7 @@ if (process.env.KANKI_USER_DATA) app.setPath('userData', process.env.KANKI_USER_
 
 let win = null;
 let hostedServer = null;
-let pendingSource = null; // { id, audio }
+let pendingSource = null; // { id, audio: 'clean' | 'plain' | false }
 
 function createWindow() {
   win = new BrowserWindow({
@@ -155,7 +155,11 @@ app.whenReady().then(() => {
         const source = sources.find((s) => s.id === sel.id);
         if (!source) return callback({});
         const streams = { video: source };
-        if (sel.audio && request.audioRequested) streams.audio = 'loopback';
+        // Sistem sesi: "clean" = Kanki'nin kendi çaldığı sesler hariç (arkadaş sesleri ve izlenen yayınlar
+        // yayına geri girmez, izleyenler kendi sesini yankı olarak duymaz). Chromium bunu Windows'ta işlem
+        // bazlı yakalamayla (Kanki'nin ses işlemi hariç), macOS'ta ScreenCaptureKit ile yapar.
+        // Desteklenmeyen sistemde açılamazsa uygulama "plain" (tüm sistem sesi) ile tekrar dener.
+        if (sel.audio && request.audioRequested) streams.audio = sel.audio === 'clean' ? 'loopbackWithoutChrome' : 'loopback';
         callback(streams);
       } catch (e) {
         console.error(e);
@@ -300,7 +304,8 @@ ipcMain.handle('screen:get-sources', async () => {
 });
 
 ipcMain.handle('screen:select-source', (_e, id, audio) => {
-  pendingSource = { id, audio: !!audio };
+  // audio: 'clean' | 'plain' | false (eski sürümlerden gelen true = 'plain')
+  pendingSource = { id, audio: audio === 'clean' ? 'clean' : audio ? 'plain' : false };
   return true;
 });
 

@@ -94,11 +94,11 @@ git push origin main v1.0.3
 GitHub Actions paketleri derler, Release'e `latest.yml` ile birlikte ekler; kurulu uygulamalar güncellemeyi buradan görür.
 
 ## Ekran paylaşımı
-- **Aynı anda birden fazla yayın:** Herkes en fazla 3 ekran/pencere paylaşabilir (ör. oyun + Discord penceresi + kod editörü). Paylaşırken **Başka Ekran Paylaş** ile yenisi eklenir, her birinin altta kendi **Durdur** düğmesi vardır. Sistem sesi yankı yapmasın diye sadece ilk yayına eklenir.
+- **Aynı anda birden fazla yayın:** Herkes en fazla 3 ekran/pencere paylaşabilir (ör. oyun + Discord penceresi + kod editörü). Paylaşırken sol alttaki **Ekran** düğmesiyle yenisi eklenir, her birinin altta kendi **Durdur** düğmesi vardır. Sistem sesi yankı yapmasın diye sadece ilk yayına eklenir.
 - **Aynı anda birden fazla yayın izleme:** Kanaldaki tüm yayınlar üstte düğme olarak görünür; tıklayınca sahneye eklenir. Yayınlar otomatik olarak en büyük sığacak şekilde dizilir.
 - **İstediğin yere yerleştir:** Her yayın penceresi üst çubuğundan tutulup sürüklenir, sağ alt köşesinden boyutlandırılır. Çift tıklayınca sahneyi kaplar. **Izgara** düğmesi hepsini yeniden düzenler. **Ayrı pencerede aç** ile yayın kendi penceresine çıkar; o pencere ekranın herhangi bir yerine ya da başka bir monitöre taşınabilir, kapatınca uygulamaya geri döner.
 - Ekran veya tek pencere seçilebilir. Çözünürlük 720p'den 4K'ya, kare hızı 15/30/60 FPS arasında seçilebilir. Öncelik olarak **Akıcılık** (oyun) ya da **Netlik** (yazı/kod) seçilebilir. Bit hızı otomatik veya elle ayarlanır.
-- **Sistem sesi:** Windows'ta doğrudan çalışır. macOS'ta 14.2 ve üstü gerekir; desteklenmiyorsa yayın sadece görüntüyle başlar.
+- **Sistem sesi:** Windows'ta doğrudan çalışır. macOS'ta 14.2 ve üstü gerekir; desteklenmiyorsa yayın sadece görüntüyle başlar. Kanki'nin kendi çaldığı sesler (arkadaş sesleri, izlenen yayınlar) yayına girmez, böylece izleyenler kendi seslerini yankı olarak duymaz. Bunu desteklemeyen eski Windows'ta (10 2004 öncesi) tüm sistem sesi gider ve uygulama uyarır.
 - Görüntü **sadece izlemeyi seçenlere** gönderilir. Yayıncının gereken yükleme hızı yaklaşık *bit hızı × izleyici sayısı* kadardır (ör. 1080p60 ≈ 7 Mbps × 3 izleyici ≈ 21 Mbps).
 - İzlerken sağ üstte gelen çözünürlük, FPS, Mbps ve kodek görünür. Tam ekran için **F** tuşuna bas ya da videoya çift tıkla.
 - Ayarlar'dan kodek seçilebilir: H.264 (donanım, varsayılan), VP9 veya AV1.

@@ -6,6 +6,17 @@
  */
 const CHANGELOG = [
   {
+    version: '1.0.11',
+    date: '2026-11-08',
+    title: 'Yayında yankı düzeltmesi',
+    fixed: [
+      'Sistem sesiyle ekran paylaşılınca izleyenler kendi seslerini yayından geri duyuyordu. Artık Kanki’nin çaldığı sesler (arkadaş sesleri, izlenen yayınlar) yayına girmiyor.',
+    ],
+    changed: [
+      'Yayın panelinde sistem sesinin "Kanki sesleri hariç" mi gittiği yazıyor. Bilgisayar bunu desteklemiyorsa eski yöntemle devam edip uyarıyor.',
+    ],
+  },
+  {
     version: '1.0.10',
     date: '2026-11-08',
     title: 'Kamera, tepkiler ve resimler',
