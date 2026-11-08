@@ -72,5 +72,6 @@
   },
   "portable": {
     "artifactName": "Kanki-Admin-Portable.${ext}"
-  }
+  },
+  "publish": null
 }

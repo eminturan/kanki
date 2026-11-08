@@ -2035,6 +2035,34 @@ $('#adm-stop').addEventListener('click', async () => {
 });
 
 // =====================================================================
+//  Otomatik güncelleme bildirimi (sadece kurulumlu Windows sürümünde gelir)
+// =====================================================================
+let updateToastShown = false;
+function renderUpdate(u) {
+  const bar = $('#update-bar');
+  if (!u || (u.state !== 'downloading' && u.state !== 'ready')) return bar.classList.add('hidden');
+  bar.classList.remove('hidden');
+  const ready = u.state === 'ready';
+  bar.classList.toggle('ready', ready);
+  $('#btn-update').classList.toggle('hidden', !ready);
+  $('#update-text').innerHTML = ready
+    ? `<b>Kanki ${esc(u.version)} hazır</b><div class="muted">Kapattığında da kendiliğinden kurulur.</div>`
+    : `Kanki ${esc(u.version || '')} indiriliyor… %${u.percent || 0}`;
+  $('#update-progress-fill').style.width = (u.percent || 0) + '%';
+  if (ready && !updateToastShown) {
+    updateToastShown = true;
+    beep('msg');
+  }
+}
+kanki.onUpdate(renderUpdate);
+kanki.updateState().then(renderUpdate);
+$('#btn-update').addEventListener('click', () => {
+  $('#btn-update').disabled = true;
+  $('#btn-update').textContent = 'Yeniden başlatılıyor…';
+  kanki.installUpdate();
+});
+
+// =====================================================================
 //  Başlangıç
 // =====================================================================
 (async function init() {

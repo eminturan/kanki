@@ -128,6 +128,57 @@ app.whenReady().then(() => {
 
   createWindow();
   app.on('activate', () => BrowserWindow.getAllWindows().length === 0 && createWindow());
+  setupAutoUpdate();
+});
+
+// ---------------- Otomatik güncelleme ----------------
+// Sadece kurulumlu Windows sürümünde (Kanki-Setup.exe) çalışır. Kurulumsuz sürüm,
+// Mac ve Kanki Admin bu bloğu atlar.
+let updater = null;
+let updateState = { state: 'idle' };
+
+function canAutoUpdate() {
+  return (
+    app.isPackaged &&
+    process.platform === 'win32' &&
+    VARIANT === 'client' &&
+    !process.env.PORTABLE_EXECUTABLE_DIR && // kurulumsuz (portable) sürüm
+    fs.existsSync(path.join(process.resourcesPath, 'app-update.yml'))
+  );
+}
+
+function sendUpdate(state) {
+  updateState = state;
+  win?.webContents.send('update', state);
+}
+
+function setupAutoUpdate() {
+  if (!canAutoUpdate()) return;
+  try {
+    ({ autoUpdater: updater } = require('electron-updater'));
+  } catch (e) {
+    console.error('electron-updater yüklenemedi', e);
+    return;
+  }
+  updater.autoDownload = true;
+  updater.autoInstallOnAppQuit = true; // kullanıcı "yeniden başlat"a basmasa da kapatınca kurulur
+  updater.on('update-available', (info) => sendUpdate({ state: 'downloading', version: info.version, percent: 0 }));
+  updater.on('download-progress', (p) =>
+    sendUpdate({ state: 'downloading', version: updateState.version, percent: Math.round(p.percent || 0) })
+  );
+  updater.on('update-downloaded', (info) => sendUpdate({ state: 'ready', version: info.version }));
+  updater.on('error', (e) => {
+    console.error('Güncelleme hatası:', e?.message || e);
+    if (updateState.state === 'downloading') sendUpdate({ state: 'idle' });
+  });
+  const check = () => updater.checkForUpdates().catch(() => {});
+  setTimeout(check, 5000);
+  setInterval(check, 4 * 60 * 60 * 1000); // açık kaldığı sürece 4 saatte bir bak
+}
+
+ipcMain.handle('update:state', () => updateState);
+ipcMain.handle('update:install', () => {
+  if (updater && updateState.state === 'ready') updater.quitAndInstall(true, true); // sessiz kur, sonra yeniden aç
 });
 
 app.on('window-all-closed', async () => {

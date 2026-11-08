@@ -80,6 +80,20 @@ Diğer seçenekler:
 
 > Ses ve görüntü sunucudan geçmez; kullanıcılar arasında doğrudan (P2P, WebRTC) akar. Bazı kısıtlı ağlarda (ör. mobil hat, CGNAT) doğrudan bağlantı kurulamazsa bir TURN sunucusu (coturn) gerekir ya da Tailscale kullanılır.
 
+## Otomatik güncelleme ve yeni sürüm çıkarma
+- **Kurulumlu Windows sürümü (`Kanki-Setup.exe`)** kendini günceller: açılışta ve açık kaldığı sürece 4 saatte bir GitHub Releases'a bakar, yeni sürümü arka planda indirir, sol altta "Yeniden başlat ve güncelle" düğmesi çıkar. Düğmeye basılmazsa uygulama kapatılınca kurulur.
+- Kurulumsuz Windows sürümü, Mac sürümleri ve Kanki Admin kendini güncellemez; yeni sürüm indirme sayfasından elle indirilir.
+- Otomatik güncelleme 1.0.2 ile gelen bir özellik; daha eski sürümü kuranlar bir kere elle güncellemeli.
+
+Yeni sürüm çıkarmak için `package.json` içindeki `version`'ı artır, commit'le ve aynı sürümün etiketini gönder:
+```bash
+npm version 1.0.3 --no-git-tag-version
+git commit -am "Sürüm 1.0.3"
+git tag v1.0.3
+git push origin main v1.0.3
+```
+GitHub Actions paketleri derler, Release'e `latest.yml` ile birlikte ekler; kurulu uygulamalar güncellemeyi buradan görür.
+
 ## Ekran paylaşımı
 - Ekran veya tek pencere seçilebilir. Çözünürlük 720p'den 4K'ya, kare hızı 15/30/60 FPS arasında seçilebilir. Öncelik olarak **Akıcılık** (oyun) ya da **Netlik** (yazı/kod) seçilebilir. Bit hızı otomatik veya elle ayarlanır.
 - **Sistem sesi:** Windows'ta doğrudan çalışır. macOS'ta 14.2 ve üstü gerekir; desteklenmiyorsa yayın sadece görüntüyle başlar.

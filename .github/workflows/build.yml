@@ -31,6 +31,8 @@ jobs:
           path: |
             dist/${{ matrix.variant }}/*.dmg
             dist/${{ matrix.variant }}/*.exe
+            dist/${{ matrix.variant }}/latest.yml
+            dist/${{ matrix.variant }}/*-Setup.exe.blockmap
           if-no-files-found: error
 
   release:

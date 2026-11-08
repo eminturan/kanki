@@ -71,5 +71,13 @@
   },
   "portable": {
     "artifactName": "Kanki-Portable.${ext}"
-  }
+  },
+  "publish": [
+    {
+      "provider": "github",
+      "owner": "kanki-app",
+      "repo": "kanki-app.github.io",
+      "releaseType": "release"
+    }
+  ]
 }
