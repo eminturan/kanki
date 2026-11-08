@@ -304,6 +304,88 @@ function beep(kind) {
   } catch {}
 }
 
+// Dürtme sesi: kısa bir "ding" ardından titreşim vızıltısı (WebAudio ile üretilir)
+function playBuzz() {
+  if (S.deafened) return;
+  try {
+    const ctx = getCtx();
+    const t0 = ctx.currentTime;
+    const out = ctx.createGain();
+    out.gain.value = 0.9;
+    out.connect(ctx.destination);
+
+    // Dikkat çeken iki notalık giriş
+    [[1046, 0], [1568, 0.07]].forEach(([f, d]) => {
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.type = 'triangle';
+      o.frequency.value = f;
+      g.gain.setValueAtTime(0.0001, t0 + d);
+      g.gain.exponentialRampToValueAtTime(0.12, t0 + d + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + d + 0.16);
+      o.connect(g).connect(out);
+      o.start(t0 + d);
+      o.stop(t0 + d + 0.18);
+    });
+
+    // Titreşim: alçak frekanslı testere dalgası, hızlı aç-kapa ile "brrr"
+    const start = t0 + 0.16;
+    const dur = 0.6;
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 1100;
+    const body = ctx.createGain();
+    body.gain.setValueAtTime(0.0001, start);
+    body.gain.exponentialRampToValueAtTime(0.22, start + 0.03);
+    body.gain.setValueAtTime(0.22, start + dur - 0.12);
+    body.gain.exponentialRampToValueAtTime(0.0001, start + dur);
+    const trem = ctx.createGain();
+    trem.gain.value = 0.5;
+    const lfo = ctx.createOscillator();
+    lfo.type = 'square';
+    lfo.frequency.value = 26;
+    const lfoAmt = ctx.createGain();
+    lfoAmt.gain.value = 0.5;
+    lfo.connect(lfoAmt).connect(trem.gain);
+    for (const [f, type] of [[74, 'sawtooth'], [148, 'square'], [111, 'sawtooth']]) {
+      const o = ctx.createOscillator();
+      o.type = type;
+      o.frequency.setValueAtTime(f, start);
+      o.frequency.linearRampToValueAtTime(f * 0.92, start + dur);
+      const g = ctx.createGain();
+      g.gain.value = type === 'square' ? 0.25 : 0.5;
+      o.connect(g).connect(trem);
+      o.start(start);
+      o.stop(start + dur + 0.02);
+    }
+    trem.connect(lp).connect(body).connect(out);
+    lfo.start(start);
+    lfo.stop(start + dur + 0.02);
+  } catch (e) {
+    log('buzz', e);
+  }
+}
+
+// Dürtülünce: ses + pencereyi titret (pencere taşınamıyorsa içeriği titret)
+let lastNudge = 0;
+async function nudge(strong = true) {
+  const now = Date.now();
+  if (now - lastNudge < 2500) return; // art arda dürtmeler pencereyi deli gibi sallamasın
+  lastNudge = now;
+  if (strong) playBuzz();
+  const shakeContent = () => {
+    const el = $$('.screen').find((s) => !s.classList.contains('hidden'));
+    if (!el) return;
+    el.classList.remove('nudge');
+    void el.offsetWidth;
+    el.classList.add('nudge');
+    setTimeout(() => el.classList.remove('nudge'), 650);
+  };
+  if (!strong) return shakeContent();
+  const how = await kanki.shake().catch(() => 'css');
+  if (how !== 'window') shakeContent();
+}
+
 // =====================================================================
 //  WebRTC eşleri (perfect negotiation)
 // =====================================================================
@@ -957,7 +1039,7 @@ function onMessage(m) {
       break;
     }
     case 'poke':
-      beep('poke');
+      nudge(true);
       toast(`${m.name} seni dürttü!`, m.text || '', 'poke', 8000);
       kanki.flash();
       kanki.notify(`${m.name} seni dürttü`, m.text || '');
@@ -1295,7 +1377,20 @@ function userMenu(e, u) {
         renderTree();
       },
     },
-    { label: 'Dürt', run: () => inlinePrompt(`${u.name} kişisini dürt — mesaj (opsiyonel)`, '', (text) => send({ t: 'poke', to: u.id, text }), true) },
+    {
+      label: 'Dürt',
+      run: () =>
+        inlinePrompt(
+          `${u.name} kişisini dürt — mesaj (opsiyonel)`,
+          '',
+          (text) => {
+            send({ t: 'poke', to: u.id, text });
+            toast(`${u.name} dürtüldü`, 'Onun ekranı şu an titriyor.');
+            nudge(false);
+          },
+          true
+        ),
+    },
     !sameChannel && { label: 'Kanalına git', run: () => joinChannel(u.channelId) },
     ...(S.isAdmin
       ? [
@@ -1790,7 +1885,7 @@ const TIPS = {
   'set-ns': 'Fan, klavye, trafik gibi sürekli arka plan seslerini temizler. Mikrofona müzik ya da enstrüman çalıyorsan kapatmak sesi daha doğal yapar.',
   'set-ec': 'Hoparlörden çıkan arkadaş sesinin mikrofonuna girip onlara yankı olarak dönmesini engeller. Kulaklık kullanıyorsan kapatabilirsin.',
   'set-agc': 'Mikrofon seviyeni kendiliğinden ayarlar; fısıldasan da bağırsan da benzer seviyede duyulursun.',
-  'set-sounds': 'Biri kanala girip çıktığında, mesaj geldiğinde ve dürtüldüğünde kısa bir uyarı sesi çalar.',
+  'set-sounds': 'Biri kanala girip çıktığında ve mesaj geldiğinde kısa bir uyarı sesi çalar. Dürtülme sesi bu ayardan bağımsızdır; sadece hoparlörü kapatınca susar.',
   // Ekran paylaşımı ayarları
   'set-codec':
     'Yayınının sıkıştırılma biçimi.\nH.264: ekran kartını kullanır, bilgisayarı en az yorar (önerilen).\nVP9: yazılar daha net, işlemciyi daha çok kullanır.\nAV1: aynı kalitede en az internet, en ağır seçenek.',

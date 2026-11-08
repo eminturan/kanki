@@ -337,6 +337,34 @@ ipcMain.handle('app:flash', () => {
   }
 });
 
+// Dürtme: pencereyi sağa sola titret. Tam ekran / büyütülmüş pencere taşınamadığı
+// için o durumda 'css' döner ve arayüz kendi içeriğini titretir.
+let shaking = false;
+ipcMain.handle('app:shake', async () => {
+  if (!win || win.isDestroyed()) return 'none';
+  if (win.isMinimized()) win.restore();
+  if (!win.isVisible()) win.show();
+  if (win.isFullScreen() || win.isMaximized() || win.isSimpleFullScreen?.()) return 'css';
+  if (shaking) return 'busy';
+  shaking = true;
+  const [x, y] = win.getPosition();
+  const offsets = [
+    [-14, -4], [14, 4], [-12, 6], [12, -6], [-10, -3], [10, 3],
+    [-8, 5], [8, -5], [-6, -2], [6, 2], [-4, 3], [4, -3], [-2, 0], [2, 0],
+  ];
+  try {
+    for (const [dx, dy] of offsets) {
+      if (win.isDestroyed()) break;
+      win.setPosition(x + dx, y + dy, false);
+      await new Promise((r) => setTimeout(r, 28));
+    }
+  } finally {
+    if (!win.isDestroyed()) win.setPosition(x, y, false);
+    shaking = false;
+  }
+  return 'window';
+});
+
 function localAddresses() {
   const out = [];
   for (const [name, list] of Object.entries(os.networkInterfaces())) {
