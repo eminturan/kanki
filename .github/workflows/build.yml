@@ -1,7 +1,12 @@
 name: build
 
-# v* etiketi atıldığında: 4 paketi derler, arkadaş sürümünü (Kanki) GitHub Release'e ekler.
+# v* etiketi atıldığında: tüm paketleri derler, arkadaş sürümünü (Kanki) GitHub Release'e ekler.
 # Elle çalıştırıldığında: sadece derler ve dosyaları Actions "artifact" olarak saklar.
+#
+# Hız için:
+#  - Windows kurulumlu (nsis) ve kurulumsuz (portable) paketler ayrı makinelerde paralel derlenir
+#  - Release sadece arkadaş sürümünü bekler; Kanki Admin paralelde derlenmeye devam eder
+#  - npm paketleri ve Electron indirmeleri önbelleğe alınır
 on:
   workflow_dispatch:
   push:
@@ -11,33 +16,91 @@ permissions:
   contents: write
 
 jobs:
-  build:
+  # Arkadaş sürümü (Kanki): Release bunu bekler
+  client:
+    name: Kanki · ${{ matrix.label }}
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest, windows-latest]
-        variant: [client, admin]
+        include:
+          - { os: windows-latest, label: windows-setup, args: '--win nsis' }
+          - { os: windows-latest, label: windows-portable, args: '--win portable' }
+          - { os: macos-latest, label: mac, args: '--mac' }
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: { node-version: 22 }
-      - run: npm ci
-      - run: npx electron-builder ${{ matrix.os == 'macos-latest' && '--mac' || '--win' }} --config electron-builder.${{ matrix.variant }}.json --publish never
+        with:
+          node-version: 22
+          cache: npm
+      - name: Electron önbelleği
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/Library/Caches/electron
+            ~/Library/Caches/electron-builder
+            ~/AppData/Local/electron/Cache
+            ~/AppData/Local/electron-builder/Cache
+          key: electron-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: electron-${{ runner.os }}-
+      - run: npm ci --prefer-offline --no-audit --no-fund
+      - run: npx electron-builder ${{ matrix.args }} --config electron-builder.client.json --publish never
         env: { CSC_IDENTITY_AUTO_DISCOVERY: 'false' }
       - uses: actions/upload-artifact@v4
         with:
-          name: kanki-${{ matrix.variant }}-${{ matrix.os }}
+          name: kanki-client-${{ matrix.label }}
           path: |
-            dist/${{ matrix.variant }}/*.dmg
-            dist/${{ matrix.variant }}/*.exe
-            dist/${{ matrix.variant }}/latest.yml
-            dist/${{ matrix.variant }}/*-Setup.exe.blockmap
+            dist/client/*.dmg
+            dist/client/*.exe
+            dist/client/latest.yml
+            dist/client/*-Setup.exe.blockmap
           if-no-files-found: error
+          compression-level: 0 # kurulum dosyaları zaten sıkıştırılmış
+
+  # Kanki Admin: paralelde derlenir, Release'i bekletmez (dosyaları Actions sayfasından indirilir)
+  admin:
+    name: Kanki Admin · ${{ matrix.label }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: windows-latest, label: windows-setup, args: '--win nsis' }
+          - { os: windows-latest, label: windows-portable, args: '--win portable' }
+          - { os: macos-latest, label: mac, args: '--mac' }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Electron önbelleği
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/Library/Caches/electron
+            ~/Library/Caches/electron-builder
+            ~/AppData/Local/electron/Cache
+            ~/AppData/Local/electron-builder/Cache
+          key: electron-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: electron-${{ runner.os }}-
+      - run: npm ci --prefer-offline --no-audit --no-fund
+      - run: npx electron-builder ${{ matrix.args }} --config electron-builder.admin.json --publish never
+        env: { CSC_IDENTITY_AUTO_DISCOVERY: 'false' }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kanki-admin-${{ matrix.label }}
+          path: |
+            dist/admin/*.dmg
+            dist/admin/*.exe
+            dist/admin/latest.yml
+            dist/admin/*-Setup.exe.blockmap
+          if-no-files-found: error
+          compression-level: 0 # kurulum dosyaları zaten sıkıştırılmış
 
   release:
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: build
+    needs: client
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
