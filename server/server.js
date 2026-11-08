@@ -98,8 +98,24 @@ function startServer(opts = {}) {
     shares: u.shares || [],
     away: u.away,
     presence: u.presence || 'online',
+    statusText: u.statusText || '',
+    hasAvatar: !!u.avatar,
     admin: !!u.admin,
   });
+
+  // Profil fotoğrafı: küçük bir resim (data URL). Durum yayınlarını şişirmesin diye ayrı mesajla gider.
+  const AVATAR_MAX = 60 * 1024;
+  const IMAGE_MAX = 3 * 1024 * 1024;
+  const isImageData = (s, max) => typeof s === 'string' && s.length <= max && /^data:image\/(png|jpeg|webp|gif);base64,[A-Za-z0-9+/=]+$/.test(s);
+  const cleanStatus = (s) => String(s || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+
+  // Sohbet mesajı herkese giderken gizli alanlar (yazarın anahtarı) çıkarılır
+  const pubMsg = (m) => {
+    const { _k, ...rest } = m;
+    return rest;
+  };
+  const findMsg = (channelId, id) => (chatHistory.get(channelId) || []).find((x) => x.id === id);
+  const canModify = (me, msg) => !!msg && !msg.system && ((msg._k && msg._k === me.clientKey) || me.admin);
 
   function send(ws, msg) {
     if (ws.readyState === 1) ws.send(JSON.stringify(msg));
@@ -129,6 +145,12 @@ function startServer(opts = {}) {
     const arr = chatHistory.get(channelId);
     arr.push(msg);
     if (arr.length > 200) arr.shift();
+    // Bellek şişmesin: kanal başına en yeni 30 resim saklanır, eskilerinin yerine not kalır
+    const withImg = arr.filter((x) => x.image);
+    for (const x of withImg.slice(0, Math.max(0, withImg.length - 30))) {
+      x.image = null;
+      x.imageExpired = true;
+    }
   }
   function moveUser(u, channelId) {
     if (!channels.find((c) => c.id === channelId)) return;
@@ -139,7 +161,7 @@ function startServer(opts = {}) {
     u.shares = [];
     if (old) systemChat(old, `${u.name} kanaldan ayrıldı`);
     systemChat(channelId, `${u.name} kanala katıldı`);
-    send(u.ws, { t: 'history', channelId, messages: chatHistory.get(channelId) || [] });
+    send(u.ws, { t: 'history', channelId, messages: (chatHistory.get(channelId) || []).map(pubMsg) });
     broadcastState();
   }
 
@@ -147,7 +169,7 @@ function startServer(opts = {}) {
     res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
     res.end(`${serverName} çalışıyor. Bağlı kullanıcı: ${users.size}\n`);
   });
-  const wss = new WebSocketServer({ server: httpServer, maxPayload: 256 * 1024 });
+  const wss = new WebSocketServer({ server: httpServer, maxPayload: 4 * 1024 * 1024 }); // sohbette resim gönderilebilsin
 
   wss.on('connection', (ws, req) => {
     let me = null;
@@ -184,6 +206,9 @@ function startServer(opts = {}) {
           shares: [],
           away: false,
           presence: ['online', 'idle', 'dnd'].includes(m.presence) ? m.presence : 'online',
+          statusText: cleanStatus(m.statusText),
+          avatar: isImageData(m.avatar, AVATAR_MAX) ? m.avatar : null,
+          clientKey: String(m.clientKey || '').slice(0, 64) || crypto.randomUUID(), // mesaj düzenleme/silme yetkisi için
           admin: isAdmin,
           ip,
           connectedAt: Date.now(),
@@ -194,6 +219,10 @@ function startServer(opts = {}) {
         log(`Bağlandı: ${name} (${ip})${isAdmin ? ' [yönetici]' : ''}`);
         if (m.adminKey && !isAdmin) send(ws, { t: 'error', code: 'bad_admin_key', message: 'Yönetici anahtarı hatalı; normal kullanıcı olarak bağlandın.' });
         send(ws, { t: 'welcome', id: me.id, name, serverName, iceServers, admin: isAdmin });
+        const avatars = {};
+        for (const u of users.values()) if (u.avatar) avatars[u.id] = u.avatar;
+        send(ws, { t: 'avatars', avatars });
+        if (me.avatar) broadcast({ t: 'avatar', id: me.id, data: me.avatar }, (u) => u.id !== me.id);
         const wanted = channels.find((c) => c.id === m.channelId) ? m.channelId : lobbyId();
         moveUser(me, wanted);
         return;
@@ -214,10 +243,14 @@ function startServer(opts = {}) {
           if ('deafened' in m) me.deafened = !!m.deafened;
           if ('sharing' in m) me.sharing = !!m.sharing;
           if (Array.isArray(m.shares)) {
-            // Aynı anda en fazla 4 yayın; her biri { id, label }
+            // Aynı anda en fazla 4 yayın (3 ekran + kamera); her biri { id, label, kind? }
             me.shares = m.shares
               .slice(0, 4)
-              .map((x) => ({ id: String(x?.id || '').slice(0, 40), label: String(x?.label || 'Ekran').slice(0, 60) }))
+              .map((x) => {
+                const s = { id: String(x?.id || '').slice(0, 40), label: String(x?.label || 'Ekran').slice(0, 60) };
+                if (x?.kind === 'camera') s.kind = 'camera';
+                return s;
+              })
               .filter((x) => x.id);
             me.sharing = me.shares.length > 0;
           } else if ('sharing' in m && !m.sharing) {
@@ -237,10 +270,61 @@ function startServer(opts = {}) {
         }
         case 'chat': {
           const text = String(m.text || '').slice(0, 2000).trim();
-          if (!text || !me.channelId) break;
-          const msg = { t: 'chat', id: crypto.randomUUID(), channelId: me.channelId, from: me.id, name: me.name, text, ts: Date.now() };
+          const image = isImageData(m.image, IMAGE_MAX) ? m.image : null;
+          if ((!text && !image) || !me.channelId) break;
+          const msg = { t: 'chat', id: crypto.randomUUID(), channelId: me.channelId, from: me.id, name: me.name, text, ts: Date.now(), _k: me.clientKey };
+          if (image) {
+            msg.image = image;
+            msg.imageW = Math.max(0, Math.min(10000, Number(m.imageW) || 0));
+            msg.imageH = Math.max(0, Math.min(10000, Number(m.imageH) || 0));
+          }
+          // Yanıt: alıntılanan mesajın kısa bir özeti mesajla birlikte saklanır
+          const orig = m.replyTo && findMsg(me.channelId, m.replyTo);
+          if (orig && !orig.system) msg.replyTo = { id: orig.id, name: orig.name, text: String(orig.text || '').slice(0, 140), image: !!orig.image };
           pushHistory(me.channelId, msg);
-          broadcast(msg, (u) => u.channelId === me.channelId);
+          broadcast(pubMsg(msg), (u) => u.channelId === me.channelId);
+          break;
+        }
+        case 'chatEdit': {
+          const msg = findMsg(me.channelId, m.id);
+          const text = String(m.text || '').slice(0, 2000).trim();
+          if (!canModify(me, msg) || msg._k !== me.clientKey || (!text && !msg.image)) break; // düzenlemeyi sadece yazan yapar
+          msg.text = text;
+          msg.edited = Date.now();
+          broadcast({ t: 'chatUpdate', channelId: me.channelId, msg: pubMsg(msg) }, (u) => u.channelId === me.channelId);
+          break;
+        }
+        case 'chatDelete': {
+          const msg = findMsg(me.channelId, m.id);
+          if (!canModify(me, msg)) break; // yazan ya da yönetici silebilir
+          const arr = chatHistory.get(me.channelId);
+          arr.splice(arr.indexOf(msg), 1);
+          broadcast({ t: 'chatDelete', channelId: me.channelId, id: msg.id }, (u) => u.channelId === me.channelId);
+          break;
+        }
+        case 'react': {
+          const msg = findMsg(me.channelId, m.id);
+          const emoji = String(m.emoji || '').slice(0, 16);
+          if (!msg || msg.system || !emoji) break;
+          msg.reactions = msg.reactions || {};
+          const list = msg.reactions[emoji] || [];
+          if (list.includes(me.name)) msg.reactions[emoji] = list.filter((n) => n !== me.name);
+          else if (Object.keys(msg.reactions).length < 20 || msg.reactions[emoji]) msg.reactions[emoji] = [...list, me.name];
+          if (!msg.reactions[emoji]?.length) delete msg.reactions[emoji];
+          broadcast({ t: 'chatUpdate', channelId: me.channelId, msg: pubMsg(msg) }, (u) => u.channelId === me.channelId);
+          break;
+        }
+        case 'profile': {
+          // Profil fotoğrafı ve özel durum yazısı
+          if ('statusText' in m) me.statusText = cleanStatus(m.statusText);
+          if ('avatar' in m) {
+            const next = isImageData(m.avatar, AVATAR_MAX) ? m.avatar : null;
+            if (next !== me.avatar) {
+              me.avatar = next;
+              broadcast({ t: 'avatar', id: me.id, data: next });
+            }
+          }
+          broadcastState();
           break;
         }
         case 'typing':

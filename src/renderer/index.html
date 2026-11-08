@@ -122,9 +122,13 @@
           </div>
           <button class="ctl danger" id="btn-disconnect" title="Bağlantıyı kes"></button>
           <div class="voice-actions">
+              <button class="btn share" id="btn-camera" title="Kamerayı aç">
+                <svg viewBox="0 0 24 24"><path d="M4 6h11a2 2 0 0 1 2 2v1.5l3.4-2.3A1 1 0 0 1 22 8v8a1 1 0 0 1-1.6.8L17 14.5V16a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2Z"/></svg>
+                <span>Kamera</span>
+              </button>
               <button class="btn share" id="btn-share">
                 <svg viewBox="0 0 24 24"><path d="M3 5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-6v2h3a1 1 0 1 1 0 2H8a1 1 0 1 1 0-2h3v-2H5a2 2 0 0 1-2-2V5Zm2 0v10h14V5H5Zm7 1.5 3.5 3.5H13v3h-2v-3H8.5L12 6.5Z"/></svg>
-                <span>Ekran Paylaş</span>
+                <span>Ekran</span>
               </button>
           </div>
         </div>
@@ -157,6 +161,10 @@
               <svg viewBox="0 0 24 24"><path d="M4 4h7v7H4V4Zm9 0h7v7h-7V4ZM4 13h7v7H4v-7Zm9 0h7v7h-7v-7Z"/></svg>
               <span>Izgara</span>
             </button>
+            <button class="icon-btn chat-toggle active" id="btn-toggle-chat" title="Sohbeti gizle">
+              <svg viewBox="0 0 24 24"><path d="M5 3h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H9l-5 4V5a2 2 0 0 1 2-2Z" transform="translate(-1 0)"/></svg>
+              <span class="unread hidden"></span>
+            </button>
           </div>
         </div>
         <div class="share-strip hidden" id="share-strip"></div>
@@ -165,6 +173,14 @@
           <div class="participants" id="participants"></div>
         </div>
         <div class="self-shares hidden" id="self-share"></div>
+        <div class="call-bar hidden" id="call-bar">
+          <button class="cb-btn" id="cb-camera"></button>
+          <button class="cb-btn" id="cb-share"></button>
+          <span class="cb-sep"></span>
+          <button class="cb-btn" id="cb-mic"></button>
+          <button class="cb-btn" id="cb-deafen"></button>
+          <button class="cb-btn leave" id="cb-leave"></button>
+        </div>
       </main>
 
       <!-- Sağ: sohbet -->
@@ -187,8 +203,13 @@
           <form class="chat-form" id="chat-form">
             <div class="mention-pop hidden" id="mention-pop"></div>
             <div class="emoji-pop hidden" id="emoji-pop"></div>
+            <div class="compose-extra hidden" id="compose-extra"></div>
             <div class="chat-input-wrap">
-              <input id="chat-input" placeholder="Mesaj yaz…" autocomplete="off" maxlength="2000" />
+              <button type="button" class="attach-btn" id="btn-attach" title="Resim ekle (yapıştırabilir ya da sürükleyip bırakabilirsin)">
+                <svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm5 11h-4v4h-2v-4H7v-2h4V7h2v4h4v2Z"/></svg>
+              </button>
+              <input type="file" id="file-input" accept="image/*" hidden />
+              <textarea id="chat-input" rows="1" placeholder="Mesaj gönder" autocomplete="off" maxlength="2000"></textarea>
               <button type="button" class="emoji-btn" id="btn-emoji" title="Emoji">
                 <svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm0 18a8 8 0 1 1 0-16 8 8 0 0 1 0 16Zm-3.5-9a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Zm7 0a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3ZM12 17.5c2.3 0 4.3-1.4 5-3.5H7c.7 2.1 2.7 3.5 5 3.5Z"/></svg>
               </button>
@@ -271,16 +292,40 @@
     <div class="settings-shell">
       <nav class="settings-nav">
         <div class="settings-nav-title">Kullanıcı ayarları</div>
-        <button class="snav active" data-pane="voice">Ses ve mikrofon</button>
+        <button class="snav active" data-pane="profile">Profilim</button>
+        <button class="snav" data-pane="voice">Ses ve görüntü</button>
         <button class="snav" data-pane="share">Ekran paylaşımı</button>
         <button class="snav" data-pane="notify">Bildirimler</button>
+        <button class="snav" data-pane="keys">Kısayollar</button>
         <div class="settings-nav-sep"></div>
         <button class="snav" data-pane="about">Hakkında</button>
       </nav>
       <div class="settings-main">
         <div class="settings-body">
-          <section class="settings-pane" data-pane="voice">
-            <h2>Ses ve mikrofon</h2>
+          <section class="settings-pane" data-pane="profile">
+            <h2>Profilim</h2>
+            <div class="profile-edit">
+              <div class="pe-form">
+                <div class="field">
+                  <span>Profil fotoğrafı</span>
+                  <div class="pe-row">
+                    <button class="btn primary" id="btn-avatar-pick">Fotoğraf seç</button>
+                    <button class="btn" id="btn-avatar-remove">Kaldır</button>
+                  </div>
+                  <input type="file" id="avatar-file" accept="image/*" hidden />
+                </div>
+                <label class="field"><span>Durum yazısı</span><input id="set-status-text" maxlength="80" placeholder="Ör. 🎮 Oyun oynuyor" autocomplete="off" /></label>
+                <p class="hint">Fotoğrafın ve durum yazın kanal listesinde, üye listesinde, sohbette ve profil kartında görünür. Fotoğraf sadece bu bilgisayarda saklanır, bağlandığın sunucuya gönderilir.</p>
+                <div class="field"><span>Görünen ad</span><div class="pe-nick-line">Bağlanırken yazdığın ad: <b id="pe-nick"></b></div></div>
+              </div>
+              <div class="pe-preview">
+                <div class="pe-label">Önizleme</div>
+                <div class="pe-card" id="pe-card"></div>
+              </div>
+            </div>
+          </section>
+          <section class="settings-pane hidden" data-pane="voice">
+            <h2>Ses ve görüntü</h2>
             <div class="row2 wide">
               <label class="field"><span>Mikrofon</span><select id="set-input"></select></label>
               <label class="field"><span>Hoparlör / Kulaklık</span><select id="set-output"></select></label>
@@ -306,6 +351,12 @@
                 <span class="muted" id="ptt-note"></span>
               </div>
             </div>
+            <h3>Kamera</h3>
+            <div class="cam-row">
+              <label class="field"><span>Kamera</span><select id="set-camera"></select></label>
+              <button class="btn" id="btn-cam-test">Kamerayı dene</button>
+            </div>
+            <div class="cam-preview-box" id="cam-preview-box"><video id="cam-preview" autoplay playsinline muted></video><span>Önizleme kapalı</span></div>
             <h3>Ses işleme</h3>
             <div class="checks">
               <label class="check"><input type="checkbox" id="set-ns" /><span>Gürültü bastırma</span></label>
@@ -334,6 +385,21 @@
               <label class="check"><input type="checkbox" id="set-autoidle" /><span>10 dakika hareketsiz kalınca "Boşta" görün</span></label>
             </div>
             <p class="hint">"Rahatsız Etmeyin" durumundayken mesaj sesleri, masaüstü bildirimleri ve dürtme titreşimi kapalıdır.</p>
+          </section>
+          <section class="settings-pane hidden" data-pane="keys">
+            <h2>Kısayollar</h2>
+            <div class="keys-list">
+              <div class="key-row"><span>Mikrofonu kapat / aç</span><span><kbd class="mod"></kbd><kbd>Shift</kbd><kbd>M</kbd></span></div>
+              <div class="key-row"><span>Sesi kapat / aç (sağırlaştır)</span><span><kbd class="mod"></kbd><kbd>Shift</kbd><kbd>D</kbd></span></div>
+              <div class="key-row"><span>İzlenen yayını tam ekran yap</span><span><kbd>F</kbd></span></div>
+              <div class="key-row"><span>Açık pencereyi ya da menüyü kapat</span><span><kbd>Esc</kbd></span></div>
+              <div class="key-row"><span>Mesajı gönder</span><span><kbd>Enter</kbd></span></div>
+              <div class="key-row"><span>Mesajda yeni satır</span><span><kbd>Shift</kbd><kbd>Enter</kbd></span></div>
+              <div class="key-row"><span>Son mesajını düzenle (kutu boşken)</span><span><kbd>↑</kbd></span></div>
+              <div class="key-row"><span>Resim yapıştır</span><span><kbd class="mod"></kbd><kbd>V</kbd></span></div>
+              <div class="key-row"><span>Mesajı sormadan sil</span><span><kbd>Shift</kbd> + Sil düğmesi</span></div>
+              <div class="key-row"><span>Bas-konuş</span><span id="keys-ptt" class="muted">Ses ve görüntü bölümünden atanır</span></div>
+            </div>
           </section>
           <section class="settings-pane hidden" data-pane="about">
             <h2>Hakkında</h2>
@@ -433,6 +499,14 @@
   </div>
 
   <div class="profile-pop hidden" id="profile-pop"></div>
+
+  <div class="modal hidden lightbox" id="lightbox">
+    <img id="lightbox-img" alt="" />
+    <div class="lb-actions">
+      <a class="btn sm" id="lightbox-save">Kaydet</a>
+      <button class="btn sm" data-close>Kapat (Esc)</button>
+    </div>
+  </div>
 
   <div class="modal hidden" id="prompt-modal">
     <div class="modal-card prompt-card">

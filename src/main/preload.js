@@ -4,6 +4,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('kanki', {
   info: () => ipcRenderer.invoke('app:info'),
   ensurePermissions: () => ipcRenderer.invoke('media:ensure-permissions'),
+  ensureCamera: () => ipcRenderer.invoke('media:ensure-camera'),
   openScreenSettings: () => ipcRenderer.invoke('media:open-screen-settings'),
   getSources: () => ipcRenderer.invoke('screen:get-sources'),
   selectSource: (id, audio) => ipcRenderer.invoke('screen:select-source', id, audio),

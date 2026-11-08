@@ -916,3 +916,225 @@ body.mac .update-btn { top: 36px; }
 .wn-text { color: var(--text); font-size: 14px; }
 .wn-text code { padding: 0 4px; border-radius: 3px; background: #000; border: 1px solid var(--line); font: 12.5px var(--mono); color: #b6f5d4; }
 .wn-foot { display: flex; align-items: center; gap: 10px; padding: 14px 24px; border-top: 1px solid var(--line); background: #070909; }
+
+/* =====================================================================
+   Discord tarzı özellikler — 2. tur
+   ===================================================================== */
+/* ---------- Profil fotoğrafları ---------- */
+.avatar.has-img { background-size: cover !important; background-position: center !important; background-repeat: no-repeat !important; color: transparent; }
+.avatar.tiny { width: 16px; height: 16px; font-size: 9px; flex: none; }
+
+/* ---------- Ses paneli: Kamera + Ekran ---------- */
+.voice-actions .btn.share.on { background: var(--accent-soft); color: var(--accent); border-color: rgba(34, 212, 126, .45); }
+.user .badges .cam-badge { display: inline-flex; color: var(--accent); }
+.user .badges .cam-badge svg { width: 15px; height: 15px; color: var(--accent); }
+
+/* ---------- Kameralı katılımcı kutuları ---------- */
+.p-card::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; transition: box-shadow .1s; }
+.p-card:has(.avatar.speaking)::after { box-shadow: inset 0 0 0 3px var(--green); }
+.p-card .cam-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; background: #000; }
+.p-card .cam-video.mirror { transform: scaleX(-1); }
+.p-card.has-cam .avatar { display: none; }
+.p-card .p-label, .p-card .live, .p-card .watch-btn { z-index: 2; }
+
+/* Yayın izlerken katılımcılar altta şerit olur (Discord'daki odak görünümü) */
+.stage-body.with-strip .tiles { bottom: 128px; }
+.participants.strip {
+  position: absolute; left: 16px; right: 16px; bottom: 10px; height: 104px; flex-wrap: nowrap; align-content: normal;
+  align-items: center; justify-content: center; gap: 8px; overflow-x: auto; overflow-y: hidden;
+}
+.participants.strip .p-card { flex: none; width: 168px; border-radius: 6px; }
+.participants.strip .p-card .avatar { min-width: 0; width: 40px; font-size: 16px; }
+.participants.strip .p-label { left: 5px; bottom: 5px; padding: 1px 6px; font-size: 11.5px; }
+.participants.strip .p-label svg { width: 13px; height: 13px; }
+.participants.strip .live { top: 5px; left: 5px; font-size: 9px; }
+
+/* ---------- Sahne alt çubuğu: arama kontrolleri ---------- */
+.self-shares { margin-bottom: 0; }
+.call-bar { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 10px 16px 14px; }
+.cb-btn {
+  width: 46px; height: 46px; border: 0; border-radius: 50%; display: grid; place-items: center; cursor: pointer;
+  background: #151b1c; color: var(--text); border: 1px solid var(--line); transition: background .12s, color .12s, transform .08s;
+}
+.cb-btn svg { width: 22px; height: 22px; }
+.cb-btn:hover:not(:disabled) { background: #1e2729; }
+.cb-btn:active:not(:disabled) { transform: scale(.95); }
+.cb-btn:disabled { opacity: .4; cursor: not-allowed; }
+.cb-btn.on { background: var(--accent); color: #03140a; border-color: transparent; }
+.cb-btn.on:hover:not(:disabled) { background: #3be691; }
+.cb-btn.off { background: rgba(255, 77, 94, .14); color: var(--red); border-color: rgba(255, 77, 94, .3); }
+.cb-btn.off:hover { background: rgba(255, 77, 94, .22); }
+.cb-btn.leave { width: 60px; border-radius: 23px; background: var(--red); color: #fff; border-color: transparent; }
+.cb-btn.leave:hover { background: #ff6170; }
+.cb-sep { width: 1px; height: 26px; background: var(--line); margin: 0 4px; }
+
+/* ---------- Sohbeti gizle / göster ---------- */
+.chat-toggle { position: relative; width: 32px; height: 30px; }
+.chat-toggle.active { color: var(--accent); background: var(--selected); }
+.chat-toggle .unread {
+  position: absolute; top: -5px; right: -6px; min-width: 17px; height: 17px; padding: 0 4px; border-radius: 9px;
+  background: var(--red); color: #fff; font: 700 10.5px/17px var(--mono); text-align: center; box-shadow: 0 0 0 2px var(--bg-2);
+}
+.layout.chat-hidden { grid-template-columns: 240px 1fr; }
+.layout.chat-hidden > aside.chat { display: none; }
+@media (max-width: 1180px) { .layout.chat-hidden { grid-template-columns: 220px 1fr; } }
+
+/* ---------- Mesaj araç çubuğu ---------- */
+.msg-tools {
+  position: absolute; top: -16px; right: 12px; z-index: 4; display: none; align-items: center; gap: 1px; padding: 2px;
+  background: var(--floating); border: 1px solid var(--line); border-radius: 6px; box-shadow: 0 4px 14px rgba(0, 0, 0, .5);
+}
+.msg:hover .msg-tools, .msg-tools:focus-within { display: flex; }
+.msg.editing .msg-tools { display: none; }
+.mt-btn { width: 28px; height: 28px; border: 0; border-radius: 4px; display: grid; place-items: center; background: transparent; color: var(--text-2); cursor: pointer; }
+.mt-btn svg { width: 17px; height: 17px; }
+.mt-btn:hover { background: var(--hover); color: var(--text); }
+.mt-btn.danger:hover { color: var(--red); background: rgba(255, 77, 94, .1); }
+.mt-emoji { font-size: 15px; line-height: 1; }
+.mt-sep { width: 1px; height: 18px; margin: 0 2px; background: var(--line); }
+.msg:first-child .msg-tools { top: 2px; }
+
+/* ---------- Yanıtlar ---------- */
+.msg.has-reply { padding-top: 26px; }
+.msg-reply {
+  position: absolute; top: 5px; left: 64px; right: 16px; display: flex; align-items: center; gap: 6px; min-width: 0;
+  font-size: 12.5px; color: var(--text-3); cursor: pointer; white-space: nowrap;
+}
+.msg-reply::before {
+  content: ""; position: absolute; left: -32px; top: 9px; width: 26px; height: 11px;
+  border-left: 2px solid #2a3436; border-top: 2px solid #2a3436; border-top-left-radius: 6px;
+}
+.msg-reply .mr-name { font-weight: 600; flex: none; }
+.msg-reply .mr-text { overflow: hidden; text-overflow: ellipsis; }
+.msg-reply:hover .mr-text { color: var(--text); }
+.msg.flash { animation: msgflash 1.6s ease-out; }
+@keyframes msgflash { 0%, 30% { background: rgba(34, 212, 126, .16); } 100% { background: transparent; } }
+
+/* ---------- Düzenleme ---------- */
+.msg.editing { background: rgba(34, 212, 126, .04); }
+.edit-box {
+  display: block; width: 100%; min-height: 38px; max-height: 200px; margin-top: 2px; padding: 8px 10px; resize: none; outline: none;
+  border-radius: 6px; border: 1px solid rgba(34, 212, 126, .45); background: #000; color: var(--text); line-height: 1.4; user-select: text;
+}
+.edit-hint { margin-top: 4px; font: 11px var(--mono); color: var(--text-3); }
+.edit-hint a { color: var(--accent); cursor: pointer; }
+.edit-hint a:hover { text-decoration: underline; }
+.msg-text .edited { margin-left: 5px; font: 10.5px var(--font); color: var(--text-3); cursor: default; }
+.msg-content { min-width: 0; }
+
+/* ---------- Resimler ---------- */
+.msg-img {
+  display: block; max-width: 100%; max-height: 280px; height: auto; margin-top: 6px; border-radius: 6px; cursor: zoom-in;
+  background: #000; object-fit: contain; border: 1px solid var(--line);
+}
+.msg-img:hover { border-color: rgba(34, 212, 126, .4); }
+.msg-img-gone { margin-top: 6px; padding: 6px 8px; border: 1px dashed var(--line); border-radius: 4px; font: 11.5px var(--mono); color: var(--text-3); }
+.modal.lightbox { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; background: rgba(0, 0, 0, .9); }
+.modal.lightbox.hidden { display: none; }
+.lightbox img { max-width: 92vw; max-height: 82vh; border-radius: 6px; box-shadow: 0 20px 60px rgba(0, 0, 0, .7); user-select: none; }
+.lb-actions { display: flex; gap: 8px; }
+.lb-actions a.btn { display: inline-flex; align-items: center; text-decoration: none; color: var(--text); }
+
+/* ---------- Tepkiler ---------- */
+.msg-reacts { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 5px; }
+.react {
+  display: inline-flex; align-items: center; gap: 5px; height: 24px; padding: 0 7px; border-radius: 6px; cursor: pointer;
+  border: 1px solid transparent; background: #121718; color: var(--text-2); font: 600 12px var(--mono);
+}
+.react:hover { border-color: rgba(34, 212, 126, .3); }
+.react.mine { background: var(--accent-soft); border-color: rgba(34, 212, 126, .55); color: var(--accent); }
+.react-emoji { font: 14px/1 var(--font); }
+.react.add { padding: 0 5px; opacity: 0; color: var(--text-3); }
+.react.add svg { width: 16px; height: 16px; }
+.msg:hover .react.add { opacity: 1; }
+.react-pop {
+  position: fixed; z-index: 240; width: 292px; padding: 8px; border-radius: 8px; background: var(--floating);
+  border: 1px solid var(--line); box-shadow: 0 10px 30px rgba(0, 0, 0, .6);
+}
+.react-pop-head { padding: 2px 4px 8px; font: 600 11px var(--mono); text-transform: uppercase; letter-spacing: .06em; color: var(--text-3); }
+.react-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 2px; }
+.react-pop .emoji { height: 32px; border: 0; border-radius: 4px; background: transparent; font-size: 19px; cursor: pointer; }
+.react-pop .emoji:hover { background: var(--hover); transform: scale(1.12); }
+
+/* ---------- Mesaj yazma: çok satır, + düğmesi, yanıt ve resim alanı ---------- */
+.chat-form textarea {
+  display: block; width: 100%; min-height: 44px; max-height: 200px; padding: 11px 44px 11px 46px; resize: none; outline: none;
+  border-radius: 8px; border: 1px solid var(--line); background: #000; color: var(--text); line-height: 1.45; overflow-y: auto; user-select: text;
+}
+.chat-form textarea:focus { border-color: rgba(34, 212, 126, .5); }
+.chat-form textarea::placeholder { color: var(--text-3); }
+.emoji-btn, .attach-btn { top: 6px; transform: none; }
+.attach-btn {
+  position: absolute; left: 6px; width: 32px; height: 32px; border: 0; border-radius: 4px; background: transparent;
+  color: var(--text-3); cursor: pointer; display: grid; place-items: center;
+}
+.attach-btn:hover { color: var(--accent); }
+.compose-extra {
+  display: flex; flex-direction: column; gap: 6px; padding: 7px 8px; border: 1px solid var(--line); border-bottom: 0;
+  border-radius: 8px 8px 0 0; background: #070909;
+}
+.compose-extra:not(.hidden) + .chat-input-wrap textarea { border-top-left-radius: 0; border-top-right-radius: 0; }
+.reply-bar { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text-2); }
+.reply-bar > svg { width: 16px; height: 16px; color: var(--text-3); }
+.reply-bar .rb-text { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cx-x { width: 22px; height: 22px; border: 0; border-radius: 50%; display: grid; place-items: center; background: #1a2022; color: var(--text-2); cursor: pointer; flex: none; }
+.cx-x svg { width: 14px; height: 14px; }
+.cx-x:hover { background: var(--red); color: #fff; }
+.attach-card { display: flex; align-items: center; gap: 10px; }
+.attach-card img { width: 60px; height: 60px; object-fit: cover; border-radius: 6px; background: #000; border: 1px solid var(--line); flex: none; }
+.attach-info { flex: 1; min-width: 0; }
+.attach-name { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.attach-meta { font: 11px var(--mono); color: var(--text-3); margin-top: 2px; }
+.chat { position: relative; }
+.chat.drop-target::after {
+  content: "Resmi buraya bırak"; position: absolute; inset: 8px; z-index: 30; display: grid; place-items: center; pointer-events: none;
+  border: 2px dashed var(--accent); border-radius: 10px; background: rgba(0, 0, 0, .8); color: var(--accent); font: 600 14px var(--mono);
+}
+.new-msgs { bottom: auto; top: 10px; }
+
+/* ---------- Profil: durum yazısı ---------- */
+.pf-custom { margin-top: 3px; font-size: 13px; color: var(--text); word-wrap: break-word; }
+.pf-custom.muted { color: var(--text-3); font-style: italic; }
+.pf-tag.cam { background: var(--accent-soft); color: var(--accent); }
+.member-sub { max-width: 210px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ---------- Ayarlar › Profilim ---------- */
+.profile-edit { display: grid; grid-template-columns: 1fr 300px; gap: 32px; align-items: start; }
+.pe-row { display: flex; gap: 8px; }
+.pe-nick-line { font-size: 14px; color: var(--text-2); }
+.pe-label { font: 600 11px var(--mono); text-transform: uppercase; letter-spacing: .06em; color: var(--text-3); margin-bottom: 8px; }
+.pe-card { width: 300px; border-radius: 8px; overflow: hidden; background: #08090a; border: 1px solid var(--line); }
+.pe-card .avatar.big { width: 80px; height: 80px; font-size: 32px; margin: -40px 0 0 16px; box-shadow: 0 0 0 6px #08090a; --dot-ring: #08090a; }
+
+/* ---------- Ayarlar › Kamera ---------- */
+.cam-row { display: flex; gap: 12px; align-items: flex-end; }
+.cam-row .field { flex: 1; margin-bottom: 0; }
+.cam-row .btn { height: 38px; }
+.cam-preview-box {
+  position: relative; width: 320px; aspect-ratio: 16 / 9; margin-top: 12px; border-radius: 8px; overflow: hidden;
+  display: grid; place-items: center; background: #000; border: 1px solid var(--line); font: 12px var(--mono); color: var(--text-3);
+}
+.cam-preview-box video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); display: none; }
+.cam-preview-box.on video { display: block; }
+.cam-preview-box.on span { display: none; }
+
+/* ---------- Ayarlar › Kısayollar ---------- */
+.keys-list { border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.key-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 11px 14px; font-size: 14px; }
+.key-row + .key-row { border-top: 1px solid var(--line); }
+.key-row:nth-child(odd) { background: rgba(0, 0, 0, .35); }
+.key-row > span:last-child { color: var(--text-2); font-size: 12.5px; white-space: nowrap; }
+kbd {
+  display: inline-block; min-width: 22px; margin-left: 4px; padding: 2px 7px; border-radius: 4px; text-align: center;
+  background: #000; border: 1px solid var(--line); border-bottom-width: 2px; font: 600 11.5px var(--mono); color: var(--text);
+}
+
+/* ---------- Düzeltmeler ---------- */
+.pf-actions .btn { white-space: nowrap; flex: 1 1 auto; }
+.status-dot.inline.online { background: var(--green); }
+.ctx-react { display: flex; gap: 2px; padding: 2px 2px 6px; margin-bottom: 4px; border-bottom: 1px solid var(--line); }
+.ctx-react button { flex: 1; height: 30px; border: 0; border-radius: 4px; background: #0e1213; font-size: 16px; cursor: pointer; }
+.ctx-react button:hover { background: var(--selected); transform: scale(1.08); }
+.msg-tools { top: -22px; }
+.mt-btn { width: 27px; }
+.voice-actions .btn.share { white-space: nowrap; min-width: 0; }

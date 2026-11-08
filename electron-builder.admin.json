@@ -39,7 +39,7 @@
     "identity": "-",
     "extendInfo": {
       "NSMicrophoneUsageDescription": "Kanki, arkadaşlarınla konuşabilmen için mikrofona erişmek istiyor.",
-      "NSCameraUsageDescription": "Kanki kamera kullanmaz ama sistem bu izni isteyebilir.",
+      "NSCameraUsageDescription": "Kanki, kanaldaki arkadaşlarına kameranı gösterebilmen için kameraya erişmek istiyor.",
       "NSScreenCaptureUsageDescription": "Kanki, ekranını paylaşabilmen için ekran kaydı iznine ihtiyaç duyar.",
       "NSAudioCaptureUsageDescription": "Kanki, ekran paylaşırken sistem sesini iletebilmek için ses kaydı iznine ihtiyaç duyar."
     }

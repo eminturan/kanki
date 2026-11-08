@@ -271,6 +271,13 @@ ipcMain.handle('media:ensure-permissions', async () => {
   return { microphone, screen: systemPreferences.getMediaAccessStatus('screen') };
 });
 
+ipcMain.handle('media:ensure-camera', async () => {
+  if (!isMac) return 'granted';
+  let st = systemPreferences.getMediaAccessStatus('camera');
+  if (st !== 'granted') st = (await systemPreferences.askForMediaAccess('camera')) ? 'granted' : 'denied';
+  return st;
+});
+
 ipcMain.handle('media:open-screen-settings', () => {
   if (isMac) shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture');
 });

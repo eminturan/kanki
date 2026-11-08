@@ -6,6 +6,35 @@
  */
 const CHANGELOG = [
   {
+    version: '1.0.10',
+    date: '2026-11-08',
+    title: 'Kamera, tepkiler ve resimler',
+    added: [
+      'Kamera: ses panelindeki "Kamera" düğmesiyle görüntünü aç. Kameralar herkeste kişinin kutusunda kendiliğinden görünür.',
+      'Sahnenin altında Discord’daki gibi arama düğmeleri: kamera, ekran paylaş, mikrofon, ses, bağlantıyı kes.',
+      'Yayın izlerken kanaldakiler sahnenin altında küçük kutular halinde (kameralarıyla) görünür.',
+      'Mesajlara emoji ile tepki verme; tepkiler mesajın altında sayılarıyla görünür.',
+      'Mesaj yanıtlama: asıl mesaj alıntılanır, tıklayınca ona gider. Sana yanıt gelince bahsedilmiş gibi bildirim alırsın.',
+      'Kendi mesajını düzenleme ve silme; boş kutuda ↑ son mesajını düzenler. Yönetici herkesin mesajını silebilir.',
+      'Mesaja sağ tıklayınca menü: tepki, yanıtla, düzenle, kopyala, sil.',
+      'Sohbete resim gönderme: yapıştır, sürükle-bırak ya da + düğmesi. Resme tıklayınca büyür, kaydedilebilir.',
+      'Profil fotoğrafı ve durum yazısı (Ayarlar › Profilim).',
+      'Sohbeti gizle/göster düğmesi; gizliyken gelen mesaj sayısı görünür.',
+      'Ayarlar › Kısayollar sayfası.',
+      'Çok satırlı mesaj: Shift+Enter yeni satır açar.',
+    ],
+    changed: [
+      'Kanala katılmak için kanal adına bir kez tıklamak yeterli.',
+      'Ayarlar Profilim sayfasıyla açılıyor; "Ses ve mikrofon" bölümü artık "Ses ve görüntü" (kamera seçimi ve önizleme).',
+      'Mesaj kutusunun solunda + (resim ekle) düğmesi var.',
+    ],
+    fixed: [
+      'Kanalda 3 kişi varken kutular tek sütuna diziliyordu; artık 2+1 diziliyor.',
+      'Profil kartında "İzlemeyi bırak" düğmesi iki satıra taşıyordu.',
+      'Profil kartında "Çevrimiçi" yazısının yanındaki yeşil nokta görünmüyordu.',
+    ],
+  },
+  {
     version: '1.0.9',
     date: '2026-11-08',
     title: 'Discord tarzı özellikler',

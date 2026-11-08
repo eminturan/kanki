@@ -110,6 +110,17 @@ GitHub Actions paketleri derler, Release'e `latest.yml` ile birlikte ekler; kuru
 - **Sunucu menüsü:** Sol üstte sunucu adına tıklayınca davet adresini kopyala, sunucu yönetimi (yönetici), kanal oluştur, ayarlar ve bağlantıyı kes.
 - **Üye listesi:** Sohbet panelinin sağ üstündeki kişiler simgesi tüm sunucudakileri kanal kanal gösterir.
 - **Mesajlar:** `**kalın**`, `*italik*`, `~~üstü çizili~~`, `` `kod` `` ve ```` ```kod bloğu``` ```` desteklenir. `@isim` ile bahsedilen kişide mesaj sarı vurgulanır ve ses çalar (`@herkes` kanaldaki herkese). "X yazıyor…" göstergesi, emoji seçici, gün ayraçları ve yukarı kaydırınca "Yeni mesajlar ↓" düğmesi vardır.
+- **Tepki, yanıt, düzenleme, silme:** Mesajın üzerine gelince sağ üstte araç çubuğu çıkar (sağ tık menüsü de var). Tepkiler mesajın altında sayılarıyla görünür. Yanıtta asıl mesaj alıntılanır, tıklayınca ona gider. Kendi mesajını düzenleyip silebilirsin (boş kutuda `↑` son mesajını düzenler); yönetici herkesin mesajını silebilir.
+- **Resim gönderme:** Resmi mesaj kutusuna yapıştır, sohbet paneline sürükle-bırak ya da `+` düğmesiyle seç. Gönderilmeden önce küçültülür (en uzun kenar 1920 px). Sunucu her kanalda son 30 resmi saklar. Resme tıklayınca büyür, oradan kaydedilebilir.
+- **Profil:** Ayarlar › Profilim'den profil fotoğrafı ve durum yazısı (ör. "🎮 Oyun oynuyor") eklenir. Fotoğraf her yerde baş harfin yerine görünür.
+- **Sohbeti gizle:** Sahnenin sağ üstündeki sohbet düğmesi sağ paneli kapatır, yayınlara daha çok yer kalır; gizliyken gelen mesaj sayısı düğmede görünür.
+- Mesaj kutusu çok satırlıdır: `Enter` gönderir, `Shift+Enter` yeni satır açar.
+
+## Kamera
+- Ses panelindeki **Kamera** düğmesi ya da sahnenin altındaki kamera düğmesiyle açılır. Kameralar herkeste kendiliğinden görünür, kişinin kutusunda (kendi görüntün ayna gibi).
+- Yayın izlerken kanaldakiler sahnenin altında küçük kutular halinde (kameralarıyla) durur.
+- Kamera seçimi ve önizleme: Ayarlar › Ses ve görüntü. macOS'ta ilk açılışta kamera izni istenir.
+- Kamera 720p / 30 FPS, kişi başı yaklaşık 1,5 Mbps yükleme kullanır.
 
 ## Ses
 - Konuşma modları: sesle etkinleştirme (eşik ayarlanabilir), bas-konuş, sürekli açık.
@@ -117,6 +128,9 @@ GitHub Actions paketleri derler, Release'e `latest.yml` ile birlikte ekler; kuru
 - Gürültü bastırma, yankı engelleme ve otomatik kazanç açılıp kapatılabilir. Giriş ve çıkış cihazı seçilebilir.
 - Bir kullanıcıya sağ tıklayarak: kişiye özel ses seviyesi, yerel susturma, dürtme, yayınını izleme.
 - Kısayollar: `Ctrl/Cmd+Shift+M` mikrofonu, `Ctrl/Cmd+Shift+D` hoparlörü açar/kapatır.
+- Sahnenin altındaki düğmeler (Discord'daki gibi): kamera, ekran paylaş, mikrofon, ses, bağlantıyı kes.
+- Kanala katılmak için kanal adına bir kez tıklamak yeterli.
+- Tüm kısayollar: Ayarlar › Kısayollar.
 
 ## Geliştirme
 ```bash
