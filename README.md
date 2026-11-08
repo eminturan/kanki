@@ -24,19 +24,17 @@ Arkadaş grubu için kanal tabanlı sesli sohbet uygulaması. Kanallar, yazılı
 
 | Platform | Dosya |
 |---|---|
-| macOS Apple Silicon (M1–M4) | `Kanki-1.0.0-arm64.dmg` |
-| macOS Intel | `Kanki-1.0.0-x64.dmg` |
-| Windows (kurulum) | `Kanki-Setup-1.0.0.exe` |
-| Windows (kurulumsuz) | `Kanki-Portable-1.0.0.exe` |
+| macOS Apple Silicon (M1–M4) | `Kanki-mac-arm64.dmg` |
+| macOS Intel | `Kanki-mac-x64.dmg` |
+| Windows (kurulum) | `Kanki-Setup.exe` |
 
 **Senin için — `dist/admin/`**
 
 | Platform | Dosya |
 |---|---|
-| macOS Apple Silicon (M1–M4) | `Kanki-Admin-1.0.0-arm64.dmg` |
-| macOS Intel | `Kanki-Admin-1.0.0-x64.dmg` |
-| Windows (kurulum) | `Kanki-Admin-Setup-1.0.0.exe` |
-| Windows (kurulumsuz) | `Kanki-Admin-Portable-1.0.0.exe` |
+| macOS Apple Silicon (M1–M4) | `Kanki-Admin-mac-arm64.dmg` |
+| macOS Intel | `Kanki-Admin-mac-x64.dmg` |
+| Windows (kurulum) | `Kanki-Admin-Setup.exe` |
 
 Uygulamalar imzasız olduğu için ilk açılışta uyarı görülür:
 - **macOS:** Uygulamayı Applications klasörüne sürükle, sonra sağ tık → **Aç** → **Aç**. "Hasarlı" uyarısı çıkarsa Terminal'de: `xattr -cr /Applications/Kanki.app` (Admin için `"/Applications/Kanki Admin.app"`).
@@ -82,7 +80,8 @@ Diğer seçenekler:
 
 ## Otomatik güncelleme ve yeni sürüm çıkarma
 - **Kurulumlu Windows sürümü (`Kanki-Setup.exe`)** kendini günceller: açılışta ve açık kaldığı sürece 4 saatte bir GitHub Releases'a bakar, yeni sürümü arka planda indirir, sol altta "Yeniden başlat ve güncelle" düğmesi çıkar. Düğmeye basılmazsa uygulama kapatılınca kurulur.
-- Kurulumsuz Windows sürümü, Mac sürümleri ve Kanki Admin kendini güncellemez; yeni sürüm indirme sayfasından elle indirilir.
+- Mac sürümleri ve Kanki Admin kendini güncellemez; yeni sürüm indirme sayfasından elle indirilir.
+- Kurulumsuz (portable) Windows sürümü şimdilik derlenmiyor. Tekrar açmak için `electron-builder.*.json` dosyalarında `win.target` listesine `portable` ekle ve `.github/workflows/build.yml` içindeki yorum satırlarını aç.
 - Otomatik güncelleme 1.0.2 ile gelen bir özellik; daha eski sürümü kuranlar bir kere elle güncellemeli.
 
 Yeni sürüm çıkarmak için `package.json` içindeki `version`'ı artır, commit'le ve aynı sürümün etiketini gönder:

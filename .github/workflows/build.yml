@@ -4,7 +4,7 @@ name: build
 # Elle çalıştırıldığında: sadece derler ve dosyaları Actions "artifact" olarak saklar.
 #
 # Hız için:
-#  - Windows kurulumlu (nsis) ve kurulumsuz (portable) paketler ayrı makinelerde paralel derlenir
+#  - Windows, Mac ve Admin paketleri ayrı makinelerde paralel derlenir (kurulumsuz Windows şimdilik kapalı)
 #  - Release sadece arkadaş sürümünü bekler; Kanki Admin paralelde derlenmeye devam eder
 #  - npm paketleri ve Electron indirmeleri önbelleğe alınır
 on:
@@ -24,7 +24,7 @@ jobs:
       matrix:
         include:
           - { os: windows-latest, label: windows-setup, args: '--win nsis' }
-          - { os: windows-latest, label: windows-portable, args: '--win portable' }
+          # - { os: windows-latest, label: windows-portable, args: '--win portable' }  # kurulumsuz sürüm şimdilik kapalı
           - { os: macos-latest, label: mac, args: '--mac' }
     runs-on: ${{ matrix.os }}
     steps:
@@ -65,7 +65,7 @@ jobs:
       matrix:
         include:
           - { os: windows-latest, label: windows-setup, args: '--win nsis' }
-          - { os: windows-latest, label: windows-portable, args: '--win portable' }
+          # - { os: windows-latest, label: windows-portable, args: '--win portable' }  # kurulumsuz sürüm şimdilik kapalı
           - { os: macos-latest, label: mac, args: '--mac' }
     runs-on: ${{ matrix.os }}
     steps:
@@ -117,7 +117,7 @@ jobs:
 
             | Platform | Dosya |
             |---|---|
-            | Windows (önerilen) | `Kanki-Setup.exe` (kurulumlu, otomatik güncellenir) · `Kanki-Portable.exe` (kurulumsuz) |
+            | Windows | `Kanki-Setup.exe` (otomatik güncellenir) |
             | Mac (M1–M4) | `Kanki-mac-arm64.dmg` |
             | Mac (Intel) | `Kanki-mac-x64.dmg` |
           files: release/*
