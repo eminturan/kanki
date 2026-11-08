@@ -1,5 +1,7 @@
 # Kanki — Sesli sohbet + ekran paylaşımı (macOS & Windows)
 
+**İndirme sayfası:** https://kanki-app.github.io
+
 Arkadaş grubu için kanal tabanlı sesli sohbet uygulaması. Kanallar, yazılı sohbet, dürtme ve **yüksek kaliteli ekran paylaşımı** (1080p/1440p/4K, 60 FPS'e kadar, sistem sesiyle) içerir.
 
 ## İki sürüm
