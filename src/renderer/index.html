@@ -1,0 +1,363 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob:; media-src 'self' blob: mediastream:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src ws: wss: http: https:" />
+  <title>Kanki</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <!-- ================= BAĞLANTI EKRANI ================= -->
+  <section id="connect-screen" class="screen">
+    <div class="drag-strip"></div>
+    <div class="connect-card">
+      <div class="brand">
+        <div class="brand-logo"><svg viewBox="0 0 24 24"><path d="M12 3a4 4 0 0 0-4 4v5a4 4 0 0 0 8 0V7a4 4 0 0 0-4-4Zm-7 9a1 1 0 1 1 2 0 5 5 0 0 0 10 0 1 1 0 1 1 2 0 7 7 0 0 1-6 6.93V21h3a1 1 0 1 1 0 2H8a1 1 0 1 1 0-2h3v-2.07A7 7 0 0 1 5 12Z"/></svg></div>
+        <div>
+          <h1 id="brand-title">Kanki</h1>
+          <p>Sesli sohbet ve ekran paylaşımı</p>
+        </div>
+      </div>
+
+      <div class="tabs" id="connect-tabs">
+        <button class="tab active" data-tab="join">Sunucuya Bağlan</button>
+        <button class="tab" data-tab="host">Sunucu Kur</button>
+      </div>
+
+      <label class="field">
+        <span>Takma ad</span>
+        <input id="in-nick" maxlength="32" placeholder="Örn. Emin" autocomplete="off" />
+      </label>
+
+      <div class="tab-panel" data-panel="join">
+        <label class="field">
+          <span>Sunucu adresi</span>
+          <input id="in-address" placeholder="192.168.1.20:4455 veya alan-adi.com" autocomplete="off" />
+        </label>
+        <label class="field">
+          <span>Şifre <em>(varsa)</em></span>
+          <input id="in-password" type="password" autocomplete="off" />
+        </label>
+        <label class="field admin-only">
+          <span>Yönetici anahtarı <em>(başka bir sunucuyu yönetmek için, opsiyonel)</em></span>
+          <input id="in-admin-key" type="password" autocomplete="off" />
+        </label>
+        <button class="btn primary wide" id="btn-connect">Bağlan</button>
+        <div class="recent" id="recent-list"></div>
+      </div>
+
+      <div class="tab-panel hidden" data-panel="host">
+        <p class="hint">Bu bilgisayar sunucu olur, arkadaşların senin adresine bağlanır. ngrok açıkken internetteki herkes verilen adresle bağlanabilir; port açmana gerek yok.</p>
+        <label class="field">
+          <span>Sunucu adı</span>
+          <input id="in-host-name" placeholder="Bizim Sunucu" maxlength="40" />
+        </label>
+        <div class="row2">
+          <label class="field">
+            <span>Port</span>
+            <input id="in-host-port" type="number" value="4455" min="1024" max="65535" />
+          </label>
+          <label class="field">
+            <span>Şifre <em>(opsiyonel)</em></span>
+            <input id="in-host-password" type="password" autocomplete="off" />
+          </label>
+        </div>
+        <label class="check ngrok-toggle">
+          <input type="checkbox" id="in-ngrok" />
+          <span>İnternete aç (ngrok)</span>
+        </label>
+        <div class="ngrok-box hidden" id="ngrok-box">
+          <label class="field">
+            <span>ngrok authtoken <a href="https://dashboard.ngrok.com/get-started/your-authtoken" target="_blank">nereden alırım?</a></span>
+            <input id="in-ngrok-token" type="password" autocomplete="off" placeholder="2abc…" />
+          </label>
+          <label class="field">
+            <span>Sabit domain <em>(opsiyonel)</em> <a href="https://dashboard.ngrok.com/domains" target="_blank">ücretsiz al</a></span>
+            <input id="in-ngrok-domain" autocomplete="off" placeholder="ornek-isim.ngrok-free.app" />
+          </label>
+        </div>
+        <button class="btn primary wide" id="btn-host">Sunucuyu Başlat ve Bağlan</button>
+      </div>
+      <div class="connect-error" id="connect-error"></div>
+    </div>
+  </section>
+
+  <!-- ================= ANA UYGULAMA ================= -->
+  <section id="app" class="screen hidden">
+    <header class="topbar">
+      <div class="topbar-left">
+        <div class="server-badge" id="server-badge">?</div>
+        <div class="server-meta">
+          <div class="server-name" id="server-name">Sunucu</div>
+          <div class="server-sub" id="server-sub"><span class="dot"></span><span id="conn-text">Bağlanıyor…</span></div>
+        </div>
+      </div>
+      <div class="topbar-right">
+        <button class="chip admin hidden" id="btn-admin" title="Sunucu yönetimi">
+          <svg viewBox="0 0 24 24"><path d="M12 2 4 5v6c0 5 3.4 9.7 8 11 4.6-1.3 8-6 8-11V5l-8-3Zm0 5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5Zm0 12.2c-1.9-.6-3.5-2-4.4-3.8.6-1.2 2.5-2 4.4-2s3.8.8 4.4 2c-.9 1.8-2.5 3.2-4.4 3.8Z"/></svg>
+          Yönetim
+        </button>
+        <button class="chip hidden" id="host-chip" title="Arkadaşlarına bu adresi ver — kopyalamak için tıkla"></button>
+        <span class="chip ghost" id="ping-chip">— ms</span>
+      </div>
+    </header>
+
+    <div class="layout">
+      <!-- Sol: kanal ağacı -->
+      <aside class="sidebar">
+        <div class="sidebar-head">
+          <span>Kanallar</span>
+          <button class="icon-btn small" id="btn-add-channel" title="Kanal oluştur">
+            <svg viewBox="0 0 24 24"><path d="M11 5h2v14h-2zM5 11h14v2H5z"/></svg>
+          </button>
+        </div>
+        <div class="tree" id="tree"></div>
+
+        <div class="me-panel">
+          <div class="me-info">
+            <div class="avatar" id="me-avatar"></div>
+            <div class="me-text">
+              <div class="me-name" id="me-name"></div>
+              <div class="me-status" id="me-status">Bağlı</div>
+            </div>
+          </div>
+          <div class="me-controls">
+            <button class="ctl" id="btn-mic" title="Mikrofonu kapat/aç (Ctrl+Shift+M)"></button>
+            <button class="ctl" id="btn-deafen" title="Hoparlörü kapat/aç (Ctrl+Shift+D)"></button>
+            <button class="ctl" id="btn-settings" title="Ayarlar"></button>
+            <button class="ctl danger" id="btn-disconnect" title="Bağlantıyı kes"></button>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Orta: sahne -->
+      <main class="stage">
+        <div class="stage-head">
+          <div>
+            <div class="stage-title" id="stage-title">#Lobi</div>
+            <div class="stage-sub" id="stage-sub"></div>
+          </div>
+          <div class="stage-actions">
+            <button class="btn share" id="btn-share">
+              <svg viewBox="0 0 24 24"><path d="M3 5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-6v2h3a1 1 0 1 1 0 2H8a1 1 0 1 1 0-2h3v-2H5a2 2 0 0 1-2-2V5Zm2 0v10h14V5H5Zm7 1.5 3.5 3.5H13v3h-2v-3H8.5L12 6.5Z"/></svg>
+              <span>Ekran Paylaş</span>
+            </button>
+          </div>
+        </div>
+        <div class="share-strip hidden" id="share-strip"></div>
+        <div class="stage-body" id="stage-body">
+          <div class="viewer hidden" id="viewer">
+            <video id="viewer-video" autoplay playsinline></video>
+            <div class="viewer-overlay">
+              <div class="viewer-top">
+                <span class="live">CANLI</span>
+                <span id="viewer-name"></span>
+                <span class="stats" id="viewer-stats"></span>
+              </div>
+              <div class="viewer-bottom">
+                <label class="vol" title="Yayın sesi">
+                  <svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9H4Zm12.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4Z"/></svg>
+                  <input type="range" id="viewer-volume" min="0" max="100" value="100" />
+                </label>
+                <div class="spacer"></div>
+                <button class="icon-btn" id="btn-viewer-stop" title="İzlemeyi bırak"><svg viewBox="0 0 24 24"><path d="M6.4 5 5 6.4 10.6 12 5 17.6 6.4 19l5.6-5.6 5.6 5.6 1.4-1.4-5.6-5.6L19 6.4 17.6 5 12 10.6z"/></svg></button>
+                <button class="icon-btn" id="btn-viewer-full" title="Tam ekran (F)"><svg viewBox="0 0 24 24"><path d="M4 4h6v2H6v4H4V4Zm10 0h6v6h-2V6h-4V4ZM4 14h2v4h4v2H4v-6Zm14 0h2v6h-6v-2h4v-4Z"/></svg></button>
+              </div>
+            </div>
+          </div>
+          <div class="participants" id="participants"></div>
+        </div>
+        <div class="self-share hidden" id="self-share">
+          <video id="self-preview" autoplay muted playsinline></video>
+          <div class="self-share-info">
+            <div><b>Ekranını paylaşıyorsun</b></div>
+            <div class="muted" id="self-share-meta"></div>
+            <div class="muted" id="self-share-viewers"></div>
+          </div>
+          <button class="btn danger" id="btn-stop-share">Paylaşımı Durdur</button>
+        </div>
+      </main>
+
+      <!-- Sağ: sohbet -->
+      <aside class="chat">
+        <div class="chat-head" id="chat-head">Kanal sohbeti</div>
+        <div class="chat-log" id="chat-log"></div>
+        <form class="chat-form" id="chat-form">
+          <input id="chat-input" placeholder="Mesaj yaz…" autocomplete="off" maxlength="2000" />
+        </form>
+      </aside>
+    </div>
+    <div class="banner hidden" id="reconnect-banner">Bağlantı koptu, yeniden bağlanılıyor…</div>
+  </section>
+
+  <!-- ================= EKRAN SEÇİCİ ================= -->
+  <div class="modal hidden" id="picker">
+    <div class="modal-card wide">
+      <div class="modal-head">
+        <h2>Ekran Paylaş</h2>
+        <button class="icon-btn" data-close><svg viewBox="0 0 24 24"><path d="M6.4 5 5 6.4 10.6 12 5 17.6 6.4 19l5.6-5.6 5.6 5.6 1.4-1.4-5.6-5.6L19 6.4 17.6 5 12 10.6z"/></svg></button>
+      </div>
+      <div class="tabs small" id="picker-tabs">
+        <button class="tab active" data-type="screen">Ekranlar</button>
+        <button class="tab" data-type="window">Pencereler</button>
+      </div>
+      <div class="sources" id="sources"></div>
+      <div class="picker-options">
+        <label class="field compact">
+          <span>Çözünürlük</span>
+          <select id="opt-res">
+            <option value="720">720p</option>
+            <option value="1080" selected>1080p</option>
+            <option value="1440">1440p</option>
+            <option value="2160">4K</option>
+            <option value="0">Kaynak (orijinal)</option>
+          </select>
+        </label>
+        <label class="field compact">
+          <span>Kare hızı</span>
+          <select id="opt-fps">
+            <option value="15">15 FPS</option>
+            <option value="30">30 FPS</option>
+            <option value="60" selected>60 FPS</option>
+          </select>
+        </label>
+        <label class="field compact">
+          <span>Öncelik</span>
+          <select id="opt-hint">
+            <option value="motion">Akıcılık (oyun, video)</option>
+            <option value="detail">Netlik (yazı, kod)</option>
+          </select>
+        </label>
+        <label class="field compact">
+          <span>Bit hızı</span>
+          <select id="opt-bitrate">
+            <option value="0" selected>Otomatik</option>
+            <option value="2500">2.5 Mbps</option>
+            <option value="4000">4 Mbps</option>
+            <option value="6000">6 Mbps</option>
+            <option value="8000">8 Mbps</option>
+            <option value="12000">12 Mbps</option>
+            <option value="20000">20 Mbps</option>
+          </select>
+        </label>
+        <label class="check">
+          <input type="checkbox" id="opt-audio" checked />
+          <span>Sistem sesini de paylaş</span>
+        </label>
+      </div>
+      <div class="picker-foot">
+        <span class="muted" id="picker-note"></span>
+        <div class="spacer"></div>
+        <button class="btn" data-close>Vazgeç</button>
+        <button class="btn primary" id="btn-go-live" disabled>Yayına Başla</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= AYARLAR ================= -->
+  <div class="modal hidden" id="settings">
+    <div class="modal-card">
+      <div class="modal-head">
+        <h2>Ayarlar</h2>
+        <button class="icon-btn" data-close><svg viewBox="0 0 24 24"><path d="M6.4 5 5 6.4 10.6 12 5 17.6 6.4 19l5.6-5.6 5.6 5.6 1.4-1.4-5.6-5.6L19 6.4 17.6 5 12 10.6z"/></svg></button>
+      </div>
+      <div class="settings-body">
+        <h3>Ses</h3>
+        <label class="field"><span>Mikrofon</span><select id="set-input"></select></label>
+        <label class="field"><span>Hoparlör / Kulaklık</span><select id="set-output"></select></label>
+        <label class="field"><span>Konuşma modu</span>
+          <select id="set-mode">
+            <option value="vad">Sesle etkinleştirme</option>
+            <option value="ptt">Bas-konuş</option>
+            <option value="open">Sürekli açık</option>
+          </select>
+        </label>
+        <div class="field" id="vad-row">
+          <span>Algılama eşiği <em id="vad-value"></em></span>
+          <div class="meter-wrap">
+            <div class="meter"><div class="meter-fill" id="meter-fill"></div><div class="meter-mark" id="meter-mark"></div></div>
+            <input type="range" id="set-vad" min="-80" max="-10" step="1" />
+          </div>
+        </div>
+        <div class="field hidden" id="ptt-row">
+          <span>Bas-konuş tuşu</span>
+          <div class="ptt-line">
+            <button class="btn" id="btn-ptt-key">Tuş ata</button>
+            <span class="muted" id="ptt-note"></span>
+          </div>
+        </div>
+        <div class="checks">
+          <label class="check"><input type="checkbox" id="set-ns" /><span>Gürültü bastırma</span></label>
+          <label class="check"><input type="checkbox" id="set-ec" /><span>Yankı engelleme</span></label>
+          <label class="check"><input type="checkbox" id="set-agc" /><span>Otomatik kazanç</span></label>
+          <label class="check"><input type="checkbox" id="set-sounds" /><span>Bildirim sesleri</span></label>
+        </div>
+        <h3>Ekran Paylaşımı</h3>
+        <label class="field"><span>Video kodek (gönderirken)</span>
+          <select id="set-codec">
+            <option value="auto">Otomatik (H.264 donanım)</option>
+            <option value="VP9">VP9 (daha net, daha çok CPU)</option>
+            <option value="AV1">AV1 (en verimli, en çok CPU)</option>
+            <option value="VP8">VP8</option>
+          </select>
+        </label>
+        <label class="check"><input type="checkbox" id="set-autowatch" /><span>Kanalda biri yayın açınca otomatik izle</span></label>
+        <p class="hint">Not: Görüntü doğrudan arkadaşlarına gider (P2P). Yayıncının yükleme hızı × izleyici sayısı kadar internet gerekir. Sadece izlemeyi seçenlere görüntü gönderilir.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= YÖNETİM PANELİ ================= -->
+  <div class="modal hidden" id="admin-panel">
+    <div class="modal-card wide">
+      <div class="modal-head">
+        <h2>Sunucu Yönetimi</h2>
+        <button class="icon-btn" data-close><svg viewBox="0 0 24 24"><path d="M6.4 5 5 6.4 10.6 12 5 17.6 6.4 19l5.6-5.6 5.6 5.6 1.4-1.4-5.6-5.6L19 6.4 17.6 5 12 10.6z"/></svg></button>
+      </div>
+      <div class="admin-grid">
+        <div class="admin-stat"><span>Bağlı kullanıcı</span><b id="adm-count">0</b></div>
+        <div class="admin-stat"><span>Kanal</span><b id="adm-channels">0</b></div>
+        <div class="admin-stat"><span>Çalışma süresi</span><b id="adm-uptime">—</b></div>
+        <div class="admin-stat"><span>Şifre</span><b id="adm-haspass">—</b></div>
+      </div>
+
+      <div class="admin-section" id="adm-address-section">
+        <h3>Bağlantı adresleri</h3>
+        <div class="addr-list" id="adm-addresses"></div>
+      </div>
+
+      <div class="admin-section">
+        <h3>Sunucu ayarları</h3>
+        <div class="admin-form">
+          <label class="field compact"><span>Sunucu adı</span><input id="adm-name" maxlength="40" /></label>
+          <label class="field compact"><span>Yeni şifre <em>(boş bırakırsan değişmez)</em></span><input id="adm-password" type="password" autocomplete="off" /></label>
+          <button class="btn primary" id="adm-save">Kaydet</button>
+        </div>
+        <label class="check" style="margin-top:10px"><input type="checkbox" id="adm-nopass" /><span>Şifreyi kaldır (herkes şifresiz girebilsin)</span></label>
+      </div>
+
+      <div class="admin-section">
+        <h3>Kullanıcılar</h3>
+        <table class="admin-table">
+          <thead><tr><th>Kullanıcı</th><th>Kanal</th><th>IP</th><th>Süre</th><th></th></tr></thead>
+          <tbody id="adm-users"></tbody>
+        </table>
+      </div>
+
+      <div class="admin-section danger-zone" id="adm-host-section">
+        <h3>Bu bilgisayardaki sunucu</h3>
+        <div class="admin-form">
+          <div class="muted" style="flex:1">Yönetici anahtarı bu bilgisayarda saklanıyor; sunucuyu bu uygulamadan her kurduğunda otomatik yönetici olursun.
+            <a href="#" id="adm-show-key">Anahtarı kopyala</a></div>
+          <button class="btn danger" id="adm-stop">Sunucuyu Kapat</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="ctx hidden" id="ctx"></div>
+  <div class="toasts" id="toasts"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>

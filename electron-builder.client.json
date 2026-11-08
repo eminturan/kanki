@@ -1,0 +1,75 @@
+{
+  "appId": "com.kanki.app",
+  "productName": "Kanki",
+  "directories": {
+    "output": "dist/client"
+  },
+  "extraMetadata": {
+    "kankiVariant": "client",
+    "kankiDefaultServer": ""
+  },
+  "npmRebuild": false,
+  "files": [
+    "src/**/*",
+    "build/icon.png",
+    "package.json",
+    "!node_modules/uiohook-napi/build/**",
+    "!node_modules/uiohook-napi/libuiohook/**",
+    "!node_modules/uiohook-napi/src/**",
+    "!node_modules/@ngrok/**"
+  ],
+  "asarUnpack": [
+    "node_modules/uiohook-napi/**",
+    "node_modules/node-gyp-build/**"
+  ],
+  "mac": {
+    "category": "public.app-category.social-networking",
+    "target": [
+      {
+        "target": "dmg",
+        "arch": [
+          "arm64",
+          "x64"
+        ]
+      }
+    ],
+    "icon": "build/icon.png",
+    "hardenedRuntime": false,
+    "identity": "-",
+    "extendInfo": {
+      "NSMicrophoneUsageDescription": "Kanki, arkadaşlarınla konuşabilmen için mikrofona erişmek istiyor.",
+      "NSCameraUsageDescription": "Kanki kamera kullanmaz ama sistem bu izni isteyebilir.",
+      "NSScreenCaptureUsageDescription": "Kanki, ekranını paylaşabilmen için ekran kaydı iznine ihtiyaç duyar.",
+      "NSAudioCaptureUsageDescription": "Kanki, ekran paylaşırken sistem sesini iletebilmek için ses kaydı iznine ihtiyaç duyar."
+    }
+  },
+  "dmg": {
+    "artifactName": "Kanki-${version}-${arch}.${ext}"
+  },
+  "win": {
+    "target": [
+      {
+        "target": "nsis",
+        "arch": [
+          "x64"
+        ]
+      },
+      {
+        "target": "portable",
+        "arch": [
+          "x64"
+        ]
+      }
+    ],
+    "icon": "build/icon.png"
+  },
+  "nsis": {
+    "oneClick": false,
+    "allowToChangeInstallationDirectory": true,
+    "artifactName": "Kanki-Setup-${version}.${ext}",
+    "shortcutName": "Kanki"
+  },
+  "portable": {
+    "artifactName": "Kanki-Portable-${version}.${ext}"
+  }
+}
