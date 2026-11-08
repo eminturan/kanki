@@ -19,6 +19,7 @@
   "dependencies": {
     "@ngrok/ngrok": "^1.7.0",
     "electron-updater": "^6.8.11",
+    "koffi": "^3.3.7",
     "ws": "^8.18.0"
   },
   "optionalDependencies": {

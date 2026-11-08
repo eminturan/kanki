@@ -23,6 +23,12 @@ contextBridge.exposeInMainWorld('kanki', {
   installUpdate: () => ipcRenderer.invoke('update:install'),
   checkUpdate: () => ipcRenderer.invoke('update:check'),
   idleTime: () => ipcRenderer.invoke('app:idle-time'),
+  // Uzaktan kontrol (yayıncı tarafı)
+  rcCheck: () => ipcRenderer.invoke('rc:check'),
+  rcStart: (sourceId, who) => ipcRenderer.invoke('rc:start', sourceId, who),
+  rcInput: (msg) => ipcRenderer.send('rc:input', msg),
+  rcStop: () => ipcRenderer.invoke('rc:stop'),
+  onRcStopped: (cb) => ipcRenderer.on('rc:stopped-locally', (_e, reason) => cb(reason)),
   onUpdate: (cb) => ipcRenderer.on('update', (_e, state) => cb(state)),
   autotest: process.env.KANKI_AUTOTEST ? JSON.parse(process.env.KANKI_AUTOTEST) : null,
 });

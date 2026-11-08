@@ -167,6 +167,11 @@
             </button>
           </div>
         </div>
+        <div class="rc-banner hidden" id="rc-banner">
+          <svg viewBox="0 0 24 24"><path d="M5 3l14 7.2-6.3 1.6 3.9 6.8-2.6 1.5-3.9-6.8L5 18V3Z"/></svg>
+          <span class="rcb-text"></span>
+          <button class="btn danger sm" id="rc-banner-stop">Durdur</button>
+        </div>
         <div class="share-strip hidden" id="share-strip"></div>
         <div class="stage-body" id="stage-body">
           <div class="tiles hidden" id="tiles"></div>
@@ -398,6 +403,7 @@
               <div class="key-row"><span>Son mesajını düzenle (kutu boşken)</span><span><kbd>↑</kbd></span></div>
               <div class="key-row"><span>Resim yapıştır</span><span><kbd class="mod"></kbd><kbd>V</kbd></span></div>
               <div class="key-row"><span>Mesajı sormadan sil</span><span><kbd>Shift</kbd> + Sil düğmesi</span></div>
+              <div class="key-row"><span>Uzaktan kontrolü durdur (ekranın kontrol edilirken)</span><span><kbd class="mod"></kbd><kbd>Shift</kbd><kbd>X</kbd></span></div>
               <div class="key-row"><span>Bas-konuş</span><span id="keys-ptt" class="muted">Ses ve görüntü bölümünden atanır</span></div>
             </div>
           </section>
@@ -516,6 +522,18 @@
       <div class="prompt-actions">
         <button class="btn" data-close>Vazgeç</button>
         <button class="btn primary" id="prompt-ok">Tamam</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal hidden" id="rc-modal">
+    <div class="modal-card rc-card">
+      <div class="rc-icon"><svg viewBox="0 0 24 24"><path d="M5 3l14 7.2-6.3 1.6 3.9 6.8-2.6 1.5-3.9-6.8L5 18V3Z"/></svg></div>
+      <h2 id="rc-title"></h2>
+      <p class="muted" id="rc-desc"></p>
+      <div class="prompt-actions">
+        <button class="btn" id="rc-deny">Reddet</button>
+        <button class="btn primary" id="rc-allow">İzin ver</button>
       </div>
     </div>
   </div>

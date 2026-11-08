@@ -20,7 +20,9 @@
   ],
   "asarUnpack": [
     "node_modules/uiohook-napi/**",
-    "node_modules/node-gyp-build/**"
+    "node_modules/node-gyp-build/**",
+    "node_modules/koffi/**",
+    "node_modules/@koromix/**"
   ],
   "mac": {
     "category": "public.app-category.social-networking",

@@ -116,6 +116,13 @@ GitHub Actions paketleri derler, Release'e `latest.yml` ile birlikte ekler; kuru
 - **Sohbeti gizle:** Sahnenin sağ üstündeki sohbet düğmesi sağ paneli kapatır, yayınlara daha çok yer kalır; gizliyken gelen mesaj sayısı düğmede görünür.
 - Mesaj kutusu çok satırlıdır: `Enter` gönderir, `Shift+Enter` yeni satır açar.
 
+## Uzaktan kontrol
+- İzlediğin **tüm ekran** yayınının üst çubuğundaki fare simgesiyle kontrol iste. Yayıncıya onay penceresi çıkar; 30 saniye içinde yanıt vermezse istek reddedilir.
+- İzin verilince görüntüye tıkla: fare (tıklama, sürükleme, tekerlek) ve klavye karşı tarafa gider. Kanki kısayolları da karşıya gider; bitirince yayının altındaki **Bırak** düğmesine bas ya da görüntünün dışına tıkla (klavye sende kalır).
+- Kontrol edilen kişinin ekranının üstünde her zaman görünen bir çubuk çıkar: kimin kontrol ettiği ve **Durdur** düğmesi. `Ctrl+Shift+X` (Mac'te `⌘⇧X`) de anında durdurur.
+- Olaylar doğrudan (P2P) gider. Tuşlar fiziksel konumuyla gönderilir, yani karşı bilgisayarın klavye düzeni geçerlidir.
+- Sınırlar: pencere paylaşımında çalışmaz. Windows'ta yönetici olarak çalışan pencerelere (ör. Görev Yöneticisi, bazı oyunlar, UAC soruları) Kanki yönetici olarak açılmadıkça dokunulamaz. macOS'ta yayıncının Kanki'ye *Erişilebilirlik* izni vermesi gerekir.
+
 ## Kamera
 - Ses panelindeki **Kamera** düğmesi ya da sahnenin altındaki kamera düğmesiyle açılır. Kameralar herkeste kendiliğinden görünür, kişinin kutusunda (kendi görüntün ayna gibi).
 - Yayın izlerken kanaldakiler sahnenin altında küçük kutular halinde (kameralarıyla) durur.

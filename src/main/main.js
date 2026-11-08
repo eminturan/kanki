@@ -10,7 +10,10 @@ const {
   Notification,
   nativeImage,
   powerMonitor,
+  screen,
+  globalShortcut,
 } = require('electron');
+const remoteInput = require('./remote-input');
 const path = require('path');
 const os = require('os');
 const fs = require('fs');
@@ -103,6 +106,10 @@ function createWindow() {
     win.webContents.on('console-message', (e) => {
       const msg = e.message;
       if (/AUTOTEST|\[kanki\]|Error/i.test(msg)) process.stdout.write(`[${JSON.parse(process.env.KANKI_AUTOTEST).name}] ${msg}\n`);
+      // Test: arayüz "[kanki] SHOT ad" yazınca o anın görüntüsü KANKI_SHOT_DIR'e kaydedilir
+      const shot = /^\[kanki\] SHOT (\S+)/.exec(msg);
+      if (shot && process.env.KANKI_SHOT_DIR)
+        win.webContents.capturePage().then((img) => fs.writeFileSync(path.join(process.env.KANKI_SHOT_DIR, shot[1] + '.png'), img.toPNG()));
     });
   }
 
@@ -302,6 +309,109 @@ ipcMain.handle('screen:get-sources', async () => {
       icon: s.appIcon && !s.appIcon.isEmpty() ? s.appIcon.toDataURL() : null,
     }));
 });
+
+// =====================================================================
+//  Uzaktan kontrol (yayıncı tarafı): izleyen kişinin fare/klavyesini bu bilgisayara uygular
+// =====================================================================
+let rcBar = null;
+const RC_STOP_KEY = 'CommandOrControl+Shift+X';
+
+async function displayForSource(sourceId) {
+  if (!/^screen:/.test(String(sourceId || ''))) return null; // pencere paylaşımında kontrol yok
+  const sources = await desktopCapturer.getSources({ types: ['screen'], thumbnailSize: { width: 0, height: 0 } });
+  const src = sources.find((x) => x.id === sourceId);
+  const displays = screen.getAllDisplays();
+  const byId = src && displays.find((d) => String(d.id) === String(src.display_id));
+  if (byId) return byId;
+  return displays.length === 1 ? displays[0] : null;
+}
+
+// Paylaşılan ekranın üstünde, her pencerenin önünde duran küçük çubuk: kimin kontrol ettiği + Durdur
+function showRcBar(display, who) {
+  closeRcBar();
+  const W = 380;
+  const H = 46;
+  const b = display.workArea;
+  rcBar = new BrowserWindow({
+    x: Math.round(b.x + (b.width - W) / 2),
+    y: b.y + 8,
+    width: W,
+    height: H,
+    frame: false,
+    transparent: true,
+    resizable: false,
+    movable: true,
+    minimizable: false,
+    maximizable: false,
+    fullscreenable: false,
+    skipTaskbar: true,
+    focusable: false,
+    alwaysOnTop: true,
+    hasShadow: false,
+    show: false,
+    webPreferences: { sandbox: true, contextIsolation: true },
+  });
+  rcBar.setAlwaysOnTop(true, 'screen-saver');
+  rcBar.setVisibleOnAllWorkspaces?.(true, { visibleOnFullScreen: true });
+  rcBar.setContentProtection(true); // izleyenin görüntüsüne girmesin
+  const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const keyLabel = isMac ? '⌘⇧X' : 'Ctrl+Shift+X';
+  const html = `<!doctype html><meta charset="utf-8"><style>
+    html,body{margin:0;height:100%;background:transparent;font:13px -apple-system,"Segoe UI",sans-serif;overflow:hidden}
+    .bar{box-sizing:border-box;height:46px;margin:0;display:flex;align-items:center;gap:10px;padding:0 8px 0 14px;border-radius:23px;
+      background:rgba(8,10,11,.94);border:1px solid rgba(34,212,126,.55);color:#dfe8e3;-webkit-app-region:drag;user-select:none}
+    .dot{width:9px;height:9px;border-radius:50%;background:#22d47e;box-shadow:0 0 0 0 rgba(34,212,126,.6);animation:p 1.6s infinite}
+    @keyframes p{70%{box-shadow:0 0 0 8px rgba(34,212,126,0)}}
+    .t{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.t b{color:#fff}
+    .k{font:11px ui-monospace,Menlo,Consolas,monospace;color:#7f908a}
+    a{-webkit-app-region:no-drag;text-decoration:none;background:#ff4d5e;color:#fff;font-weight:700;padding:7px 14px;border-radius:16px}
+    a:hover{background:#ff6170}</style>
+    <div class="bar"><span class="dot"></span><span class="t"><b>${esc(who)}</b> ekranını kontrol ediyor</span><span class="k">${keyLabel}</span><a href="https://kanki.invalid/stop">Durdur</a></div>`;
+  rcBar.webContents.on('will-navigate', (e, url) => {
+    e.preventDefault();
+    if (url.endsWith('/stop')) requestRcStop('bar');
+  });
+  rcBar.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  rcBar.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
+  rcBar.once('ready-to-show', () => {
+    rcBar?.showInactive();
+    // Test: çubuğun görüntüsünü kaydet
+    if (process.env.KANKI_RC_BARSHOT)
+      setTimeout(async () => rcBar && fs.writeFileSync(process.env.KANKI_RC_BARSHOT, (await rcBar.webContents.capturePage()).toPNG()), 600);
+  });
+}
+function closeRcBar() {
+  if (rcBar && !rcBar.isDestroyed()) rcBar.destroy();
+  rcBar = null;
+}
+// Yayıncı çubuktan ya da kısayoldan durdurdu: arayüze haber ver (o da izleyene bildirir)
+function requestRcStop(reason) {
+  stopRc();
+  win?.webContents.send('rc:stopped-locally', reason);
+}
+function stopRc() {
+  remoteInput.stop();
+  closeRcBar();
+  try {
+    globalShortcut.unregister(RC_STOP_KEY);
+  } catch {}
+}
+
+ipcMain.handle('rc:check', () => remoteInput.check());
+ipcMain.handle('rc:start', async (_e, sourceId, who) => {
+  const display = await displayForSource(sourceId);
+  if (!display) return { ok: false, reason: 'window', message: 'Uzaktan kontrol sadece tüm ekran paylaşımında çalışır.' };
+  const r = remoteInput.start(display);
+  if (!r.ok) return r;
+  showRcBar(display, who || 'Biri');
+  try {
+    globalShortcut.register(RC_STOP_KEY, () => requestRcStop('shortcut'));
+  } catch {}
+  return { ok: true };
+});
+ipcMain.on('rc:input', (_e, msg) => remoteInput.input(msg));
+ipcMain.handle('rc:stop', () => stopRc());
+app.on('will-quit', () => stopRc());
 
 ipcMain.handle('screen:select-source', (_e, id, audio) => {
   // audio: 'clean' | 'plain' | false (eski sürümlerden gelen true = 'plain')

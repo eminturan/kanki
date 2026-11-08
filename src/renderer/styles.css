@@ -1155,3 +1155,40 @@ body.has-update .layout.chat-hidden .stage-head { padding-right: 56px; }
 .tile-mute:hover { background: rgba(255, 255, 255, .14); }
 .tile-vol.muted .tile-mute { color: var(--red); }
 .tile-vol.muted input { opacity: .35; }
+
+/* ---------- Bağlam menüsünde alt menü (ör. Kanala taşı ›) ---------- */
+.ctx-item.has-sub { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.ctx-arrow { color: var(--text-3); font-size: 15px; line-height: 1; }
+.ctx-item.has-sub.open { background: var(--selected); color: var(--text); }
+.ctx-sub { display: none; position: absolute !important; left: calc(100% + 6px); top: -6px; min-width: 180px; max-height: 60vh; overflow-y: auto; }
+.ctx-sub.left { left: auto; right: calc(100% + 6px); }
+.ctx-item.has-sub.open > .ctx-sub { display: block; }
+
+/* ---------- Uzaktan kontrol ---------- */
+.tile-btn.rc.pending { color: var(--amber); animation: rcpulse 1.2s ease-in-out infinite; }
+.tile-btn.rc.active { color: #03140a; background: var(--accent); }
+@keyframes rcpulse { 50% { opacity: .45; } }
+.tile.rc-active { box-shadow: 0 0 0 2px var(--accent), 0 0 24px rgba(34, 212, 126, .25); }
+.tile.rc-active video { cursor: default; }
+.tile.rc-focus { box-shadow: 0 0 0 3px var(--accent), 0 0 30px rgba(34, 212, 126, .4); }
+.tile-rc-badge {
+  position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); z-index: 3; display: flex; align-items: center; gap: 8px;
+  padding: 4px 4px 4px 12px; border-radius: 16px; background: rgba(4, 8, 6, .86); border: 1px solid rgba(34, 212, 126, .55);
+  color: #dfe8e3; font-size: 12.5px; white-space: nowrap; pointer-events: auto;
+}
+.tile-rc-badge .rc-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); animation: rcpulse 1.6s infinite; }
+.tile-rc-badge .rc-release { height: 24px; padding: 0 12px; border: 0; border-radius: 12px; background: var(--red); color: #fff; font-weight: 700; font-size: 12px; cursor: pointer; }
+.tile-rc-badge .rc-release:hover { background: #ff6170; }
+.rc-banner {
+  display: flex; align-items: center; gap: 10px; margin: 10px 16px 0; padding: 8px 8px 8px 14px; border-radius: 8px;
+  background: rgba(34, 212, 126, .1); border: 1px solid rgba(34, 212, 126, .45); color: var(--text);
+}
+.rc-banner svg { width: 18px; height: 18px; color: var(--accent); }
+.rc-banner .rcb-text { flex: 1; }
+.rc-card { width: 440px; text-align: center; }
+.rc-card .rc-icon { width: 56px; height: 56px; margin: 0 auto 12px; border-radius: 50%; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); }
+.rc-card .rc-icon svg { width: 28px; height: 28px; }
+.rc-card h2 { margin: 0 0 8px; font-size: 18px; }
+.rc-card p { margin: 0; line-height: 1.5; font-size: 13.5px; }
+.rc-card .prompt-actions { justify-content: center; }
+.rc-card .prompt-actions .btn { min-width: 130px; height: 38px; }

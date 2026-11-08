@@ -168,6 +168,10 @@ const S = {
   editDraft: '',
   pendingImage: null, // gönderilmeyi bekleyen resim { data, w, h, name }
   unread: 0, // sohbet gizliyken gelen mesaj sayısı
+  rcHost: null, // benim ekranımı kontrol eden: { peerId, shareId, name }
+  rcPending: null, // bekleyen kontrol isteği: { peerId, shareId, timer }
+  rcView: null, // benim kontrol ettiğim yayın: { key, peerId, shareId, state: 'pending' | 'active', timer }
+  rcFocus: false, // klavye karşı tarafa gidiyor mu (görüntüye tıklanınca)
 };
 
 // =====================================================================
@@ -480,6 +484,8 @@ class Peer {
     this.micSender = null;
     this.screenTx = new Map(); // gönderdiğim yayınlar: shareId -> [transceiver]
     this.remoteMeta = new Map(); // karşının yayın akışları: streamId -> shareId
+    this.remoteSurface = new Map(); // karşının yayınları: shareId -> 'screen' | 'window' | 'camera'
+    this.rcCh = null; // uzaktan kontrol veri kanalı
     this.pc = new RTCPeerConnection({ iceServers: S.iceServers, bundlePolicy: 'max-bundle', rtcpMuxPolicy: 'require' });
     const pc = this.pc;
 
@@ -601,6 +607,18 @@ class Peer {
       renderSelfShare();
     } else if (data.kind === 'screen-meta') {
       this.remoteMeta.set(data.streamId, data.shareId || 'main');
+      if (data.surface) {
+        this.remoteSurface.set(data.shareId || 'main', data.surface);
+        renderTiles();
+      }
+    } else if (data.kind === 'rc-request') {
+      onRcRequest(this.id, data.shareId);
+    } else if (data.kind === 'rc-answer') {
+      onRcAnswer(this.id, data);
+    } else if (data.kind === 'rc-stop') {
+      onRcStop(this.id, data);
+    } else if (data.kind === 'rc-in') {
+      rcIncoming(this.id, data.m); // veri kanalı açılana kadar sunucu üzerinden
     } else if (data.kind === 'screen-ended') {
       if (data.shareId) dropRemoteScreen(shareKey(this.id, data.shareId));
       else dropUserScreens(this.id);
@@ -619,7 +637,7 @@ class Peer {
     const sh = S.myShares.get(shareId);
     if (!sh || this.screenTx.has(shareId)) return;
     const o = sh.opts;
-    this.signal({ kind: 'screen-meta', shareId, streamId: sh.stream.id });
+    this.signal({ kind: 'screen-meta', shareId, streamId: sh.stream.id, surface: sh.kind === 'camera' ? 'camera' : sh.opts.surface || 'screen' });
     const txs = [];
     for (const track of sh.stream.getTracks()) {
       const isVideo = track.kind === 'video';
@@ -649,6 +667,23 @@ class Peer {
     if (notify) this.signal({ kind: 'screen-ended', shareId });
   }
 
+  // Uzaktan kontrol için doğrudan (P2P) veri kanalı; iki taraf da aynı kimlikle açar
+  ensureRcChannel() {
+    if (this.rcCh && this.rcCh.readyState !== 'closed') return this.rcCh;
+    const ch = this.pc.createDataChannel('kanki-rc', { negotiated: true, id: 42, ordered: true });
+    ch.onmessage = (ev) => {
+      try {
+        rcIncoming(this.id, JSON.parse(ev.data));
+      } catch {}
+    };
+    this.rcCh = ch;
+    return ch;
+  }
+  sendRc(m) {
+    if (this.rcCh?.readyState === 'open') this.rcCh.send(JSON.stringify(m));
+    else this.signal({ kind: 'rc-in', m });
+  }
+
   // Belirli bir görüntü izinin (trackId) gelen istatistikleri
   async inboundVideo(trackId) {
     const report = await this.pc.getStats();
@@ -670,6 +705,8 @@ class Peer {
   close() {
     clearInterval(this.watchdog);
     clearTimeout(this.offerTimer);
+    if (S.rcHost?.peerId === this.id) stopRcHost(false, `${userName(this.id) || 'İzleyen'} ayrıldı`);
+    if (S.rcView?.peerId === this.id) releaseControl(false);
     try {
       this.pc.close();
     } catch {}
@@ -828,7 +865,7 @@ async function goLive() {
     return;
   }
   if (sh.audio && audioTaken) toast('Sistem sesi diğer yayında', 'Ses yankı yapmasın diye sadece ilk yayına ekleniyor.');
-  addShare(stream, { fps, res, bitrate, hint: sh.hint, audioMode }, label);
+  addShare(stream, { fps, res, bitrate, hint: sh.hint, audioMode, sourceId, surface: src?.type === 'window' ? 'window' : 'screen' }, label);
 }
 
 let shareSeq = 0;
@@ -874,6 +911,7 @@ function addShare(stream, opts, label) {
 function removeShare(id, notify = true) {
   const sh = S.myShares.get(id);
   if (!sh) return;
+  if (S.rcHost?.shareId === id) stopRcHost(true, 'Yayın durdu');
   for (const p of S.peers.values()) p.stopShare(id, notify);
   sh.stream.getTracks().forEach((t) => t.stop());
   S.myShares.delete(id);
@@ -1055,6 +1093,7 @@ function addRemoteScreenTrack(userId, shareId, track) {
 }
 
 function dropRemoteScreen(key) {
+  if (S.rcView?.key === key) releaseControl(true);
   const sc = S.remoteScreens.get(key);
   if (sc) {
     if (sc.audioEl) sc.audioEl.srcObject = null;
@@ -1176,6 +1215,7 @@ function buildTile(key) {
     h('span', { class: 'spacer' }),
     h('div', { class: 'tile-vol' }, muteBtn, vol),
     h('span', { class: 'tile-noaudio', title: 'Bu yayında ses yok (yayıncı sistem sesini paylaşmıyor)' }, 'ses yok'),
+    btn('Uzaktan kontrol iste', ICON_RC, () => requestControl(key)),
     btn('Ayrı pencerede aç (istediğin yere, başka monitöre taşıyabilirsin)', ICON_POP, () => popOut(key)),
     btn('Tam ekran (F)', ICON_FULL, () => tileFullscreen(key)),
     btn('Sahneyi kapla / eski boyutuna dön (çift tıkla)', ICON_MAX, () => toggleMax(key)),
@@ -1186,12 +1226,20 @@ function buildTile(key) {
   );
   const video = h('video', { autoplay: true, playsinline: true });
   video.muted = true; // ses ayrı <audio> ile çalınıyor
-  const el = h('div', { class: 'tile', 'data-key': key }, video, h('div', { class: 'tile-waiting' }, 'Bağlanıyor…'), bar, h('div', { class: 'tile-resize', title: 'Boyutlandır' }));
+  const rcBadge = h(
+    'div',
+    { class: 'tile-rc-badge hidden' },
+    h('span', { class: 'rc-dot' }),
+    h('span', { class: 'rc-text' }),
+    h('button', { class: 'rc-release', onclick: (e) => (e.stopPropagation(), releaseControl(true)) }, 'Bırak')
+  );
+  const el = h('div', { class: 'tile', 'data-key': key }, video, h('div', { class: 'tile-waiting' }, 'Bağlanıyor…'), rcBadge, bar, h('div', { class: 'tile-resize', title: 'Boyutlandır' }));
+  attachRcInput(video, el, key);
   bar.addEventListener('pointerdown', (e) => startDrag(e, key, el, 'move'));
   el.querySelector('.tile-resize').addEventListener('pointerdown', (e) => startDrag(e, key, el, 'resize'));
   el.addEventListener('pointerdown', () => bringFront(el, key), true);
   bar.addEventListener('dblclick', (e) => !e.target.closest('button, input') && toggleMax(key));
-  video.addEventListener('dblclick', () => tileFullscreen(key));
+  video.addEventListener('dblclick', () => !isControlling(key) && tileFullscreen(key));
   for (const ev of ['loadeddata', 'playing']) video.addEventListener(ev, () => el.classList.remove('waiting'));
   bringFront(el, key);
   return el;
@@ -1294,6 +1342,7 @@ function renderTiles() {
     const hasAudio = !!sc?.audioEl;
     el.querySelector('.tile-vol').classList.toggle('hidden', !hasAudio);
     syncTileMute(k);
+    syncTileRc(k, el);
     el.querySelector('.tile-noaudio').classList.toggle('hidden', hasAudio || !sc);
     const v = el.querySelector('video');
     const want = sc?.video || null;
@@ -1486,6 +1535,8 @@ function connect(url, password) {
 }
 
 function onDisconnected() {
+  stopRcHost(false);
+  releaseControl(false);
   closeAllPeers();
   stopAllShares(false);
   closeAllPopouts();
@@ -1505,6 +1556,8 @@ function onDisconnected() {
 function disconnect() {
   S.intentionalClose = true;
   clearTimeout(S.reconnectTimer);
+  stopRcHost(true);
+  releaseControl(true);
   stopAllShares();
   closeAllPeers();
   closeAllPopouts();
@@ -2202,9 +2255,10 @@ function userMenu(e, u) {
       ? [
           '-',
           { html: '<div class="ctx-label">Yönetici</div>' },
-          ...S.channels
-            .filter((c) => c.id !== u.channelId)
-            .map((c) => ({ label: `Taşı → ${c.name}`, run: () => send({ t: 'move', to: u.id, channelId: c.id }) })),
+          {
+            label: 'Kanala taşı',
+            submenu: S.channels.filter((c) => c.id !== u.channelId).map((c) => ({ label: c.name, run: () => send({ t: 'move', to: u.id, channelId: c.id }) })),
+          },
           !u.muted && { label: 'Mikrofonunu kapat', run: () => send({ t: 'serverMute', to: u.id }) },
           {
             label: 'Sunucudan at',
@@ -2226,6 +2280,42 @@ function showCtx(e, items) {
       ctx.append(h('div', { class: 'ctx-sep' }));
     } else if (it.html) {
       ctx.insertAdjacentHTML('beforeend', it.html);
+    } else if (it.submenu) {
+      const sub = h('div', { class: 'ctx ctx-sub' });
+      for (const si of it.submenu)
+        sub.append(
+          h(
+            'div',
+            {
+              class: 'ctx-item',
+              onclick: (ev) => {
+                ev.stopPropagation();
+                hideCtx();
+                si.run();
+              },
+            },
+            si.label
+          )
+        );
+      const row = h('div', { class: 'ctx-item has-sub' }, h('span', {}, it.label), h('span', { class: 'ctx-arrow' }, '›'), sub);
+      const place = () => {
+        // Sağa sığmazsa sola aç; ekranın altına taşmasın
+        sub.classList.remove('left');
+        sub.style.top = '';
+        const r = sub.getBoundingClientRect();
+        if (r.right > innerWidth - 8) sub.classList.add('left');
+        if (r.bottom > innerHeight - 8) sub.style.top = `${Math.min(0, innerHeight - 8 - r.bottom)}px`;
+      };
+      row.addEventListener('mouseenter', () => {
+        row.classList.add('open');
+        place();
+      });
+      row.addEventListener('mouseleave', () => row.classList.remove('open'));
+      row.addEventListener('click', () => {
+        row.classList.toggle('open');
+        place();
+      });
+      ctx.append(row);
     } else if (it.slider) {
       const out = h('span', {}, it.slider.value + '%');
       const input = h('input', { type: 'range', min: 0, max: it.slider.max, value: it.slider.value });
@@ -4087,6 +4177,301 @@ $('#btn-toggle-chat').addEventListener('click', () => {
     if (!settings.chatHidden) $('#chat-log').scrollTop = $('#chat-log').scrollHeight;
   });
 });
+
+// =====================================================================
+//  Uzaktan kontrol (TeamViewer / AnyDesk gibi)
+//  İzleyen "Kontrol iste" der → yayıncı onaylarsa izleyenin fare ve klavyesi
+//  yayıncının paylaştığı ekrana uygulanır. Olaylar doğrudan (P2P) veri kanalından gider.
+// =====================================================================
+const ICON_RC = '<svg viewBox="0 0 24 24"><path d="M5 3l14 7.2-6.3 1.6 3.9 6.8-2.6 1.5-3.9-6.8L5 18V3Z"/></svg>';
+const RC_TYPES = new Set(['m', 'd', 'u', 'w', 'k']);
+const isControlling = (key) => S.rcView?.state === 'active' && S.rcView.key === key;
+
+// ---------- Yayıncı tarafı ----------
+function answerRc(peerId, shareId, ok, reason = '', message = '') {
+  S.peers.get(peerId)?.signal({ kind: 'rc-answer', shareId, ok, reason, message });
+}
+function onRcRequest(peerId, shareId) {
+  const sh = S.myShares.get(shareId);
+  const who = userName(peerId) || 'Biri';
+  if (!sh || sh.kind === 'camera') return answerRc(peerId, shareId, false, 'nosuch');
+  if (sh.opts.surface !== 'screen') return answerRc(peerId, shareId, false, 'window');
+  if (S.rcHost || S.rcPending) return answerRc(peerId, shareId, false, 'busy');
+  let left = 30;
+  const tick = () => {
+    $('#rc-deny').textContent = `Reddet (${left})`;
+    if (left-- <= 0) decideRc(false, 'timeout');
+  };
+  S.rcPending = { peerId, shareId, timer: setInterval(tick, 1000) };
+  $('#rc-title').textContent = `${who} ekranını kontrol etmek istiyor`;
+  $('#rc-desc').textContent = `İzin verirsen ${who} "${sh.label}" ekranında fareni ve klavyeni kullanabilir. Ekranının üstünde bir çubuk görünür; istediğin an Durdur’a ya da ${S.platform === 'darwin' ? '⌘⇧X' : 'Ctrl+Shift+X'} kısayoluna basarak kontrolü geri alırsın.`;
+  tick();
+  showModal('rc-modal');
+  beep('mention');
+  kanki.flash();
+  if (!document.hasFocus()) kanki.notify(`${who} ekranını kontrol etmek istiyor`, 'İzin vermek ya da reddetmek için Kanki’ye geç.');
+}
+async function decideRc(allow, reason = 'declined') {
+  const p = S.rcPending;
+  if (!p) return;
+  clearInterval(p.timer);
+  S.rcPending = null;
+  hideModal('rc-modal');
+  const sh = S.myShares.get(p.shareId);
+  if (!allow || !sh || !S.peers.has(p.peerId)) return answerRc(p.peerId, p.shareId, false, sh ? reason : 'nosuch');
+  const who = userName(p.peerId) || 'Biri';
+  const r = await kanki.rcStart(sh.opts.sourceId, who);
+  if (!r?.ok) {
+    toast('Uzaktan kontrol başlatılamadı', r?.message || '', 'err', 9000);
+    return answerRc(p.peerId, p.shareId, false, r?.reason || 'error', r?.message || '');
+  }
+  S.rcHost = { peerId: p.peerId, shareId: p.shareId, name: who };
+  S.peers.get(p.peerId)?.ensureRcChannel();
+  answerRc(p.peerId, p.shareId, true);
+  renderRcHost();
+  toast(`${who} ekranını kontrol ediyor`, `Durdurmak için ekranın üstündeki çubuğu ya da ${S.platform === 'darwin' ? '⌘⇧X' : 'Ctrl+Shift+X'} kısayolunu kullan.`, '', 7000);
+}
+$('#rc-allow').addEventListener('click', () => decideRc(true));
+$('#rc-deny').addEventListener('click', () => decideRc(false));
+// Pencere başka bir yoldan kapanırsa (Esc, dışarı tıklama) istek reddedilmiş sayılır
+new MutationObserver(() => $('#rc-modal').classList.contains('hidden') && S.rcPending && decideRc(false)).observe($('#rc-modal'), { attributes: true, attributeFilter: ['class'] });
+
+// Gelen fare/klavye olayı: sadece izin verilen kişiden ve kontrol açıkken uygulanır
+function rcIncoming(peerId, m) {
+  if (!S.rcHost || S.rcHost.peerId !== peerId || !m || !RC_TYPES.has(m.t)) return;
+  kanki.rcInput(m);
+}
+function stopRcHost(notify = true, why = '') {
+  if (S.rcPending) {
+    clearInterval(S.rcPending.timer);
+    const p = S.rcPending;
+    S.rcPending = null;
+    hideModal('rc-modal');
+    if (notify) answerRc(p.peerId, p.shareId, false, 'declined');
+  }
+  if (!S.rcHost) return;
+  const h0 = S.rcHost;
+  S.rcHost = null;
+  kanki.rcStop();
+  if (notify) S.peers.get(h0.peerId)?.signal({ kind: 'rc-stop', shareId: h0.shareId });
+  renderRcHost();
+  toast('Uzaktan kontrol bitti', why || `${h0.name} artık ekranını kontrol etmiyor.`);
+}
+kanki.onRcStopped(() => stopRcHost(true, 'Kontrolü geri aldın.'));
+function renderRcHost() {
+  const b = $('#rc-banner');
+  b.classList.toggle('hidden', !S.rcHost);
+  if (S.rcHost) b.querySelector('.rcb-text').innerHTML = `<b>${esc(S.rcHost.name)}</b> ekranını kontrol ediyor`;
+  renderStage(); // bant sahnenin yüksekliğini değiştirir; kutular yeniden dizilsin
+}
+$('#rc-banner-stop').addEventListener('click', () => stopRcHost(true, 'Kontrolü geri aldın.'));
+
+// ---------- İzleyen tarafı ----------
+function requestControl(key) {
+  if (S.rcView?.key === key) return releaseControl(true); // ikinci tıklama: bırak / isteği geri al
+  if (S.rcView) releaseControl(true);
+  const [uid, sid] = splitKey(key);
+  const p = S.peers.get(uid);
+  if (!p) return;
+  p.signal({ kind: 'rc-request', shareId: sid });
+  S.rcView = {
+    key,
+    peerId: uid,
+    shareId: sid,
+    state: 'pending',
+    timer: setTimeout(() => {
+      if (S.rcView?.key !== key || S.rcView.state !== 'pending') return;
+      S.rcView = null;
+      renderTiles();
+      toast('Yanıt gelmedi', `${userName(uid)} isteği görmemiş olabilir ya da Kanki’nin eski bir sürümünü kullanıyor.`);
+    }, 40000),
+  };
+  renderTiles();
+  toast('Kontrol isteği gönderildi', `${userName(uid)} onaylarsa ekranını kontrol edebileceksin.`);
+}
+function onRcAnswer(peerId, d) {
+  const v = S.rcView;
+  if (!v || v.peerId !== peerId || v.shareId !== d.shareId || v.state !== 'pending') return;
+  clearTimeout(v.timer);
+  const who = userName(peerId) || 'Karşı taraf';
+  if (d.ok) {
+    v.state = 'active';
+    S.peers.get(peerId)?.ensureRcChannel();
+    renderTiles();
+    toast('Kontrol sende', 'Görüntüye tıkla: fare ve klavye karşı tarafa gider. Bitirince "Bırak"a bas.', '', 7000);
+    return;
+  }
+  S.rcView = null;
+  renderTiles();
+  const MSG = {
+    declined: `${who} isteğini reddetti.`,
+    timeout: `${who} isteğe yanıt vermedi.`,
+    busy: `${who} ekranını şu an başka biri kontrol ediyor.`,
+    window: `${who} bir pencere paylaşıyor; kontrol için tüm ekranı paylaşması gerekiyor.`,
+    nosuch: 'Bu yayın artık yok.',
+  };
+  toast('Kontrol verilmedi', MSG[d.reason] || d.message || `${who} tarafında kontrol başlatılamadı.`, d.reason === 'declined' ? '' : 'err', 7000);
+}
+function onRcStop(peerId, d) {
+  if (S.rcHost?.peerId === peerId && (!d.shareId || d.shareId === S.rcHost.shareId)) {
+    stopRcHost(false, `${S.rcHost.name} kontrolü bıraktı.`);
+  }
+  if (S.rcView?.peerId === peerId && (!d.shareId || d.shareId === S.rcView.shareId)) {
+    const wasActive = S.rcView.state === 'active';
+    releaseControl(false);
+    if (wasActive) toast('Uzaktan kontrol bitti', `${userName(peerId) || 'Yayıncı'} kontrolü geri aldı.`);
+  }
+}
+const rcHeldKeys = new Set();
+const rcHeldButtons = new Set();
+function rcSend(m) {
+  S.peers.get(S.rcView?.peerId)?.sendRc(m);
+}
+function releaseHeld() {
+  for (const c of rcHeldKeys) rcSend({ t: 'k', c, d: false });
+  for (const b of rcHeldButtons) rcSend({ t: 'u', b });
+  rcHeldKeys.clear();
+  rcHeldButtons.clear();
+}
+function setRcFocus(on) {
+  if (S.rcFocus === on) return;
+  if (!on) releaseHeld();
+  S.rcFocus = on;
+  const el = S.rcView && tileEls.get(S.rcView.key);
+  if (el) syncTileRc(S.rcView.key, el);
+}
+function releaseControl(notify = true) {
+  const v = S.rcView;
+  if (!v) return;
+  clearTimeout(v.timer);
+  if (v.state === 'active') releaseHeld();
+  if (notify) S.peers.get(v.peerId)?.signal({ kind: 'rc-stop', shareId: v.shareId });
+  S.rcView = null;
+  S.rcFocus = false;
+  renderTiles();
+}
+function syncTileRc(key, el) {
+  const [uid, sid] = splitKey(key);
+  const surface = S.peers.get(uid)?.remoteSurface.get(sid);
+  const btn = el.querySelector('.tile-btn[title*="kontrol" i], .tile-btn.rc');
+  if (btn) {
+    btn.classList.add('rc');
+    btn.classList.toggle('hidden', surface !== 'screen'); // pencere ve kamerada kontrol yok
+    const st = S.rcView?.key === key ? S.rcView.state : '';
+    btn.classList.toggle('pending', st === 'pending');
+    btn.classList.toggle('active', st === 'active');
+    btn.title = st === 'active' ? 'Kontrolü bırak' : st === 'pending' ? 'İsteği geri al (yanıt bekleniyor)' : 'Uzaktan kontrol iste';
+  }
+  const on = isControlling(key);
+  el.classList.toggle('rc-active', on);
+  el.classList.toggle('rc-focus', on && S.rcFocus);
+  const badge = el.querySelector('.tile-rc-badge');
+  badge.classList.toggle('hidden', !on);
+  if (on) badge.querySelector('.rc-text').textContent = S.rcFocus ? 'Kontrol sende · klavye de karşıya gidiyor' : 'Kontrol sende · görüntüye tıkla';
+}
+
+// Görüntü üzerindeki fare olaylarını karşı ekranın oranlarına çevirir (siyah kenarlar hariç)
+function rcPos(e, video, clampIt) {
+  const r = video.getBoundingClientRect();
+  const vw = video.videoWidth;
+  const vh = video.videoHeight;
+  if (!vw || !vh) return null;
+  const sc = Math.min(r.width / vw, r.height / vh);
+  const cw = vw * sc;
+  const ch = vh * sc;
+  let x = (e.clientX - (r.left + (r.width - cw) / 2)) / cw;
+  let y = (e.clientY - (r.top + (r.height - ch) / 2)) / ch;
+  if (!clampIt && (x < 0 || y < 0 || x > 1 || y > 1)) return null;
+  x = Math.min(1, Math.max(0, x));
+  y = Math.min(1, Math.max(0, y));
+  return { x: Math.round(x * 10000) / 10000, y: Math.round(y * 10000) / 10000 };
+}
+function attachRcInput(video, el, key) {
+  let pending = null;
+  let timer = null;
+  const flushMove = () => {
+    timer = null;
+    if (pending && isControlling(key)) rcSend({ t: 'm', ...pending });
+    pending = null;
+  };
+  video.addEventListener('pointermove', (e) => {
+    if (!isControlling(key)) return;
+    const p = rcPos(e, video, rcHeldButtons.size > 0);
+    if (!p) return;
+    pending = p;
+    if (!timer) timer = setTimeout(flushMove, 16); // en fazla ~60 olay/sn
+  });
+  video.addEventListener('pointerdown', (e) => {
+    if (!isControlling(key)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setRcFocus(true);
+    const p = rcPos(e, video, false);
+    if (!p) return;
+    try {
+      video.setPointerCapture(e.pointerId);
+    } catch {}
+    if (timer) flushMove();
+    rcHeldButtons.add(e.button);
+    rcSend({ t: 'd', b: e.button, n: e.detail || 1, ...p });
+  });
+  const up = (e) => {
+    if (!isControlling(key) || !rcHeldButtons.has(e.button)) return;
+    e.preventDefault();
+    if (timer) flushMove();
+    rcHeldButtons.delete(e.button);
+    rcSend({ t: 'u', b: e.button, n: e.detail || 1, ...(rcPos(e, video, true) || {}) });
+  };
+  video.addEventListener('pointerup', up);
+  video.addEventListener('pointercancel', up);
+  video.addEventListener(
+    'wheel',
+    (e) => {
+      if (!isControlling(key)) return;
+      e.preventDefault();
+      const k = e.deltaMode === 1 ? 40 : e.deltaMode === 2 ? 800 : 1;
+      rcSend({ t: 'w', dx: Math.round(e.deltaX * k), dy: Math.round(e.deltaY * k) });
+    },
+    { passive: false }
+  );
+  video.addEventListener('contextmenu', (e) => isControlling(key) && e.preventDefault());
+  video.addEventListener('auxclick', (e) => isControlling(key) && e.preventDefault());
+}
+// Klavye: kontrol açıkken ve görüntüye tıklanmışken tüm tuşlar karşıya gider (Kanki kısayolları dahil)
+window.addEventListener(
+  'keydown',
+  (e) => {
+    if (!S.rcView || S.rcView.state !== 'active' || !S.rcFocus) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    if (!e.code) return;
+    rcHeldKeys.add(e.code);
+    rcSend({ t: 'k', c: e.code, d: true });
+  },
+  true
+);
+window.addEventListener(
+  'keyup',
+  (e) => {
+    if (!S.rcView || S.rcView.state !== 'active' || !S.rcFocus) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    if (!e.code) return;
+    rcHeldKeys.delete(e.code);
+    rcSend({ t: 'k', c: e.code, d: false });
+  },
+  true
+);
+window.addEventListener('blur', () => setRcFocus(false));
+document.addEventListener(
+  'pointerdown',
+  (e) => {
+    if (!S.rcFocus) return;
+    const el = S.rcView && tileEls.get(S.rcView.key);
+    if (!el || !el.querySelector('video').contains(e.target)) setRcFocus(false);
+  },
+  true
+);
 
 // =====================================================================
 //  Yenilikler: güncellemeden sonra, eski sürümden yenisine kadar olan değişiklikler

@@ -6,6 +6,17 @@
  */
 const CHANGELOG = [
   {
+    version: '1.0.13',
+    date: '2026-11-08',
+    title: 'Uzaktan kontrol',
+    added: [
+      'Uzaktan kontrol: izlediğin ekran yayınında fare simgesine basıp kontrol iste. Yayıncı izin verirse onun fare ve klavyesini kullanırsın (TeamViewer/AnyDesk gibi).',
+      'Ekranı kontrol edilen kişinin ekranında her zaman üstte duran "X kontrol ediyor · Durdur" çubuğu; Ctrl+Shift+X (Mac’te ⌘⇧X) ile de anında durdurulur.',
+      'Kontrol isteği 30 saniye içinde yanıtlanmazsa kendiliğinden reddedilir. Kontrol bitince basılı kalan tuşlar ve fare düğmeleri bırakılır.',
+    ],
+    changed: ['Kişi menüsünde her kanal için ayrı "Taşı" satırı yerine tek bir "Kanala taşı ›" alt menüsü var.'],
+  },
+  {
     version: '1.0.12',
     date: '2026-11-08',
     title: 'Windows düzeltmeleri',
