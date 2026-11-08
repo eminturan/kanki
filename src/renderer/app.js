@@ -2166,6 +2166,8 @@ async function enterApp(url, password, address) {
     }
     $('#connect-screen').classList.add('hidden');
     $('#app').classList.remove('hidden');
+    everConnected = true;
+    $('#launch-update').classList.add('hidden');
     renderAll();
     applyPtt();
     return true;
@@ -2353,7 +2355,7 @@ function placeTip(target) {
   const t = tipEl.getBoundingClientRect();
   let top = r.bottom + 8;
   let below = true;
-  if (target.dataset.tipPos === 'above' || top + t.height > innerHeight - 8) {
+  if ((target.dataset.tipPos === 'above' || top + t.height > innerHeight - 8) && target.dataset.tipPos !== 'below') {
     top = r.top - t.height - 8;
     below = false;
   }
@@ -2552,27 +2554,57 @@ $('#adm-stop').addEventListener('click', async () => {
 //  Otomatik güncelleme bildirimi (sadece kurulumlu Windows sürümünde gelir)
 // =====================================================================
 let updateToastShown = false;
+const appStartedAt = Date.now();
+let everConnected = false; // bu açılışta bir sunucuya bağlanıldı mı
+let launchInstall = false; // açılışta bulunan güncelleme kendiliğinden kurulacak mı
+
 function renderUpdate(u) {
-  const bar = $('#update-bar');
-  if (!u || (u.state !== 'downloading' && u.state !== 'ready')) return bar.classList.add('hidden');
-  bar.classList.remove('hidden');
+  const btn = $('#update-btn');
+  const active = u && (u.state === 'downloading' || u.state === 'ready');
+  btn.classList.toggle('hidden', !active);
+  if (!active) {
+    $('#launch-update').classList.add('hidden');
+    return;
+  }
   const ready = u.state === 'ready';
-  bar.classList.toggle('ready', ready);
-  $('#btn-update').classList.toggle('hidden', !ready);
-  $('#update-text').innerHTML = ready
-    ? `<b>Kanki ${esc(u.version)} hazır</b><div class="muted">Kapattığında da kendiliğinden kurulur.</div>`
-    : `Kanki ${esc(u.version || '')} indiriliyor… %${u.percent || 0}`;
-  $('#update-progress-fill').style.width = (u.percent || 0) + '%';
+  const pct = ready ? 100 : Math.max(0, Math.min(100, u.percent || 0));
+  btn.classList.toggle('ready', ready);
+  btn.disabled = !ready;
+  // İlerleme halkası (çevre = 2πr ≈ 100.5)
+  $('#update-ring-fg').style.strokeDashoffset = String(100.5 * (1 - pct / 100));
+  btn.dataset.tip = ready
+    ? `Kanki ${u.version} hazır\nGüncellemek ve yeniden başlatmak için tıkla`
+    : `Kanki ${u.version || ''} indiriliyor… %${pct}`;
+  if (tipTarget === btn) tipEl.textContent = btn.dataset.tip;
+
+  // Açılışta bulunan güncelleme: henüz kimse bir sunucuya bağlanmadıysa kendiliğinden kur
+  if (!everConnected && Date.now() - appStartedAt < 3 * 60 * 1000) launchInstall = true;
+  const showLaunch = launchInstall && !everConnected;
+  $('#launch-update').classList.toggle('hidden', !showLaunch);
+  if (showLaunch) {
+    $('#launch-update-text').textContent = ready
+      ? `Kanki ${u.version} kuruluyor, uygulama yeniden açılacak…`
+      : `Yeni sürüm (Kanki ${u.version || ''}) indiriliyor… %${pct}`;
+    $('#launch-update-fill').style.width = pct + '%';
+  }
+  if (ready && showLaunch) {
+    setTimeout(() => !everConnected && kanki.installUpdate(), 1500);
+    return;
+  }
   if (ready && !updateToastShown) {
     updateToastShown = true;
     beep('msg');
+    toast(`Kanki ${u.version} hazır`, 'Sağ üstteki yeşil düğmeye basınca güncellenip yeniden başlar.');
   }
 }
 kanki.onUpdate(renderUpdate);
 kanki.updateState().then(renderUpdate);
-$('#btn-update').addEventListener('click', () => {
-  $('#btn-update').disabled = true;
-  $('#btn-update').textContent = 'Yeniden başlatılıyor…';
+$('#update-btn').addEventListener('click', () => {
+  const btn = $('#update-btn');
+  if (!btn.classList.contains('ready')) return;
+  btn.disabled = true;
+  btn.classList.add('installing');
+  btn.dataset.tip = 'Güncelleniyor, Kanki yeniden açılıyor…';
   kanki.installUpdate();
 });
 

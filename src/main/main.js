@@ -194,7 +194,7 @@ function setupAutoUpdate() {
     if (updateState.state === 'downloading') sendUpdate({ state: 'idle' });
   });
   const check = () => updater.checkForUpdates().catch(() => {});
-  setTimeout(check, 5000);
+  setTimeout(check, 1500); // açılışta hemen bak: varsa bağlanmadan önce kurulabilsin
   setInterval(check, 4 * 60 * 60 * 1000); // açık kaldığı sürece 4 saatte bir bak
 }
 

@@ -19,6 +19,11 @@
         </div>
       </div>
 
+      <div class="launch-update hidden" id="launch-update">
+        <div id="launch-update-text">Güncelleme indiriliyor…</div>
+        <div class="update-progress"><div id="launch-update-fill"></div></div>
+      </div>
+
       <div class="tabs" id="connect-tabs">
         <button class="tab active" data-tab="join">Sunucuya Bağlan</button>
         <button class="tab" data-tab="host">Sunucu Kur</button>
@@ -337,14 +342,11 @@
     </div>
   </div>
 
-  <div class="update-bar hidden" id="update-bar" role="status">
-    <svg viewBox="0 0 24 24"><path d="M11 3h2v10.17l3.59-3.58L18 11l-6 6-6-6 1.41-1.41L11 13.17V3ZM5 19h14v2H5v-2Z"/></svg>
-    <div class="update-info">
-      <div id="update-text"></div>
-      <div class="update-progress" id="update-progress"><div id="update-progress-fill"></div></div>
-    </div>
-    <button class="btn primary sm hidden" id="btn-update">Yeniden başlat ve güncelle</button>
-  </div>
+  <!-- Güncelleme düğmesi (sağ üst): indirme sürerken ilerleme halkası, hazır olunca tıkla-güncelle -->
+  <button class="update-btn hidden" id="update-btn" data-tip-pos="below" data-tip="">
+    <svg class="update-ring" viewBox="0 0 36 36"><circle cx="18" cy="18" r="16" class="ring-bg"/><circle cx="18" cy="18" r="16" class="ring-fg" id="update-ring-fg"/></svg>
+    <svg class="update-icon" viewBox="0 0 24 24"><path d="M11 3h2v10.17l3.59-3.58L18 11l-6 6-6-6 1.41-1.41L11 13.17V3ZM5 19h14v2H5v-2Z"/></svg>
+  </button>
 
   <div class="ctx hidden" id="ctx"></div>
   <div class="toasts" id="toasts"></div>

@@ -622,3 +622,35 @@ body.win .sidebar { border-top-left-radius: 0; }
 .brand p { font-family: var(--mono); font-size: 12px; color: var(--text-3); }
 
 ::-webkit-scrollbar-thumb { background: #1a2224; }
+
+/* ---------- Güncelleme düğmesi (sağ üst) ---------- */
+.update-btn {
+  position: fixed; top: 8px; right: 12px; z-index: 90; width: 32px; height: 32px; padding: 0; border: 0;
+  border-radius: 50%; background: transparent; color: var(--text-3); cursor: default; display: grid; place-items: center;
+  -webkit-app-region: no-drag;
+}
+body.mac .update-btn { top: 36px; }
+.update-btn .update-icon { width: 18px; height: 18px; grid-area: 1 / 1; }
+.update-btn .update-ring { width: 32px; height: 32px; grid-area: 1 / 1; transform: rotate(-90deg); }
+.update-ring circle { fill: none; stroke-width: 2.5; }
+.update-ring .ring-bg { stroke: rgba(34, 212, 126, .15); }
+.update-ring .ring-fg { stroke: var(--accent); stroke-dasharray: 100.5; stroke-dashoffset: 100.5; stroke-linecap: round; transition: stroke-dashoffset .3s; }
+.update-btn:not(.ready) .update-icon { animation: update-bob 1.6s ease-in-out infinite; color: var(--text-2); }
+@keyframes update-bob { 50% { transform: translateY(2px); } }
+.update-btn.ready { cursor: pointer; color: var(--accent); }
+.update-btn.ready .update-ring { display: none; }
+.update-btn.ready::before {
+  content: ""; position: absolute; inset: 0; border-radius: 50%; background: var(--accent-soft);
+  animation: update-pulse 1.8s ease-out infinite;
+}
+.update-btn.ready:hover { background: var(--accent-soft); }
+.update-btn.installing { opacity: .5; }
+@keyframes update-pulse { 0% { box-shadow: 0 0 0 0 rgba(34, 212, 126, .5); } 100% { box-shadow: 0 0 0 10px rgba(34, 212, 126, 0); } }
+
+/* Açılışta bulunan güncelleme (bağlantı ekranında) */
+.launch-update {
+  margin: -6px 0 20px; padding: 10px 12px; border-radius: 4px; border: 1px solid rgba(34, 212, 126, .35);
+  background: rgba(34, 212, 126, .06); color: var(--accent); font: 12px var(--mono);
+}
+.launch-update .update-progress { height: 4px; margin-top: 8px; border-radius: 2px; background: rgba(34, 212, 126, .15); overflow: hidden; }
+.launch-update .update-progress > div { height: 100%; width: 0; background: var(--accent); transition: width .3s; }

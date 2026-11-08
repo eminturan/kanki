@@ -79,7 +79,7 @@ Diğer seçenekler:
 > Ses ve görüntü sunucudan geçmez; kullanıcılar arasında doğrudan (P2P, WebRTC) akar. Bazı kısıtlı ağlarda (ör. mobil hat, CGNAT) doğrudan bağlantı kurulamazsa bir TURN sunucusu (coturn) gerekir ya da Tailscale kullanılır.
 
 ## Otomatik güncelleme ve yeni sürüm çıkarma
-- **Kurulumlu Windows sürümü (`Kanki-Setup.exe`)** kendini günceller: açılışta ve açık kaldığı sürece 4 saatte bir GitHub Releases'a bakar, yeni sürümü arka planda indirir, sol altta "Yeniden başlat ve güncelle" düğmesi çıkar. Düğmeye basılmazsa uygulama kapatılınca kurulur.
+- **Kurulumlu Windows sürümü (`Kanki-Setup.exe`)** kendini günceller: açılışta ve açık kaldığı sürece 4 saatte bir GitHub Releases'a bakar. Uygulama açılır açılmaz yeni sürüm bulunursa (henüz bir sunucuya bağlanılmadıysa) indirip kurar ve kendiliğinden yeniden açılır. Kullanım sırasında bulunursa arka planda iner; sağ üstteki yeşil indirme düğmesi ilerlemeyi gösterir, hazır olunca düğmeye basmak güncelleyip yeniden başlatır. Basılmazsa uygulama kapatılınca kurulur.
 - Mac sürümleri ve Kanki Admin kendini güncellemez; yeni sürüm indirme sayfasından elle indirilir.
 - Kurulumsuz (portable) Windows sürümü şimdilik derlenmiyor. Tekrar açmak için `electron-builder.*.json` dosyalarında `win.target` listesine `portable` ekle ve `.github/workflows/build.yml` içindeki yorum satırlarını aç.
 - Otomatik güncelleme 1.0.2 ile gelen bir özellik; daha eski sürümü kuranlar bir kere elle güncellemeli.
