@@ -1985,12 +1985,37 @@ $('#adm-stop').addEventListener('click', async () => {
       c.height = 1080;
       const g = c.getContext('2d');
       let n = 0;
+      // Test yayını: hareketli bir manzara (gün batımı, dağlar, HUD)
+      const ridge = (base, amp, freq, shift, color) => {
+        g.fillStyle = color;
+        g.beginPath();
+        g.moveTo(0, 1080);
+        for (let x = 0; x <= 1920; x += 16) g.lineTo(x, base + Math.sin((x + shift) * freq) * amp + Math.sin((x + shift) * freq * 2.7) * amp * 0.35);
+        g.lineTo(1920, 1080);
+        g.fill();
+      };
       setInterval(() => {
-        g.fillStyle = `hsl(${n % 360},60%,30%)`;
+        n++;
+        const sky = g.createLinearGradient(0, 0, 0, 1080);
+        sky.addColorStop(0, '#1b1f4a');
+        sky.addColorStop(0.55, '#c2477a');
+        sky.addColorStop(1, '#f6a65b');
+        g.fillStyle = sky;
         g.fillRect(0, 0, 1920, 1080);
+        g.fillStyle = 'rgba(255,214,150,.95)';
+        g.beginPath();
+        g.arc(1340, 560, 150, 0, Math.PI * 2);
+        g.fill();
+        ridge(640, 70, 0.004, n * 0.6, '#6b2f63');
+        ridge(760, 60, 0.006, n * 1.6, '#3f1f4d');
+        ridge(880, 45, 0.009, n * 4, '#1d1330');
+        g.fillStyle = 'rgba(0,0,0,.35)';
+        g.fillRect(60, 60, 420, 120);
         g.fillStyle = '#fff';
-        g.font = 'bold 120px sans-serif';
-        g.fillText(`Kanki test ${n++}`, 200, 560);
+        g.font = 'bold 44px -apple-system, sans-serif';
+        g.fillText('SKOR  ' + String(1200 + n * 5).padStart(6, '0'), 90, 115);
+        g.font = '30px -apple-system, sans-serif';
+        g.fillText('Bölüm 3 · Gün batımı vadisi', 90, 158);
       }, 1000 / 30);
       startShareWithStream(c.captureStream(30), { fps: 30, res: 1080, bitrate: 6000, hint: 'detail' });
     }

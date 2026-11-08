@@ -44,7 +44,7 @@
     }
   },
   "dmg": {
-    "artifactName": "Kanki-${version}-${arch}.${ext}"
+    "artifactName": "Kanki-mac-${arch}.${ext}"
   },
   "win": {
     "target": [
@@ -66,10 +66,10 @@
   "nsis": {
     "oneClick": false,
     "allowToChangeInstallationDirectory": true,
-    "artifactName": "Kanki-Setup-${version}.${ext}",
+    "artifactName": "Kanki-Setup.${ext}",
     "shortcutName": "Kanki"
   },
   "portable": {
-    "artifactName": "Kanki-Portable-${version}.${ext}"
+    "artifactName": "Kanki-Portable.${ext}"
   }
 }

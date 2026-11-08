@@ -1,11 +1,19 @@
 name: build
+
+# v* etiketi atıldığında: 4 paketi derler, arkadaş sürümünü (Kanki) GitHub Release'e ekler.
+# Elle çalıştırıldığında: sadece derler ve dosyaları Actions "artifact" olarak saklar.
 on:
   workflow_dispatch:
   push:
     tags: ['v*']
+
+permissions:
+  contents: write
+
 jobs:
   build:
     strategy:
+      fail-fast: false
       matrix:
         os: [macos-latest, windows-latest]
         variant: [client, admin]
@@ -14,7 +22,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: 22 }
-      - run: npm ci || npm install
+      - run: npm ci
       - run: npx electron-builder ${{ matrix.os == 'macos-latest' && '--mac' || '--win' }} --config electron-builder.${{ matrix.variant }}.json --publish never
         env: { CSC_IDENTITY_AUTO_DISCOVERY: 'false' }
       - uses: actions/upload-artifact@v4
@@ -23,3 +31,29 @@ jobs:
           path: |
             dist/${{ matrix.variant }}/*.dmg
             dist/${{ matrix.variant }}/*.exe
+          if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: kanki-client-*
+          merge-multiple: true
+          path: release
+      - run: ls -la release
+      - uses: softprops/action-gh-release@v2
+        with:
+          name: Kanki ${{ github.ref_name }}
+          body: |
+            Kurulum adımları: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/
+
+            | Platform | Dosya |
+            |---|---|
+            | Windows | `Kanki-Setup.exe` (kurulumlu) · `Kanki-Portable.exe` (kurulumsuz) |
+            | Mac (M1–M4) | `Kanki-mac-arm64.dmg` |
+            | Mac (Intel) | `Kanki-mac-x64.dmg` |
+          files: release/*
+          fail_on_unmatched_files: true

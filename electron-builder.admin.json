@@ -45,7 +45,7 @@
     }
   },
   "dmg": {
-    "artifactName": "Kanki-Admin-${version}-${arch}.${ext}"
+    "artifactName": "Kanki-Admin-mac-${arch}.${ext}"
   },
   "win": {
     "target": [
@@ -67,10 +67,10 @@
   "nsis": {
     "oneClick": false,
     "allowToChangeInstallationDirectory": true,
-    "artifactName": "Kanki-Admin-Setup-${version}.${ext}",
+    "artifactName": "Kanki-Admin-Setup.${ext}",
     "shortcutName": "Kanki Admin"
   },
   "portable": {
-    "artifactName": "Kanki-Admin-Portable-${version}.${ext}"
+    "artifactName": "Kanki-Admin-Portable.${ext}"
   }
 }
