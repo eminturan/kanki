@@ -6,6 +6,31 @@
  */
 const CHANGELOG = [
   {
+    version: '1.0.19',
+    date: '2026-11-09',
+    title: 'Birlikte izle, anket, dosya ve daha fazlası',
+    added: [
+      'Birlikte izle: sahnenin altındaki film düğmesiyle bir YouTube bağlantısı ya da bilgisayarındaki video dosyası kanala yayın olarak açılır. İzleyen herkes videonun üstündeki çubuktan durdurup oynatabilir ve sarabilir.',
+      'Yayına işaret: izlediğin yayının üst çubuğundaki kalem düğmesiyle (ya da Alt + tık) yayına nokta koyup çizebilirsin. İşaret herkesin görüntüsünde ve tüm ekran paylaşılıyorsa yayıncının ekranında birkaç saniye görünür.',
+      'Dosya gönderme: + düğmesinden ya da sürükleyip bırakarak her türlü dosya (50 MB’a kadar). Dosyalar sadece sunucunun belleğinde durur, sunucu kapanınca silinir.',
+      'Bağlantı önizlemesi: mesajdaki ilk bağlantının başlığı, açıklaması ve resmi altında görünür (YouTube dahil).',
+      'GIF arama: mesaj kutusundaki GIF düğmesi. Sunucuyu kuran kişinin Sunucu yönetiminde ücretsiz bir KLIPY (ya da GIPHY) anahtarı girmesi gerekir.',
+      'Anket, çark ve takım kurma: + düğmesinden. Çarkın sonucunu sunucu seçer, herkes aynı çarkı döner görür. Takım kur, ses kanalındakileri rastgele 2–4 takıma böler.',
+      'Sabitlenmiş mesajlar (sağ tık › Sabitle) ve sohbette arama (büyüteç ya da Ctrl+F; from:isim, has:resim, has:dosya, has:link).',
+      'Geçmiş sekmesi (sağ paneldeki saat): kanala kimin girip çıktığı, dürtmeler, ses efektleri ve oylamalar saatleriyle. Giriş-çıkış artık sohbete yazılmıyor.',
+      'Oylamayla susturma / AFK’ya gönderme: kişiye sağ tıkla. Kanaldakilerin çoğu (%75) onaylarsa kişi 10 dakika susturulur ya da AFK kanalına taşınır.',
+      'Moderatörler: yönetici birini moderatör yapabilir (sağ tık). Moderatörler kişileri taşıyabilir, atabilir, mikrofonunu kapatabilir ve mesaj sabitleyebilir.',
+      'Kanal şifresi ve kişi sınırı (yönetici: kanala sağ tık › Şifre ve kişi sınırı).',
+      'Yasaklama: atılan kişi aynı bilgisayardan (ve aynı internet adresinden) tekrar giremez. Yasaklar Sunucu yönetiminden kaldırılır.',
+      'AFK’ya otomatik taşıma: uzun süre (varsayılan 15 dakika) hem hareketsiz hem sessiz kalan AFK kanalına geçer. Yayın izlerken taşınmaz. Süre Sunucu yönetiminden değişir.',
+      'Oynadığın oyun ve Spotify’da dinlediğin şarkı adının altında görünür (Ayarlar › Profilim’den kapatılabilir).',
+      'Kendi kısayolların (Ayarlar › Kısayollar): ses efekti çalmak, birini dürtmek, AFK kanalına geçmek, mikrofon/ses için; oyundayken de çalışır.',
+      'Oyun içi katman (Ayarlar › Oyun içi katman): ekranın köşesinde kimin konuştuğunu gösteren, her zaman üstte duran küçük kutu.',
+      'Davet bağlantısı: sunucu menüsünden kopyala; arkadaşın tıklayınca Kanki açılır ve sunucuya bağlanır.',
+      'Yapay zekâ ile gürültü engelleme (RNNoise): Ayarlar › Ses ve görüntü › Ses işleme.',
+    ],
+  },
+  {
     version: '1.0.18',
     date: '2026-11-09',
     title: 'Ses efektleri',

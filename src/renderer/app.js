@@ -230,7 +230,7 @@ async function startMic() {
       audio: {
         deviceId: settings.inputId && settings.inputId !== 'default' ? { exact: settings.inputId } : undefined,
         echoCancellation: settings.ec,
-        noiseSuppression: settings.ns,
+        noiseSuppression: settings.ns && !settings.rnnoise, // RNNoise açıksa ikisi üst üste binmesin
         autoGainControl: settings.agc,
         channelCount: 1,
         sampleRate: 48000,
@@ -3075,6 +3075,10 @@ const TIPS = {
     'Mikrofonun açılması için sesinin ne kadar yüksek olması gerektiği. Konuşurken renkli çubuk beyaz çizgiyi geçmeli, sessizken geçmemeli. Klavye ya da fan sesin gidiyorsa çizgiyi sağa kaydır.',
   'btn-ptt-key':
     'Konuşmak için basılı tutacağın klavye ya da fare yan tuşu. Oyun içindeyken de çalışır (macOS’ta Erişilebilirlik izni ister).',
+  'set-rnnoise': 'Yapay zekâ (RNNoise) ile klavye, fan, köpek havlaması, kalabalık gibi sesleri çok daha iyi temizler. Açıkken standart gürültü bastırma kendiliğinden devre dışı kalır. Biraz daha fazla işlemci kullanır.',
+  'set-overlay': 'Oyun oynarken ekranın köşesinde kanaldakileri gösterir; konuşan yeşil halkayla belirir. Oyunu "kenarlıksız pencere" modunda oynarsan üstünde görünür.',
+  'set-show-game': 'Bilinen 100\'den fazla oyundan birini açınca adının altında "🎮 Oyun adı oynuyor" yazar, kapatınca kalkar. Sadece oyunun adı sunucuya gider.',
+  'set-show-music': 'Spotify\'da çalan şarkı adının altında görünür. Mac\'te ilk seferde macOS izin ister.',
   'set-ns': 'Fan, klavye, trafik gibi sürekli arka plan seslerini temizler. Mikrofona müzik ya da enstrüman çalıyorsan kapatmak sesi daha doğal yapar.',
   'set-ec': 'Hoparlörden çıkan arkadaş sesinin mikrofonuna girip onlara yankı olarak dönmesini engeller. Kulaklık kullanıyorsan kapatabilirsin.',
   'set-agc': 'Mikrofon seviyeni kendiliğinden ayarlar; fısıldasan da bağırsan da benzer seviyede duyulursun.',

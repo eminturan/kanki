@@ -854,6 +854,8 @@ setInterval(() => {
 setInterval(async () => {
   const afk = S.afk;
   if (!afk?.channelId || !afk.minutes || !S.channelId || S.channelId === afk.channelId || !S.myId) return;
+  // Yayın izleyen ya da yayın açan (ör. birlikte film izlerken) hareketsiz kalsa da taşınmaz
+  if (S.watching.size || S.myShares.size) return;
   let idle = 0;
   try {
     idle = await kanki.idleTime();

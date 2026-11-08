@@ -412,11 +412,22 @@ function startServer(opts = {}) {
     const key = conf.gifKey;
     if (!key) return { error: 'nokey' };
     const giphy = conf.gifProvider === 'giphy';
-    const url = giphy
-      ? `https://api.giphy.com/v1/gifs/${q ? 'search' : 'trending'}?api_key=${encodeURIComponent(key)}&limit=24&rating=pg-13&lang=tr${q ? '&q=' + encodeURIComponent(q) : ''}`
-      : `https://api.klipy.com/api/v1/${encodeURIComponent(key)}/gifs/${q ? 'search' : 'trending'}?per_page=24&page=1&locale=tr&customer_id=kanki${q ? '&q=' + encodeURIComponent(q) : ''}`;
-    const r = await fetchText(url, 2 * 1024 * 1024, 0, 'application/json');
-    const j = JSON.parse(r.buf.toString('utf8'));
+    const path = giphy
+      ? `/v1/gifs/${q ? 'search' : 'trending'}?api_key=${encodeURIComponent(key)}&limit=24&rating=pg-13&lang=tr${q ? '&q=' + encodeURIComponent(q) : ''}`
+      : `/api/v1/${encodeURIComponent(key)}/gifs/${q ? 'search' : 'trending'}?per_page=24&page=1&locale=tr&customer_id=kanki${q ? '&q=' + encodeURIComponent(q) : ''}`;
+    // KLIPY'nin adresi bazı belgelerde .com, bazılarında .co geçiyor: ilki olmazsa diğeri denenir
+    let j = null;
+    let lastErr = null;
+    for (const host of giphy ? ['api.giphy.com'] : ['api.klipy.com', 'api.klipy.co']) {
+      try {
+        const r = await fetchText(`https://${host}${path}`, 2 * 1024 * 1024, 0, 'application/json');
+        j = JSON.parse(r.buf.toString('utf8'));
+        break;
+      } catch (e) {
+        lastErr = e;
+      }
+    }
+    if (!j) throw lastErr || new Error('gif');
     const pick = (o) => (o && o.url ? { url: o.url, w: Number(o.width) || 0, h: Number(o.height) || 0 } : null);
     const items = giphy ? j.data || [] : j.data?.data || j.data || [];
     return {
@@ -438,7 +449,7 @@ function startServer(opts = {}) {
   const gifHostOk = (url) => {
     try {
       const u = new URL(url);
-      return u.protocol === 'https:' && /(^|\.)(giphy\.com|klipy\.com)$/.test(u.hostname);
+      return u.protocol === 'https:' && /(^|\.)(giphy\.com|klipy\.com|klipy\.co)$/.test(u.hostname);
     } catch {
       return false;
     }

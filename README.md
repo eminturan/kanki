@@ -134,6 +134,35 @@ GitHub Actions paketleri derler, Release'e `latest.yml` ile birlikte ekler; kuru
 - Spam koruması: kişi başı 1,2 saniyede bir ses. Aynı kişinin yeni sesi öncekini keser.
 - Sunucu tarafında destek gerekir: Kanki Admin 1.0.18 ve üstü. Eski sunucularda panel uyarı gösterir ve sesler sadece sende çalar.
 
+## Sohbet araçları
+- **Dosya gönderme:** mesaj kutusundaki + düğmesi ya da sürükle-bırak. Resim değilse dosya olarak gider (en fazla 50 MB). Dosyalar sunucunun belleğinde durur (en fazla 400 MB, 12 saat), sunucu kapanınca silinir; diske yazılmaz.
+- **Bağlantı önizlemesi:** mesajdaki ilk bağlantının başlığı, açıklaması ve resmi sunucu tarafından alınır. Yerel ağ adreslerine (192.168.x.x, 127.0.0.1…) istek atılmaz.
+- **GIF:** mesaj kutusundaki GIF düğmesi. Yönetici, Sunucu yönetimi › AFK ve GIF bölümüne bir [KLIPY](https://klipy.com) (ücretsiz) ya da GIPHY anahtarı girer; arkadaşlar anahtarsız arar. (Google'ın Tenor servisi 2026'da kapandı.)
+- **Anket, çark, takım kur:** + düğmesinden. Çarkın sonucunu sunucu seçer; takım kur, ses kanalındakileri rastgele böler.
+- **Sabitlenmiş mesajlar:** mesaja sağ tık › Sabitle (yazan, yönetici ya da moderatör). Sohbet başlığındaki iğne düğmesi listeyi açar.
+- **Arama:** büyüteç ya da `Ctrl/Cmd+F`. `from:isim`, `has:resim`, `has:dosya`, `has:link`, `has:gif`, `has:anket`.
+- **Geçmiş sekmesi:** sağ paneldeki saat simgesi. Giriş-çıkış, dürtme, ses efekti, oylama ve birlikte izle olayları saatleriyle (sadece sende, bu oturumda).
+
+## Birlikte izle ve yayına işaret
+- Sahnenin altındaki film düğmesi: YouTube bağlantısı ya da bilgisayarındaki video dosyası. Video senin bilgisayarında oynar ve kanala yayın olarak gider; izleyenler yayının altındaki çubuktan herkes için durdurup sarabilir.
+- YouTube için yt-dlp kullanılır (ilk kullanımda indirilir). 720p'ye kadar.
+- İzlediğin yayının üst çubuğundaki kalemle (ya da Alt + tık) yayına nokta koy ya da çiz; işaret herkeste ve tüm ekran paylaşılıyorsa yayıncının ekranında 3 saniye görünür.
+
+## Yönetim
+- **Moderatör:** yönetici kişiye sağ tıklayıp moderatör yapar. Moderatörler taşıyabilir, atabilir, mikrofonunu kapatabilir, mesaj sabitleyebilir; ayarlara, kanallara, yasaklara dokunamaz. Moderatörlük cihaza bağlıdır.
+- **Kanal şifresi / kişi sınırı:** kanala sağ tık › Şifre ve kişi sınırı. Yönetici ve moderatörler şifresiz girer.
+- **Yasak:** kişiye sağ tık › Yasakla. Cihaz ve (internetten bağlanıyorsa) IP adresi yasaklanır. Sunucu yönetimi › Yasaklılar'dan kaldırılır.
+- **AFK:** Sunucu yönetiminde AFK kanalı ve süre (varsayılan 15 dk, 0 = kapalı). Hem hareketsiz hem sessiz kalan kişi kendiliğinden AFK kanalına geçer; yayın izleyen ya da açan taşınmaz.
+- **Oylamayla susturma / AFK:** kişiye sağ tık. Kanaldakilerin %75'i (en az 2 kişi) evet derse 10 dakika susturulur ya da AFK'ya taşınır. Yönetici ve moderatörler oylanamaz.
+- Bu ayarlar (moderatörler, yasaklar, AFK, GIF anahtarı) Kanki Admin'in veri klasöründe `server-config.json` içinde saklanır; mesajlar saklanmaz.
+
+## Durum, kısayollar, katman, davet
+- **Oyun / Spotify:** bilinen bir oyunu açınca adının altında "🎮 … oynuyor", Spotify'da şarkı çalınca "🎵 Sanatçı - Şarkı" görünür. Ayarlar › Profilim'den kapatılır. Mac'te Spotify için ilk seferde izin istenir.
+- **Kendi kısayolların:** Ayarlar › Kısayollar › Kısayol ekle. Ses efekti, dürtme, AFK'ya geç / geri dön, mikrofon, ses, birlikte izle durdur/oynat. Oyundayken de çalışır.
+- **Oyun içi katman:** Ayarlar › Oyun içi katman. Ekranın köşesinde konuşanlar; tam ekran (özel) moddaki oyunlarda görünmeyebilir.
+- **Davet bağlantısı:** sunucu menüsü › Davet bağlantısını kopyala. Bağlantı `kanki-app.github.io/join` sayfasını açar, o da Kanki'yi açıp sunucuya bağlar (kurulu değilse indirme düğmeleri çıkar).
+- **Yapay zekâ gürültü engelleme (RNNoise):** Ayarlar › Ses ve görüntü › Ses işleme.
+
 ## Yazı stili
 - Ayarlar › Yazı stili: adın için yazı tipi (12 seçenek), efekt (düz, gradyan, neon, parıltı, gökkuşağı, nabız, ateş) ve iki renk. Önizleme anında güncellenir.
 - "Mesajlarımda da kullan" açılırsa mesaj metnin de aynı yazı tipi ve renkle görünür (efektsiz, okunaklı kalsın diye).

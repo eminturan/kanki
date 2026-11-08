@@ -705,7 +705,8 @@ ipcMain.handle('file:upload', (_e, { url, token, name, type, data }) =>
 );
 ipcMain.handle('file:download', async (_e, { url, name }) => {
   const safe = String(name || 'dosya').replace(/[\\/:*?"<>|]/g, '_');
-  const r = await dialog.showSaveDialog(win, { defaultPath: path.join(app.getPath('downloads'), safe) });
+  // Test: KANKI_DL_DIR verilirse kayıt penceresi açılmaz, dosya oraya iner
+  const r = process.env.KANKI_AUTOTEST && process.env.KANKI_DL_DIR ? { filePath: path.join(process.env.KANKI_DL_DIR, safe) } : await dialog.showSaveDialog(win, { defaultPath: path.join(app.getPath('downloads'), safe) });
   if (r.canceled || !r.filePath) return { canceled: true };
   return new Promise((resolve) => {
     const req = httpReq(url);
