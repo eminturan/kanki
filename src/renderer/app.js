@@ -665,7 +665,9 @@ async function openPicker() {
   $('#opt-hint').value = sh.hint;
   $('#opt-bitrate').value = sh.bitrate;
   $('#opt-audio').checked = sh.audio;
-  $('#picker-note').textContent = S.platform === 'darwin' ? 'macOS: sistem sesi macOS 14.2+ ile desteklenir.' : '';
+  $('#picker-note').textContent =
+    (S.platform === 'darwin' ? 'macOS 14.2+ gerekir. ' : '') +
+    'Sistem sesi, pencere seçsen de bilgisayarın tüm sesini gönderir (arkadaşlarının sesi dahil).';
   pickerSelected = null;
   $('#btn-go-live').disabled = true;
   $('#sources').innerHTML = '<div class="muted">Kaynaklar yükleniyor…</div>';
@@ -731,7 +733,10 @@ async function goLive() {
   let stream = null;
   const tryCapture = async (withAudio) => {
     await kanki.selectSource(sourceId, withAudio);
-    return navigator.mediaDevices.getDisplayMedia({ video, audio: withAudio, selfBrowserSurface: 'exclude', systemAudio: 'include' });
+    const audio = withAudio
+      ? { echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: 2, sampleRate: 48000, suppressLocalAudioPlayback: false }
+      : false;
+    return navigator.mediaDevices.getDisplayMedia({ video, audio, selfBrowserSurface: 'exclude', systemAudio: 'include' });
   };
   try {
     stream = await tryCapture(wantAudio);
@@ -775,7 +780,19 @@ function addShare(stream, opts, label) {
   let name = String(label || 'Ekran').slice(0, 60);
   const taken = new Set([...S.myShares.values()].map((x) => x.label));
   for (let n = 2; taken.has(name); n++) name = `${String(label || 'Ekran').slice(0, 55)} ${n}`;
-  S.myShares.set(id, { id, label: name, stream, opts, watchers: new Set() });
+  const at = stream.getAudioTracks()[0];
+  let analyser = null;
+  if (at) {
+    at.contentHint = 'music'; // kodlayıcı konuşmaya göre değil müziğe göre ayarlansın
+    at.applyConstraints({ echoCancellation: false, noiseSuppression: false, autoGainControl: false }).catch(() => {});
+    try {
+      const ctx = getCtx();
+      analyser = ctx.createAnalyser();
+      analyser.fftSize = 1024;
+      ctx.createMediaStreamSource(new MediaStream([at])).connect(analyser); // hoparlöre bağlanmaz, sadece ölçer
+    } catch {}
+  }
+  S.myShares.set(id, { id, label: name, stream, opts, watchers: new Set(), analyser, lastSound: 0 });
   sendShareStatus();
   renderSelfShare();
   beep('unmute');
@@ -794,6 +811,31 @@ function removeShare(id, notify = true) {
   }
   renderSelfShare();
 }
+
+const shareLevelBuf = new Float32Array(1024);
+function updateShareMeters() {
+  const now = performance.now();
+  for (const sh of S.myShares.values()) {
+    const el = document.querySelector(`.self-share-item[data-id="${sh.id}"]`);
+    if (!el) continue;
+    const label = el.querySelector('.ss-audio-label');
+    const fill = el.querySelector('.ss-meter-fill');
+    if (!sh.analyser) {
+      el.querySelector('.ss-audio').classList.add('off');
+      label.textContent = 'Sistem sesi yok — sadece görüntü gidiyor';
+      fill.style.width = '0%';
+      continue;
+    }
+    const db = rmsDb(sh.analyser, shareLevelBuf);
+    if (db > -60) sh.lastSound = now;
+    const pct = Math.max(0, Math.min(100, ((db + 70) / 60) * 100));
+    fill.style.width = pct + '%';
+    const silent = now - sh.lastSound > 3000;
+    el.querySelector('.ss-audio').classList.toggle('silent', silent);
+    label.textContent = silent ? 'Sistem sesi: sessiz (ses çalınca dolar)' : 'Sistem sesi gidiyor';
+  }
+}
+setInterval(updateShareMeters, 100);
 
 function stopAllShares(notify = true) {
   for (const id of [...S.myShares.keys()]) removeShare(id, notify);
@@ -824,7 +866,14 @@ function renderSelfShare() {
         'div',
         { class: 'self-share-item', 'data-id': sh.id },
         v,
-        h('div', { class: 'self-share-info' }, h('div', {}, h('span', { class: 'live' }, 'CANLI'), ' ', h('b', { class: 'ss-label' })), h('div', { class: 'muted ss-meta' }), h('div', { class: 'muted ss-viewers' })),
+        h(
+          'div',
+          { class: 'self-share-info' },
+          h('div', {}, h('span', { class: 'live' }, 'CANLI'), ' ', h('b', { class: 'ss-label' })),
+          h('div', { class: 'muted ss-meta' }),
+          h('div', { class: 'ss-audio' }, h('span', { class: 'ss-audio-label' }), h('span', { class: 'ss-meter' }, h('span', { class: 'ss-meter-fill' }))),
+          h('div', { class: 'muted ss-viewers' })
+        ),
         h('button', { class: 'btn danger sm', onclick: () => removeShare(sh.id) }, 'Durdur')
       );
       box.append(el);
@@ -1028,6 +1077,7 @@ function buildTile(key) {
     h('span', { class: 'tile-stats' }),
     h('span', { class: 'spacer' }),
     h('label', { class: 'tile-vol' }, svgEl(ICON.speaker), vol),
+    h('span', { class: 'tile-noaudio', title: 'Bu yayında ses yok (yayıncı sistem sesini paylaşmıyor)' }, 'ses yok'),
     btn('Ayrı pencerede aç (istediğin yere, başka monitöre taşıyabilirsin)', ICON_POP, () => popOut(key)),
     btn('Tam ekran (F)', ICON_FULL, () => tileFullscreen(key)),
     btn('Sahneyi kapla / eski boyutuna dön (çift tıkla)', ICON_MAX, () => toggleMax(key)),
@@ -1119,6 +1169,9 @@ function renderTiles() {
     Object.assign(el.style, { left: L.x + '%', top: L.y + '%', width: L.w + '%', height: L.h + '%' });
     el.querySelector('.tile-name').textContent = shareLabel(k);
     const sc = S.remoteScreens.get(k);
+    const hasAudio = !!sc?.audioEl;
+    el.querySelector('.tile-vol').classList.toggle('hidden', !hasAudio);
+    el.querySelector('.tile-noaudio').classList.toggle('hidden', hasAudio || !sc);
     const v = el.querySelector('video');
     const want = sc?.video || null;
     if (v.srcObject !== want) v.srcObject = want;
@@ -2319,7 +2372,8 @@ const TIPS = {
     'İnternet yetmediğinde neyin korunacağı.\nAkıcılık: görüntü biraz yumuşar ama takılmaz (oyun, video).\nNetlik: yazılar keskin kalır, kare hızı düşebilir (kod, belge).',
   'opt-bitrate':
     'Yayına ayrılan internet hızı. "Otomatik", çözünürlük ve kare hızına göre seçer. Her izleyiciye ayrı gönderilir: 6 Mbps × 3 izleyici = 18 Mbps yükleme hızı gerekir.',
-  'opt-audio': 'Oyunun, videonun ya da müziğin sesi de yayına eklenir. Windows’ta çalışır; macOS’ta 14.2 ve üstü gerekir.',
+  'opt-audio':
+    'Bilgisayarın sesi de yayına eklenir (oyun, video, müzik). Pencere seçsen bile sadece o pencerenin değil, tüm bilgisayar sesi gider; Kanki’den duyduğun arkadaş sesleri de buna dahil, bu yüzden izleyenler kendi seslerini gecikmeli duyabilir. Oyun sesi gerekmiyorsa kapat. Windows’ta çalışır; macOS’ta 14.2 ve üstü gerekir.',
   // Bağlantı ekranı
   'in-nick': 'Sunucuda arkadaşlarının göreceği adın. Aynı ad kullanılıyorsa sonuna otomatik numara eklenir.',
   'in-address': 'Sunucuyu kuran kişinin verdiği adres, ör. bizim-kanki.ngrok-free.app ya da 192.168.1.20:4455. Başına https:// eklemene gerek yok.',

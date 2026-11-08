@@ -654,3 +654,22 @@ body.mac .update-btn { top: 36px; }
 }
 .launch-update .update-progress { height: 4px; margin-top: 8px; border-radius: 2px; background: rgba(34, 212, 126, .15); overflow: hidden; }
 .launch-update .update-progress > div { height: 100%; width: 0; background: var(--accent); transition: width .3s; }
+
+/* ---------- Yayın sesi göstergeleri ---------- */
+.ss-audio { display: flex; align-items: center; gap: 8px; margin: 3px 0; font: 11px var(--mono); color: var(--accent); }
+.ss-audio .ss-meter { width: 90px; height: 5px; border-radius: 3px; background: rgba(34, 212, 126, .12); overflow: hidden; flex: none; }
+.ss-audio .ss-meter-fill { display: block; height: 100%; width: 0; background: var(--accent); transition: width .08s; }
+.ss-audio.silent { color: var(--text-3); }
+.ss-audio.off { color: var(--amber); }
+.ss-audio.off .ss-meter { display: none; }
+.tile-noaudio { flex: none; padding: 2px 6px; border-radius: 3px; background: rgba(0, 0, 0, .55); color: rgba(255, 255, 255, .7); font: 11px var(--mono); }
+
+/* Ekran paylaş düğmesi ses panelinin altında (Discord'daki gibi) */
+.voice-panel { flex-wrap: wrap; row-gap: 8px; }
+.voice-actions { flex-basis: 100%; display: flex; gap: 6px; }
+.voice-actions .btn.share {
+  flex: 1; height: 32px; font-size: 13px; background: #121718; color: var(--text-2); border: 1px solid var(--line);
+}
+.voice-actions .btn.share svg { width: 17px; height: 17px; }
+.voice-actions .btn.share:hover:not(:disabled) { background: var(--accent-soft); color: var(--accent); border-color: rgba(34, 212, 126, .4); }
+.voice-actions .btn.share:disabled { opacity: .45; }
