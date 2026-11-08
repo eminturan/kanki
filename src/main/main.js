@@ -9,6 +9,7 @@ const {
   shell,
   Notification,
   nativeImage,
+  powerMonitor,
 } = require('electron');
 const path = require('path');
 const os = require('os');
@@ -33,6 +34,9 @@ app.commandLine.appendSwitch(
     'WebRtcAllowInputVolumeAdjustment',
   ].join(',')
 );
+// Yerel IP'leri rastgele .local (mDNS) adlarının arkasına gizleme: bu adlar bazen çözülemiyor ve
+// aynı ağdaki iki kişi hiç bağlanamıyor ("Ses bağlanıyor…" takılı kalıyor). Arkadaş uygulamasında gizlemeye gerek yok.
+app.commandLine.appendSwitch('disable-features', 'WebRtcHideLocalIpsWithMdns');
 // Pencere arka plandayken ses/görüntü işleme yavaşlamasın
 app.commandLine.appendSwitch('disable-renderer-backgrounding');
 app.commandLine.appendSwitch('disable-background-timer-throttling');
@@ -102,6 +106,19 @@ function createWindow() {
     });
   }
 
+  // Test: KANKI_SHOTS="ms:dosya.png,ms:dosya2.png" ile birden fazla ekran görüntüsü
+  if (process.env.KANKI_SHOTS) {
+    for (const part of process.env.KANKI_SHOTS.split(',')) {
+      const i = part.indexOf(':');
+      const ms = Number(part.slice(0, i));
+      const file = part.slice(i + 1);
+      setTimeout(async () => {
+        if (!win || win.isDestroyed()) return;
+        const img = await win.webContents.capturePage();
+        require('fs').writeFileSync(file, img.toPNG());
+      }, ms);
+    }
+  }
   if (process.env.KANKI_SCREENSHOT) {
     if (process.env.KANKI_EXEC) win.webContents.once('did-finish-load', () => setTimeout(() => win.webContents.executeJavaScript(process.env.KANKI_EXEC).catch(() => {}), 800));
     setTimeout(async () => {
@@ -195,10 +212,33 @@ function setupAutoUpdate() {
   });
   const check = () => updater.checkForUpdates().catch(() => {});
   setTimeout(check, 1500); // açılışta hemen bak: varsa bağlanmadan önce kurulabilsin
-  setInterval(check, 4 * 60 * 60 * 1000); // açık kaldığı sürece 4 saatte bir bak
+  setInterval(check, 30 * 60 * 1000); // açık kaldığı sürece 30 dakikada bir bak
 }
 
 ipcMain.handle('update:state', () => updateState);
+// Ayarlar › Hakkında › "Güncellemeleri kontrol et"
+ipcMain.handle('update:check', async () => {
+  if (!updater) {
+    const why = !app.isPackaged
+      ? 'Geliştirme sürümünde güncelleme kontrolü yok.'
+      : process.platform !== 'win32'
+        ? 'Otomatik güncelleme sadece Windows kurulumlu sürümde çalışır; yeni sürümü indirme sayfasından al.'
+        : VARIANT !== 'client'
+          ? 'Kanki Admin kendini güncellemez.'
+          : 'Kurulumsuz sürüm kendini güncelleyemez; kurulumlu sürümü kullan.';
+    return { ok: false, message: why };
+  }
+  try {
+    const r = await updater.checkForUpdates();
+    const latest = r?.updateInfo?.version;
+    if (latest && latest !== app.getVersion()) return { ok: true, message: `Kanki ${latest} bulundu, indiriliyor…` };
+    return { ok: true, message: 'Kanki güncel.' };
+  } catch (e) {
+    return { ok: false, message: 'Kontrol edilemedi: ' + (e?.message || e) };
+  }
+});
+// Sistem genelinde kaç saniyedir klavye/fare kullanılmadı (otomatik "Boşta" için)
+ipcMain.handle('app:idle-time', () => powerMonitor.getSystemIdleTime());
 ipcMain.handle('update:install', () => {
   if (updater && updateState.state === 'ready') updater.quitAndInstall(true, true); // sessiz kur, sonra yeniden aç
 });

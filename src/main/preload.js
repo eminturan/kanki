@@ -20,6 +20,8 @@ contextBridge.exposeInMainWorld('kanki', {
   onPtt: (cb) => ipcRenderer.on('ptt', (_e, down) => cb(down)),
   updateState: () => ipcRenderer.invoke('update:state'),
   installUpdate: () => ipcRenderer.invoke('update:install'),
+  checkUpdate: () => ipcRenderer.invoke('update:check'),
+  idleTime: () => ipcRenderer.invoke('app:idle-time'),
   onUpdate: (cb) => ipcRenderer.on('update', (_e, state) => cb(state)),
   autotest: process.env.KANKI_AUTOTEST ? JSON.parse(process.env.KANKI_AUTOTEST) : null,
 });

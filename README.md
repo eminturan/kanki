@@ -104,6 +104,13 @@ GitHub Actions paketleri derler, Release'e `latest.yml` ile birlikte ekler; kuru
 - Ayarlar'dan kodek seçilebilir: H.264 (donanım, varsayılan), VP9 veya AV1.
 - **macOS:** İlk paylaşımda *Sistem Ayarları → Gizlilik ve Güvenlik → Ekran Kaydı* bölümünden Kanki'ye izin ver ve uygulamayı yeniden başlat.
 
+## Sohbet ve kişiler
+- **Durum:** Sol alttaki adına tıklayıp Çevrimiçi / Boşta / Rahatsız Etmeyin seçilir; 10 dakika hareketsiz kalınca otomatik Boşta olur. Rahatsız Etmeyin'de mesaj sesleri, bildirimler ve dürtme titreşimi kapalıdır.
+- **Profil kartı:** Bir kişiye tıklayınca durumu, kişiye özel ses seviyesi ve Dürt / Sustur / Yayını izle düğmeleri açılır. Sağ tık menüsü de duruyor.
+- **Sunucu menüsü:** Sol üstte sunucu adına tıklayınca davet adresini kopyala, sunucu yönetimi (yönetici), kanal oluştur, ayarlar ve bağlantıyı kes.
+- **Üye listesi:** Sohbet panelinin sağ üstündeki kişiler simgesi tüm sunucudakileri kanal kanal gösterir.
+- **Mesajlar:** `**kalın**`, `*italik*`, `~~üstü çizili~~`, `` `kod` `` ve ```` ```kod bloğu``` ```` desteklenir. `@isim` ile bahsedilen kişide mesaj sarı vurgulanır ve ses çalar (`@herkes` kanaldaki herkese). "X yazıyor…" göstergesi, emoji seçici, gün ayraçları ve yukarı kaydırınca "Yeni mesajlar ↓" düğmesi vardır.
+
 ## Ses
 - Konuşma modları: sesle etkinleştirme (eşik ayarlanabilir), bas-konuş, sürekli açık.
 - Bas-konuş tuşu **global** çalışır, yani oyun içindeyken de algılanır. macOS'ta bunun için *Erişilebilirlik* izni gerekir.

@@ -97,6 +97,7 @@ function startServer(opts = {}) {
     sharing: u.sharing,
     shares: u.shares || [],
     away: u.away,
+    presence: u.presence || 'online',
     admin: !!u.admin,
   });
 
@@ -182,6 +183,7 @@ function startServer(opts = {}) {
           sharing: false,
           shares: [],
           away: false,
+          presence: ['online', 'idle', 'dnd'].includes(m.presence) ? m.presence : 'online',
           admin: isAdmin,
           ip,
           connectedAt: Date.now(),
@@ -222,6 +224,10 @@ function startServer(opts = {}) {
             me.shares = [];
           }
           if ('away' in m) me.away = !!m.away;
+          if (['online', 'idle', 'dnd'].includes(m.presence)) {
+            me.presence = m.presence;
+            me.away = m.presence === 'idle';
+          }
           broadcastState();
           break;
         case 'signal': {
@@ -237,6 +243,10 @@ function startServer(opts = {}) {
           broadcast(msg, (u) => u.channelId === me.channelId);
           break;
         }
+        case 'typing':
+          // "X yazıyor…" göstergesi: sadece aynı kanaldakilere, saklanmaz
+          if (me.channelId) broadcast({ t: 'typing', from: me.id, name: me.name, channelId: me.channelId }, (u) => u.channelId === me.channelId && u.id !== me.id);
+          break;
         case 'poke': {
           const target = users.get(m.to);
           if (target) send(target.ws, { t: 'poke', from: me.id, name: me.name, text: String(m.text || '').slice(0, 200) });
