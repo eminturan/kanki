@@ -273,7 +273,7 @@ function startServer(opts = {}) {
         users.set(me.id, me);
         log(`Bağlandı: ${name} (${ip})${isAdmin ? ' [yönetici]' : ''}`);
         if (m.adminKey && !isAdmin) send(ws, { t: 'error', code: 'bad_admin_key', message: 'Yönetici anahtarı hatalı; normal kullanıcı olarak bağlandın.' });
-        send(ws, { t: 'welcome', id: me.id, name, serverName, iceServers, admin: isAdmin });
+        send(ws, { t: 'welcome', id: me.id, name, serverName, iceServers, admin: isAdmin, features: ['sfx'] });
         const avatars = {};
         for (const u of users.values()) if (u.avatar) avatars[u.id] = u.avatar;
         send(ws, { t: 'avatars', avatars });
@@ -436,6 +436,17 @@ function startServer(opts = {}) {
         case 'poke': {
           const target = users.get(m.to);
           if (target) send(target.ws, { t: 'poke', from: me.id, name: me.name, text: String(m.text || '').slice(0, 200) });
+          break;
+        }
+        case 'sfx': {
+          // Ses efekti: sadece sesin adı iletilir, her uygulama sesi kendisi üretip çalar.
+          // Kişi başı 1,2 saniyede bir (spam koruması); sadece aynı ses kanalındakilere gider.
+          const sid = String(m.sid || '');
+          const now = Date.now();
+          if (me.bot || !me.channelId || isText(me.channelId) || !/^[a-z]{2,16}$/.test(sid)) break;
+          if (now - (me.sfxAt || 0) < 1200) break;
+          me.sfxAt = now;
+          broadcast({ t: 'sfx', from: me.id, sid }, (u) => u.channelId === me.channelId && u.id !== me.id && !u.bot);
           break;
         }
         case 'createChannel': {

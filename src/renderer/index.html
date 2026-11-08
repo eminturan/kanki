@@ -216,9 +216,17 @@
           </div>
           <div class="mp-help">Sohbete de yazabilirsin: <code>!çal</code> <code>!geç</code> <code>!duraklat</code> <code>!devam</code> <code>!dur</code> <code>!kuyruk</code> <code>!ses 50</code> <code>!gel</code> <code>!ayrıl</code> <code>!yardım</code></div>
         </div>
+        <div class="sfx-pop hidden" id="sfx-pop">
+          <div class="mp-head"><span>Ses efektleri</span><span class="mp-where">kanaldaki herkes duyar</span></div>
+          <div class="sfx-old hidden" id="sfx-old">Bu sunucu ses efektlerini henüz desteklemiyor; sesler sadece sende çalar. Sunucuyu kuran kişinin Kanki Admin'i 1.0.18 ya da üstüne güncellemesi gerekir.</div>
+          <div class="sfx-grid" id="sfx-builtin"></div>
+          <div class="mp-vol sfx-vol"><span>Efekt sesi <em>(sadece sende)</em></span><input type="range" id="sfx-vol" min="0" max="100" /><b id="sfx-vol-v"></b></div>
+          <div class="sfx-hint">Sağ tık: sadece sen dinle</div>
+        </div>
         <div class="call-bar hidden" id="call-bar">
           <button class="cb-btn" id="cb-camera"></button>
           <button class="cb-btn" id="cb-share"></button>
+          <button class="cb-btn" id="cb-sfx"></button>
           <span class="cb-sep"></span>
           <button class="cb-btn" id="cb-mic"></button>
           <button class="cb-btn" id="cb-deafen"></button>
@@ -598,6 +606,7 @@
   <div class="toasts" id="toasts"></div>
 
   <script src="changelog.js"></script>
+  <script src="sfx.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

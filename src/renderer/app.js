@@ -101,6 +101,7 @@ const DEFAULT_SETTINGS = {
   chatHidden: false,
   userVolumes: {},
   localMutes: {},
+  sfxVolume: 50, // ses efektlerinin sende ne kadar yüksek çalacağı (0 = kapalı)
   share: { res: '1080', fps: '60', hint: 'motion', bitrate: '0', audio: true },
   recent: [],
   host: { name: '', port: 4455 },
@@ -113,6 +114,11 @@ const settings = (() => {
   }
 })();
 const saveSettings = () => localStorage.setItem('kanki-settings', JSON.stringify(settings));
+// Ses efektleri: çalan sesler (kişi başı bir tane), kimin ne çaldığı (ismin yanında kısa süre görünür)
+const sfx = { ctx: null, playing: new Map(), active: new Map(), coolUntil: 0, coolTimer: null };
+const SFX_BY_ID = new Map(KankiSfx.BUILTIN.map((x) => [x.sid, x]));
+const SFX_COOLDOWN = 1300;
+const SFX_SHOW_MS = 2400;
 // Bu bilgisayara özel kalıcı anahtar: sunucu kendi mesajlarını düzenleyip silebilmen için bununla tanır
 const CLIENT_KEY = (() => {
   try {
@@ -1738,7 +1744,9 @@ function onMessage(m) {
       av.dataset.av = m.id;
       $('#me-avatar').replaceWith(Object.assign(av, { id: 'me-avatar' }));
       S.isAdmin = !!m.admin;
+      S.features = new Set(m.features || []);
       applyAdminUi();
+      setTimeout(() => KankiSfx.BUILTIN.forEach((x) => KankiSfx.builtin(x.sid)), 1500); // ilk basışta gecikme olmasın
       break;
     case 'state': {
       queueMicrotask(renderMusic);
@@ -1894,6 +1902,9 @@ function onMessage(m) {
         renderTyping();
       }
       break;
+    case 'sfx':
+      onSfx(m);
+      break;
     case 'poke':
       if (effectivePresence() === 'dnd') {
         // Rahatsız Etmeyin: titreşim ve ses yok, sadece sessiz bir not
@@ -2027,6 +2038,8 @@ function userRow(u, depth) {
         nShares > 1 ? `CANLI ${nShares}` : 'CANLI'
       )
     );
+  const sfb = sfxNow(u.id);
+  if (sfb) badges.prepend(h('span', { class: 'sfx-badge', title: `${sfb.it.name} çaldı`, style: `animation-delay:-${sfb.age}ms` }, sfb.it.emoji));
   if (u.bot) badges.append(h('span', { class: 'bot-tag', title: 'Müzik botu — !yardım' }, 'BOT'));
   if (u.admin) badges.append(h('span', { class: 'crown', title: 'Yönetici' }, ICON_CROWN()));
   if (u.muted) badges.insertAdjacentHTML('beforeend', ICON.micOff);
@@ -2208,6 +2221,8 @@ function renderParticipants(members, strip = false) {
     );
     if (camStream) usedCams.add(u.id);
     card.style.setProperty('--tint', colorFor(u.name));
+    const sf = sfxNow(u.id);
+    if (sf) card.append(sfxFloatEl(sf));
     box.append(card);
   }
   cleanupCams(usedCams);
@@ -2593,6 +2608,7 @@ function toggleDeafen() {
     S.muted = true;
   } else S.muted = S.mutedBeforeDeafen;
   beep(S.deafened ? 'mute' : 'unmute');
+  if (S.deafened) stopAllSfx();
   send({ t: 'status', muted: S.muted, deafened: S.deafened });
   for (const id of audio.remote.keys()) applyRemoteVolume(id);
   applyScreenVolumes();
@@ -2651,6 +2667,7 @@ $('#set-output').addEventListener('change', (e) => {
   saveSettings();
   for (const r of audio.remote.values()) r.el.setSinkId?.(settings.outputId).catch(() => {});
   for (const sc of S.remoteScreens.values()) sc.audioEl?.setSinkId?.(settings.outputId).catch(() => {});
+  applySfxOutput();
 });
 $('#set-mode').addEventListener('change', (e) => {
   settings.mode = e.target.value;
@@ -4324,6 +4341,8 @@ function renderCallBar() {
   };
   set('#cb-camera', cam ? ICON.camera : ICON.cameraOff, cam ? 'Kamerayı kapat' : 'Kamerayı aç', cam ? 'on' : '');
   set('#cb-share', ICON.screen, screens ? 'Bir ekran daha paylaş' : 'Ekranını paylaş', screens ? 'on' : '');
+  if (!S.channelId) $('#sfx-pop').classList.add('hidden');
+  set('#cb-sfx', ICON_SFX, 'Ses efektleri', $('#sfx-pop').classList.contains('hidden') ? '' : 'on');
   set('#cb-mic', S.muted ? ICON.micOff : ICON.mic, S.muted ? 'Mikrofonu aç (Ctrl+Shift+M)' : 'Mikrofonu kapat (Ctrl+Shift+M)', S.muted ? 'off' : '');
   set('#cb-deafen', S.deafened ? ICON.headOff : ICON.head, S.deafened ? 'Sesi aç (Ctrl+Shift+D)' : 'Sesi kapat (Ctrl+Shift+D)', S.deafened ? 'off' : '');
   set('#cb-leave', ICON.power, 'Bağlantıyı kes', 'leave');
@@ -4334,6 +4353,10 @@ $('#cb-share').addEventListener('click', openPicker);
 $('#cb-mic').addEventListener('click', toggleMute);
 $('#cb-deafen').addEventListener('click', toggleDeafen);
 $('#cb-leave').addEventListener('click', disconnect);
+$('#cb-sfx').addEventListener('click', (e) => {
+  e.stopPropagation();
+  toggleSfxPop();
+});
 
 function renderChatToggle() {
   const b = $('#btn-toggle-chat');
@@ -4354,6 +4377,173 @@ $('#btn-toggle-chat').addEventListener('click', () => {
     renderStage(); // sahne genişledi/daraldı: kutular yeniden dizilsin
     if (!settings.chatHidden) $('#chat-log').scrollTop = $('#chat-log').scrollHeight;
   });
+});
+
+// =====================================================================
+//  Ses efektleri (soundboard): bastığın ses kanaldaki herkeste çalar.
+//  Sunucu sadece sesin adını iletir; sesi her uygulama kendisi üretir (sfx.js).
+// =====================================================================
+const ICON_SFX =
+  '<svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3Zm13.5 3A4.5 4.5 0 0 0 14 7.97v8.05A4.5 4.5 0 0 0 16.5 12Z"/><path d="m19 2 1.1 2.4 2.4 1.1-2.4 1.1L19 9l-1.1-2.4-2.4-1.1 2.4-1.1L19 2Zm.5 11 .6 1.4 1.4.6-1.4.6-.6 1.4-.6-1.4-1.4-.6 1.4-.6.6-1.4Z"/></svg>';
+const sfxSupported = () => !!S.features?.has('sfx');
+
+function sfxCtx() {
+  if (!sfx.ctx) {
+    sfx.ctx = new AudioContext({ latencyHint: 'interactive' });
+    applySfxOutput();
+  }
+  if (sfx.ctx.state === 'suspended') sfx.ctx.resume();
+  return sfx.ctx;
+}
+// Efektler de seçili hoparlörden çıksın
+function applySfxOutput() {
+  if (!sfx.ctx?.setSinkId) return;
+  const id = settings.outputId && settings.outputId !== 'default' ? settings.outputId : '';
+  sfx.ctx.setSinkId(id).catch(() => {});
+}
+// Ne kadar yüksek çalsın: efekt sesi ayarı × o kişiye verdiğin ses. Hoparlörün kapalıysa ya da kişiyi susturduysan çalmaz.
+function sfxGain(userId) {
+  if (S.deafened) return 0;
+  if (userId !== S.myId && settings.localMutes[userName(userId)]) return 0;
+  const uv = userId === S.myId ? 100 : settings.userVolumes[volKey(userId)] ?? 100;
+  return ((settings.sfxVolume ?? 50) / 100) * Math.min(1, uv / 100);
+}
+async function playSfxLocal(key, sid, gain) {
+  if (!(gain > 0)) return;
+  const buf = await KankiSfx.builtin(sid);
+  if (!buf) return;
+  const ctx = sfxCtx();
+  // Aynı kişinin önceki sesi kısılıp kesilir: üst üste binip gürültüye dönmesin
+  const prev = sfx.playing.get(key);
+  if (prev) {
+    try {
+      prev.g.gain.setTargetAtTime(0, ctx.currentTime, 0.015);
+      prev.src.stop(ctx.currentTime + 0.08);
+    } catch {}
+  }
+  const src = ctx.createBufferSource();
+  src.buffer = buf;
+  const g = ctx.createGain();
+  g.gain.value = gain;
+  src.connect(g).connect(ctx.destination);
+  src.start();
+  const entry = { src, g };
+  sfx.playing.set(key, entry);
+  src.onended = () => sfx.playing.get(key) === entry && sfx.playing.delete(key);
+}
+function stopAllSfx() {
+  for (const p of sfx.playing.values()) {
+    try {
+      p.src.stop();
+    } catch {}
+  }
+  sfx.playing.clear();
+}
+// Kim hangi sesi çaldı: kartında ve kenar çubuğunda ismin yanında kısa süre görünür
+function sfxNow(userId) {
+  const a = sfx.active.get(userId);
+  if (!a) return null;
+  const age = Date.now() - a.at;
+  if (age > SFX_SHOW_MS) {
+    sfx.active.delete(userId);
+    return null;
+  }
+  return { it: SFX_BY_ID.get(a.sid), age };
+}
+function sfxFloatEl(sf) {
+  return h('div', { class: 'sfx-float', style: `animation-delay:-${sf.age}ms` }, h('span', { class: 'sfx-float-emo' }, sf.it.emoji), h('span', { class: 'sfx-float-name' }, sf.it.name));
+}
+function markSfx(userId, sid) {
+  sfx.active.set(userId, { sid, at: Date.now() });
+  const sf = sfxNow(userId);
+  const card = $(`#participants .p-card[data-uid="${userId}"]`);
+  if (card) {
+    card.querySelector('.sfx-float')?.remove();
+    card.append(sfxFloatEl(sf));
+  }
+  for (const av of $$(`.user [data-av="${userId}"]`)) {
+    const badges = av.closest('.user')?.querySelector('.badges');
+    if (!badges) continue;
+    badges.querySelector('.sfx-badge')?.remove();
+    badges.prepend(h('span', { class: 'sfx-badge', title: `${sf.it.name} çaldı` }, sf.it.emoji));
+  }
+  setTimeout(() => {
+    if (sfxNow(userId)) return; // bu arada yeni bir ses çalındı
+    $(`#participants .p-card[data-uid="${userId}"] .sfx-float`)?.remove();
+    for (const av of $$(`.user [data-av="${userId}"]`)) av.closest('.user')?.querySelector('.sfx-badge')?.remove();
+  }, SFX_SHOW_MS + 50);
+}
+
+function sendSfx(sid) {
+  if (!S.channelId || !SFX_BY_ID.has(sid)) return;
+  const now = Date.now();
+  if (now < sfx.coolUntil) return; // spam koruması (sunucu da kontrol eder)
+  sfx.coolUntil = now + SFX_COOLDOWN;
+  if (sfxSupported()) send({ t: 'sfx', sid });
+  markSfx(S.myId, sid);
+  playSfxLocal(S.myId, sid, sfxGain(S.myId));
+  const pop = $('#sfx-pop');
+  pop.classList.remove('cool');
+  void pop.offsetWidth; // animasyon baştan başlasın
+  pop.classList.add('cool');
+  for (const t of $$('.sfx-tile', pop)) t.classList.toggle('hit', t.dataset.sid === sid);
+  clearTimeout(sfx.coolTimer);
+  sfx.coolTimer = setTimeout(() => {
+    pop.classList.remove('cool');
+    for (const t of $$('.sfx-tile.hit', pop)) t.classList.remove('hit');
+  }, SFX_COOLDOWN);
+}
+function onSfx(m) {
+  if (!SFX_BY_ID.has(m.sid) || m.from === S.myId) return;
+  markSfx(m.from, m.sid);
+  playSfxLocal(m.from, m.sid, sfxGain(m.from));
+}
+// Sağ tık: sadece kendin dinle (kanala gitmez, hoparlörün kapalı olsa da çalar)
+const previewSfx = (sid) => playSfxLocal('preview', sid, Math.max(0.3, (settings.sfxVolume ?? 50) / 100));
+
+function renderSfxPop() {
+  const pop = $('#sfx-pop');
+  const grid = $('#sfx-builtin');
+  if (!grid.childElementCount)
+    for (const it of KankiSfx.BUILTIN)
+      grid.append(
+        h(
+          'button',
+          {
+            class: 'sfx-tile',
+            'data-sid': it.sid,
+            title: `${it.name} — kanaldaki herkes duyar`,
+            onclick: () => sendSfx(it.sid),
+            oncontextmenu: (e) => {
+              e.preventDefault();
+              showCtx(e, [{ label: `${it.emoji} ${it.name}: sadece ben dinle`, run: () => previewSfx(it.sid) }]);
+            },
+          },
+          h('span', { class: 'sfx-emo' }, it.emoji),
+          h('span', { class: 'sfx-name' }, it.name)
+        )
+      );
+  $('#sfx-old', pop).classList.toggle('hidden', !S.myId || sfxSupported());
+  const v = settings.sfxVolume ?? 50;
+  $('#sfx-vol').value = v;
+  $('#sfx-vol-v').textContent = v ? `%${v}` : 'Kapalı';
+}
+function toggleSfxPop(force) {
+  const pop = $('#sfx-pop');
+  const open = force ?? pop.classList.contains('hidden');
+  pop.classList.toggle('hidden', !open);
+  if (open) renderSfxPop();
+  renderCallBar();
+}
+document.addEventListener('mousedown', (e) => {
+  if (!$('#sfx-pop').classList.contains('hidden') && !e.target.closest('#sfx-pop, #cb-sfx, #ctx')) toggleSfxPop(false);
+});
+window.addEventListener('keydown', (e) => e.key === 'Escape' && !$('#sfx-pop').classList.contains('hidden') && toggleSfxPop(false));
+$('#sfx-vol').addEventListener('input', (e) => {
+  settings.sfxVolume = Number(e.target.value);
+  saveSettings();
+  $('#sfx-vol-v').textContent = settings.sfxVolume ? `%${settings.sfxVolume}` : 'Kapalı';
+  for (const p of sfx.playing.values()) p.g.gain.value = settings.sfxVolume / 100;
 });
 
 // =====================================================================

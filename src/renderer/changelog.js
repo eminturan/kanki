@@ -6,6 +6,17 @@
  */
 const CHANGELOG = [
   {
+    version: '1.0.18',
+    date: '2026-11-09',
+    title: 'Ses efektleri',
+    added: [
+      'Ses efektleri paneli: sahnenin altındaki yeni düğmeyle açılır. Bir sese basınca ses kanalındaki herkeste çalar (alkış, ba-dum-tss, davul, tada, korna, üzgün trombon, doğru/yanlış, zil, cırcır böceği, dramatik, boing, lazer, kalp, parti, sansür bip).',
+      'Ses çalanın kutusunda ve kenar çubuğunda isminin yanında sesin emojisi kısa süre görünür.',
+      'Efektlerin sende ne kadar yüksek çalacağını panelin altındaki sürgüden ayarlayabilir ya da kapatabilirsin. Sağ tıkla sesi sadece kendin dinlersin.',
+      'Spam koruması: kişi başı 1,2 saniyede bir ses. Hoparlörü kapalı olan ya da çalanı susturan duymaz.',
+    ],
+  },
+  {
     version: '1.0.17',
     date: '2026-11-09',
     title: 'Yazı kanalı geçmişi kaydedilmiyor',

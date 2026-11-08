@@ -126,6 +126,14 @@ GitHub Actions paketleri derler, Release'e `latest.yml` ile birlikte ekler; kuru
 - Bir YouTube şarkısının başlaması 10–15 saniye sürebilir: bağlantı çözülür ve YouTube bazı videolarda akışı reklam süresi kadar (birkaç saniye) bekletir. Kuyruktaki sıradaki şarkı önceden hazırlandığı için geçişler genelde beklemesizdir. Canlı yayınlar çalınamaz.
 - YouTube için [yt-dlp](https://github.com/yt-dlp/yt-dlp) kullanılır: ilk kullanımda resmi GitHub sürümünden Kanki Admin'in veri klasörüne indirilir ve haftada bir kendini günceller. Doğrudan ses dosyası ve radyo bağlantıları buna gerek duymaz.
 
+## Ses efektleri
+- Sahnenin altındaki ses efektleri düğmesi (ekran paylaş düğmesinin yanında) paneli açar. Bir sese basınca ses kanalındaki herkeste çalar; çalanın kutusunda ve kenar çubuğunda isminin yanında sesin emojisi kısa süre görünür.
+- 16 hazır ses: alkış, ba-dum-tss, davul, tada, korna, "olmadı" (üzgün trombon), doğru, yanlış, zil, cırcır böceği, dramatik, boing, lazer, kalp atışı, parti düdüğü, sansür bip. Sesler uygulamanın içinde üretilir (ses dosyası yok); sunucu sadece hangi sesin çalındığını iletir.
+- Herkes kendi duyduğu efekt sesini panelin altındaki sürgüyle ayarlar (0 = kapalı). Hoparlörü kapalı olan ya da çalanı yerel olarak susturan duymaz; kişiye verdiğin ses seviyesi efektlerine de uygulanır.
+- Sağ tık: sesi kanala göndermeden sadece kendin dinle.
+- Spam koruması: kişi başı 1,2 saniyede bir ses. Aynı kişinin yeni sesi öncekini keser.
+- Sunucu tarafında destek gerekir: Kanki Admin 1.0.18 ve üstü. Eski sunucularda panel uyarı gösterir ve sesler sadece sende çalar.
+
 ## Yazı stili
 - Ayarlar › Yazı stili: adın için yazı tipi (12 seçenek), efekt (düz, gradyan, neon, parıltı, gökkuşağı, nabız, ateş) ve iki renk. Önizleme anında güncellenir.
 - "Mesajlarımda da kullan" açılırsa mesaj metnin de aynı yazı tipi ve renkle görünür (efektsiz, okunaklı kalsın diye).
@@ -150,7 +158,7 @@ GitHub Actions paketleri derler, Release'e `latest.yml` ile birlikte ekler; kuru
 - Gürültü bastırma, yankı engelleme ve otomatik kazanç açılıp kapatılabilir. Giriş ve çıkış cihazı seçilebilir.
 - Bir kullanıcıya sağ tıklayarak: kişiye özel ses seviyesi, yerel susturma, dürtme, yayınını izleme.
 - Kısayollar: `Ctrl/Cmd+Shift+M` mikrofonu, `Ctrl/Cmd+Shift+D` hoparlörü açar/kapatır.
-- Sahnenin altındaki düğmeler (Discord'daki gibi): kamera, ekran paylaş, mikrofon, ses, bağlantıyı kes.
+- Sahnenin altındaki düğmeler (Discord'daki gibi): kamera, ekran paylaş, ses efektleri, mikrofon, ses, bağlantıyı kes.
 - Kanala katılmak için kanal adına bir kez tıklamak yeterli.
 - Tüm kısayollar: Ayarlar › Kısayollar.
 
