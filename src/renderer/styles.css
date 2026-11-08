@@ -1333,3 +1333,22 @@ body.has-update .layout.chat-hidden .stage-head { padding-right: 56px; }
   font: 700 10px var(--mono); letter-spacing: .03em;
 }
 #btn-go-live { white-space: nowrap; }
+
+/* =====================================================================
+   Yazı kanalları
+   ===================================================================== */
+.text-tree { padding: 0 8px 6px; max-height: 35vh; overflow-y: auto; flex: none; }
+.text-ch .ch-name { color: var(--text-3); }
+.text-ch:hover .ch-name, .text-ch.current .ch-name { color: var(--text); }
+.text-ch.unread .ch-name { color: var(--text); font-weight: 700; }
+.text-ch.unread::before { content: ""; position: absolute; left: -8px; top: 50%; width: 4px; height: 8px; margin-top: -4px; border-radius: 0 4px 4px 0; background: var(--text); }
+.text-ch { position: relative; }
+.ch-badge {
+  margin-left: auto; min-width: 18px; height: 16px; padding: 0 5px; border-radius: 8px; display: grid; place-items: center;
+  background: var(--bg-4); color: var(--text-2); font: 700 10.5px var(--mono);
+}
+.ch-badge.mention { background: var(--red); color: #fff; }
+#chat-head { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+#chat-head svg { width: 17px; height: 17px; color: var(--text-3); flex: none; }
+#chat-head span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#chat-head .chat-head-sub { font: 11px var(--mono); color: var(--text-3); }

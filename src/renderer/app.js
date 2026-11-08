@@ -174,7 +174,13 @@ const S = {
   rcView: null, // benim kontrol ettiğim yayın: { key, peerId, shareId, state: 'pending' | 'active', timer }
   rcFocus: false, // klavye karşı tarafa gidiyor mu (görüntüye tıklanınca)
   botState: null, // müzik botunun durumu (çalan şarkı, kuyruk)
+  chatView: null, // sağ panelde açık yazı kanalı (null = bulunduğum ses kanalının sohbeti)
+  textUnread: new Map(), // yazı kanalı -> { n, mention }
+  textLoaded: new Set(), // geçmişi alınmış yazı kanalları
 };
+// Yazı kanalları
+const isTextCh = (cid) => S.channels.find((c) => c.id === cid)?.type === 'text';
+const chatChannel = () => S.chatView || S.channelId;
 
 // =====================================================================
 //  Ses motoru
@@ -1719,6 +1725,7 @@ function setConnText(text, cls) {
 function onMessage(m) {
   switch (m.t) {
     case 'welcome':
+      S.textLoaded.clear();
       S.myId = m.id;
       S.myName = m.name;
       S.serverName = m.serverName;
@@ -1735,6 +1742,10 @@ function onMessage(m) {
       break;
     case 'state': {
       queueMicrotask(renderMusic);
+      queueMicrotask(() => {
+        if (S.chatView && !isTextCh(S.chatView)) openChat(null);
+        else if (S.chatView && !S.textLoaded.has(S.chatView)) send({ t: 'openText', channelId: S.chatView });
+      });
       const prevUsers = S.users;
       S.serverName = m.serverName;
       S.channels = m.channels;
@@ -1749,10 +1760,12 @@ function onMessage(m) {
         closeAllPopouts();
         S.layout.clear();
         S.layoutCustom = false;
-        S.replyTo = null; // başka kanalın mesajına yanıt olmaz
-        S.editing = null;
-        S.unread = 0;
-        renderChat();
+        if (!S.chatView) {
+          S.replyTo = null; // başka kanalın mesajına yanıt olmaz
+          S.editing = null;
+          S.unread = 0;
+          renderChat();
+        }
       } else if (prevChannel) {
         // Kanal içi giriş/çıkış sesleri
         for (const u of S.users.values())
@@ -1804,21 +1817,35 @@ function onMessage(m) {
       break;
     case 'history':
       S.chat.set(m.channelId, m.messages || []);
-      renderChat();
+      if (isTextCh(m.channelId)) S.textLoaded.add(m.channelId);
+      if (m.channelId === chatChannel()) renderChat();
       break;
     case 'chat': {
       if (!S.chat.has(m.channelId)) S.chat.set(m.channelId, []);
       S.chat.get(m.channelId).push(m);
-      if (m.channelId === S.channelId) appendChat(m);
+      const viewing = m.channelId === chatChannel();
+      const inText = isTextCh(m.channelId);
+      if (viewing) appendChat(m);
       if (!m.system && m.from !== S.myId) {
-        S.typing.delete(m.from);
-        renderTyping();
+        if (viewing) {
+          S.typing.delete(m.from);
+          renderTyping();
+        }
         const mention = mentionsMe(m.text) || (m.replyTo && m.replyTo.name === S.myName);
-        if (settings.chatHidden && m.channelId === S.channelId) {
+        // Açık olmayan yazı kanalında okunmamış sayısı (bahsedilince kırmızı)
+        if (inText && !viewing) {
+          const un = S.textUnread.get(m.channelId) || { n: 0, mention: false };
+          un.n++;
+          un.mention = un.mention || mention;
+          S.textUnread.set(m.channelId, un);
+          renderTextChannels();
+        }
+        if (settings.chatHidden && viewing) {
           S.unread++;
           renderChatToggle();
         }
-        if (effectivePresence() !== 'dnd') {
+        // Başka bir yazı kanalındaki sıradan mesaj ses çıkarmaz, sadece sayı artar
+        if (effectivePresence() !== 'dnd' && (viewing || !inText || mention)) {
           beep(mention ? 'mention' : 'msg');
           if (settings.notify && !document.hasFocus()) kanki.notify(mention ? `${m.name} senden bahsetti` : m.name, m.text || '📷 Resim gönderdi');
           if (mention) kanki.flash();
@@ -1831,7 +1858,7 @@ function onMessage(m) {
       const list = S.chat.get(m.channelId) || [];
       const i = list.findIndex((x) => x.id === m.msg.id);
       if (i >= 0) list[i] = { ...m.msg, t: 'chat' };
-      if (m.channelId === S.channelId) refreshChat();
+      if (m.channelId === chatChannel()) refreshChat();
       break;
     }
     case 'chatDelete': {
@@ -1842,7 +1869,7 @@ function onMessage(m) {
         S.replyTo = null;
         renderComposerExtras();
       }
-      if (m.channelId === S.channelId) refreshChat();
+      if (m.channelId === chatChannel()) refreshChat();
       break;
     }
     case 'botState':
@@ -1862,7 +1889,7 @@ function onMessage(m) {
       refreshAvatars();
       break;
     case 'typing':
-      if (m.channelId === S.channelId && m.from !== S.myId) {
+      if (m.channelId === chatChannel() && m.from !== S.myId) {
         S.typing.set(m.from, Date.now());
         renderTyping();
       }
@@ -1932,10 +1959,11 @@ function renderAll() {
 }
 
 function childrenOf(parent) {
-  return S.channels.filter((c) => (c.parent || null) === parent).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  return S.channels.filter((c) => c.type !== 'text' && (c.parent || null) === parent).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 }
 
 function renderTree() {
+  renderTextChannels();
   const tree = $('#tree');
   const scroll = tree.scrollTop;
   tree.innerHTML = '';
@@ -1946,8 +1974,8 @@ function renderTree() {
         'div',
         {
           class: `ch ${ch.id === S.channelId ? 'current' : ''}`,
-          title: ch.id === S.channelId ? 'Bu kanaldasın' : 'Katılmak için tıkla',
-          onclick: () => joinChannel(ch.id),
+          title: ch.id === S.channelId ? 'Bu kanaldasın — sohbetini açmak için tıkla' : 'Katılmak için tıkla',
+          onclick: () => (ch.id === S.channelId ? openChat(null) : joinChannel(ch.id)),
           oncontextmenu: (e) => channelMenu(e, ch),
           ondragover: (e) => {
             e.preventDefault();
@@ -2035,7 +2063,7 @@ function renderStage() {
   $('#voice-where').textContent = ch ? `${ch.name} / ${S.serverName}` : S.serverName;
   const members = [...S.users.values()].filter((u) => u.channelId === S.channelId);
   $('#stage-sub').textContent = `${members.length} kişi`;
-  $('#chat-head').textContent = ch ? `# ${ch.name}` : 'Sohbet';
+  renderChatHead();
   $('#member-count').textContent = String(S.users.size || '');
   renderMembers();
   updateVoiceState();
@@ -2225,7 +2253,7 @@ function renderChat() {
   lastMsgFrom = null;
   lastMsgTs = 0;
   lastMsgDay = '';
-  for (const m of S.chat.get(S.channelId) || []) appendChat(m, false);
+  for (const m of S.chat.get(chatChannel()) || []) appendChat(m, false);
   box.scrollTop = box.scrollHeight;
   $('#new-msgs').classList.add('hidden');
   if (S.editing) focusEditBox();
@@ -2959,7 +2987,7 @@ $('#chat-input').addEventListener('input', () => {
   const v = $('#chat-input').value;
   if (v && Date.now() - lastTypingSent > 2500) {
     lastTypingSent = Date.now();
-    send({ t: 'typing' });
+    send({ t: 'typing', channelId: chatChannel() });
   }
   updateMentionPop();
 });
@@ -3093,6 +3121,7 @@ const ICON_CROWN = () => {
 function applyAdminUi() {
   $('#btn-admin').classList.toggle('hidden', !S.isAdmin);
   $('#btn-add-channel').classList.toggle('hidden', !S.isAdmin);
+  $('#btn-add-text').classList.toggle('hidden', !S.isAdmin);
 }
 
 const fmtDuration = (ms) => {
@@ -3807,7 +3836,7 @@ function msgMenu(e, m) {
       react(m.id, b.dataset.em);
     });
 }
-const react = (id, emoji) => send({ t: 'react', id, emoji });
+const react = (id, emoji) => send({ t: 'react', id, emoji, channelId: chatChannel() });
 
 const reactPop = h('div', { class: 'react-pop hidden' });
 document.body.append(reactPop);
@@ -3898,11 +3927,11 @@ function saveEdit(m) {
     cancelEdit(false);
     return deleteMsg(m);
   }
-  if (v !== (m.text || '')) send({ t: 'chatEdit', id: m.id, text: v });
+  if (v !== (m.text || '')) send({ t: 'chatEdit', id: m.id, text: v, channelId: chatChannel() });
   cancelEdit();
 }
 function deleteMsg(m, now = false) {
-  const go = () => send({ t: 'chatDelete', id: m.id });
+  const go = () => send({ t: 'chatDelete', id: m.id, channelId: chatChannel() });
   if (now) return go();
   confirmBox('Mesajı sil', 'Bu mesaj kanaldaki herkes için silinecek. İpucu: Sil düğmesine Shift tuşuna basılıyken tıklarsan sormadan siler.', 'Sil', go);
 }
@@ -4006,8 +4035,8 @@ function renderComposerExtras() {
     box.append(card);
   }
   box.classList.toggle('hidden', !box.childElementCount);
-  const ch = S.channels.find((c) => c.id === S.channelId);
-  $('#chat-input').placeholder = S.pendingImage ? 'Not ekle (isteğe bağlı)' : S.replyTo ? 'Yanıtını yaz' : `#${ch?.name || 'kanal'} kanalına yaz`;
+  const ch = S.channels.find((c) => c.id === chatChannel());
+  $('#chat-input').placeholder = S.pendingImage ? 'Not ekle (isteğe bağlı)' : S.replyTo ? 'Yanıtını yaz' : ch?.type === 'text' ? `#${ch.name} kanalına yaz` : `${ch?.name || 'Kanal'} sohbetine yaz`;
   if (atBottom) chatLog.scrollTop = chatLog.scrollHeight;
 }
 
@@ -4016,7 +4045,7 @@ function sendChat() {
   const v = inp.value.trim();
   if (!v && !S.pendingImage) return;
   if (!S.ws || S.ws.readyState !== 1) return toast('Mesaj gönderilemedi', 'Sunucuya bağlı değilsin.', 'err');
-  const msg = { t: 'chat', text: v };
+  const msg = { t: 'chat', text: v, channelId: chatChannel() };
   if (S.pendingImage) Object.assign(msg, { image: S.pendingImage.data, imageW: S.pendingImage.w, imageH: S.pendingImage.h });
   if (S.replyTo) msg.replyTo = S.replyTo.id;
   send(msg);
@@ -4054,7 +4083,7 @@ $('#chat-input').addEventListener('keydown', (e) => {
     renderComposerExtras();
   } else if (e.key === 'ArrowUp' && !inp.value) {
     // Discord'daki gibi: boş kutuda ↑ son mesajını düzenler
-    const last = [...(S.chat.get(S.channelId) || [])].reverse().find((m) => isMineMsg(m) && m.text);
+    const last = [...(S.chat.get(chatChannel()) || [])].reverse().find((m) => isMineMsg(m) && m.text);
     if (last) {
       e.preventDefault();
       startEdit(last);
@@ -4650,6 +4679,92 @@ function botAvatar() {
   av.innerHTML = ICON_MUSIC;
   return av;
 }
+
+// =====================================================================
+//  Yazı kanalları (Discord'daki # kanallar): sese katılmadan herkes okur ve yazar
+// =====================================================================
+const ICON_HASH = '<svg viewBox="0 0 24 24"><path d="M10.2 3 9.5 7h4l.7-4h2l-.7 4H19v2h-3.9l-.7 4H18v2h-3.9l-.7 4h-2l.7-4h-4l-.7 4h-2l.7-4H3v-2h3.9l.7-4H4V7h3.9l.7-4h1.6Zm-1 6-.7 4h4l.7-4h-4Z"/></svg>';
+function renderTextChannels() {
+  const box = $('#text-tree');
+  if (!box) return;
+  box.innerHTML = '';
+  const list = S.channels.filter((c) => c.type === 'text').sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  $('#text-head').classList.toggle('hidden', !list.length && !S.isAdmin);
+  for (const ch of list) {
+    const un = S.textUnread.get(ch.id);
+    const row = h(
+      'div',
+      {
+        class: `ch text-ch ${S.chatView === ch.id ? 'current' : ''} ${un ? 'unread' : ''}`,
+        title: 'Sohbeti aç',
+        onclick: () => openChat(ch.id),
+        oncontextmenu: (e) => textChannelMenu(e, ch),
+      },
+      h('span', { class: 'ch-ico' }),
+      h('span', { class: 'ch-name' }, ch.name),
+      un ? h('span', { class: `ch-badge ${un.mention ? 'mention' : ''}`, title: un.mention ? 'Senden bahsedildi' : 'Okunmamış mesaj' }, un.n > 99 ? '99+' : String(un.n)) : null
+    );
+    row.querySelector('.ch-ico').outerHTML = ICON_HASH;
+    box.append(row);
+  }
+}
+// Sağ paneldeki sohbeti değiştir: yazı kanalı ya da (null) bulunduğum ses kanalının sohbeti
+function openChat(cid) {
+  const text = cid && isTextCh(cid);
+  const next = text ? cid : null;
+  if (next !== S.chatView) {
+    S.replyTo = null;
+    S.editing = null;
+    S.typing.clear();
+  }
+  S.chatView = next;
+  if (text) {
+    S.textUnread.delete(cid);
+    if (!S.textLoaded.has(cid)) send({ t: 'openText', channelId: cid });
+  }
+  if (settings.chatHidden) {
+    settings.chatHidden = false;
+    saveSettings();
+    S.unread = 0;
+    renderChatToggle();
+    requestAnimationFrame(() => renderStage());
+  }
+  if (rightTab !== 'chat') $('.chat-tab[data-tab="chat"]').click();
+  renderTree();
+  renderChatHead();
+  renderChat();
+  renderTyping();
+  $('#chat-input').focus();
+}
+function renderChatHead() {
+  const ch = S.channels.find((c) => c.id === chatChannel());
+  const head = $('#chat-head');
+  head.innerHTML = '';
+  if (!ch) return (head.textContent = 'Sohbet');
+  if (ch.type === 'text') head.append(svgEl(ICON_HASH), h('span', {}, ch.name));
+  else head.append(svgEl(ICON.channel), h('span', {}, ch.name));
+  head.title = ch.type === 'text' ? `#${ch.name} — sunucudaki herkes görür` : `${ch.name} — sadece bu ses kanalındakiler görür`;
+}
+function textChannelMenu(e, ch) {
+  e.preventDefault();
+  const un = S.textUnread.get(ch.id);
+  showCtx(e, [
+    { label: 'Sohbeti aç', run: () => openChat(ch.id) },
+    un && {
+      label: 'Okundu olarak işaretle',
+      run: () => {
+        S.textUnread.delete(ch.id);
+        renderTextChannels();
+      },
+    },
+    S.isAdmin && '-',
+    S.isAdmin && { label: 'Yeniden adlandır', run: () => renameChannel(ch) },
+    S.isAdmin && { label: 'Kanalı sil', danger: true, run: () => confirmBox(`#${ch.name} silinsin mi?`, 'Kanal ve tüm mesaj geçmişi herkes için silinir.', 'Sil', () => send({ t: 'deleteChannel', channelId: ch.id })) },
+  ]);
+}
+$('#btn-add-text').addEventListener('click', () =>
+  inlinePrompt('Yazı kanalı adı', '', (name) => send({ t: 'createChannel', name, type: 'text' }), false, 'Sese katılmadan herkesin yazabildiği kanal, ör. "oyun-planı" ya da "linkler".')
+);
 
 // =====================================================================
 //  Uzaktan kontrol (TeamViewer / AnyDesk gibi)

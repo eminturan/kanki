@@ -6,6 +6,18 @@
  */
 const CHANGELOG = [
   {
+    version: '1.0.16',
+    date: '2026-11-09',
+    title: 'Yazı kanalları',
+    added: [
+      'Yazı kanalları (# kanallar): sese katılmadan sunucudaki herkesin okuyup yazabildiği kanallar. Kenar çubuğunda ses kanallarının üstünde.',
+      'Açık olmayan yazı kanalındaki yeni mesajlar kanal adının yanında sayı olarak görünür; senden bahsedilirse sayı kırmızı olur.',
+      'Yazı kanallarının geçmişi sunucu kapanıp açılsa da kalır.',
+      'Yönetici yeni yazı kanalı açabilir, yeniden adlandırabilir, silebilir. Sunucuya bir "genel" kanalı eklendi.',
+    ],
+    changed: ['Bulunduğun ses kanalının adına tekrar tıklayınca sağ panelde o ses kanalının sohbeti açılır.'],
+  },
+  {
     version: '1.0.15',
     date: '2026-11-09',
     title: 'Yayını düzenle',

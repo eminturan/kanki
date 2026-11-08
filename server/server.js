@@ -25,6 +25,7 @@ const crypto = require('crypto');
 const { WebSocketServer } = require('ws');
 
 const DEFAULT_CHANNELS = [
+  { name: 'genel', parent: null, type: 'text' },
   { name: 'Lobi', parent: null },
   { name: 'Sohbet', parent: null },
   { name: 'Oyun', parent: null },
@@ -79,17 +80,61 @@ function startServer(opts = {}) {
     const byName = {};
     channels = DEFAULT_CHANNELS.map((c, i) => {
       const ch = { id: crypto.randomUUID(), name: c.name, parent: c.parent ? byName[c.parent] : null, order: i, topic: '' };
+      if (c.type === 'text') ch.type = 'text';
       byName[c.name] = ch.id;
       return ch;
     });
     saveChannels();
   }
-  const lobbyId = () => channels[0]?.id;
+  // Yazı kanalları: sese katılmadan herkesin okuyup yazabildiği kanallar (Discord'daki # kanallar)
+  const textMarker = path.join(dataDir, '.text-channels-added');
+  if (!channels.some((c) => c.type === 'text') && !fs.existsSync(textMarker)) {
+    // Eski sunucuya bir kez "genel" yazı kanalı ekle (silinirse tekrar eklenmez)
+    channels.unshift({ id: crypto.randomUUID(), name: 'genel', parent: null, order: -1, topic: '', type: 'text' });
+    saveChannels();
+  }
+  try {
+    fs.mkdirSync(dataDir, { recursive: true });
+    fs.writeFileSync(textMarker, '1');
+  } catch {}
+  const isText = (cid) => channels.find((c) => c.id === cid)?.type === 'text';
+  const lobbyId = () => channels.find((c) => c.type !== 'text')?.id;
 
   // ---------- Kullanıcılar ----------
   /** @type {Map<string, {id,name,channelId,muted,deafened,sharing,ws,alive}>} */
   const users = new Map();
   const chatHistory = new Map(); // channelId -> [{...}]
+  // Yazı kanallarının geçmişi diske yazılır (sunucu yeniden başlasa da kalır)
+  const textHistoryFile = path.join(dataDir, 'text-history.json');
+  try {
+    const saved = JSON.parse(fs.readFileSync(textHistoryFile, 'utf8'));
+    for (const [cid, msgs] of Object.entries(saved)) if (isText(cid) && Array.isArray(msgs)) chatHistory.set(cid, msgs);
+  } catch {}
+  let textSaveTimer = null;
+  function saveTextHistory() {
+    clearTimeout(textSaveTimer);
+    textSaveTimer = setTimeout(() => {
+      const out = {};
+      for (const [cid, msgs] of chatHistory) {
+        if (!isText(cid)) continue;
+        // Dosya şişmesin: her kanalda en yeni 10 resim saklanır
+        const imgs = msgs.filter((x) => x.image);
+        const keep = new Set(imgs.slice(-10));
+        out[cid] = msgs.map((x) => (x.image && !keep.has(x) ? { ...x, image: null, imageExpired: true } : x));
+      }
+      try {
+        fs.mkdirSync(dataDir, { recursive: true });
+        fs.writeFileSync(textHistoryFile + '.tmp', JSON.stringify(out));
+        fs.renameSync(textHistoryFile + '.tmp', textHistoryFile);
+      } catch (e) {
+        log('Sohbet geçmişi kaydedilemedi:', e.message);
+      }
+    }, 3000);
+  }
+  // Mesajın gideceği kanal: yazı kanalı seçildiyse o, yoksa kişinin bulunduğu ses kanalı
+  const chatTarget = (me, cid) => (cid && isText(cid) ? cid : me.channelId);
+  // Yazı kanalı mesajları herkese, ses kanalı sohbeti sadece o kanaldakilere gider
+  const audience = (cid) => (isText(cid) ? (u) => !u.bot : (u) => u.channelId === cid);
 
   const publicUser = (u) => ({
     id: u.id,
@@ -180,7 +225,8 @@ function startServer(opts = {}) {
     }
   }
   function moveUser(u, channelId) {
-    if (!channels.find((c) => c.id === channelId)) return;
+    const target = channels.find((c) => c.id === channelId);
+    if (!target || target.type === 'text') return; // yazı kanalına katılınmaz, sadece okunur
     const old = u.channelId;
     if (old === channelId) return;
     u.channelId = channelId;
@@ -307,8 +353,9 @@ function startServer(opts = {}) {
         case 'chat': {
           const text = String(m.text || '').slice(0, 2000).trim();
           const image = isImageData(m.image, IMAGE_MAX) ? m.image : null;
-          if ((!text && !image) || !me.channelId) break;
-          const msg = { t: 'chat', id: crypto.randomUUID(), channelId: me.channelId, from: me.id, name: me.name, text, ts: Date.now(), _k: me.clientKey };
+          const cid = chatTarget(me, m.channelId);
+          if ((!text && !image) || !cid) break;
+          const msg = { t: 'chat', id: crypto.randomUUID(), channelId: cid, from: me.id, name: me.name, text, ts: Date.now(), _k: me.clientKey };
           if (me.nameStyle) msg.ns = me.nameStyle; // isim stili mesajla saklanır (kişi çıkınca da görünsün)
           if (image) {
             msg.image = image;
@@ -316,10 +363,11 @@ function startServer(opts = {}) {
             msg.imageH = Math.max(0, Math.min(10000, Number(m.imageH) || 0));
           }
           // Yanıt: alıntılanan mesajın kısa bir özeti mesajla birlikte saklanır
-          const orig = m.replyTo && findMsg(me.channelId, m.replyTo);
+          const orig = m.replyTo && findMsg(cid, m.replyTo);
           if (orig && !orig.system) msg.replyTo = { id: orig.id, name: orig.name, text: String(orig.text || '').slice(0, 140), image: !!orig.image };
-          pushHistory(me.channelId, msg);
-          broadcast(pubMsg(msg), (u) => u.channelId === me.channelId);
+          pushHistory(cid, msg);
+          broadcast(pubMsg(msg), audience(cid));
+          if (isText(cid)) saveTextHistory();
           // Sohbet komutu: "!çal şarkı adı" → müzik botuna
           const cm = !me.bot && /^!([^\s!]+)\s*([\s\S]*)$/.exec(text);
           if (cm && BOT_WORDS.has(cm[1].toLocaleLowerCase('tr'))) forwardToBot(me, cm[1].toLocaleLowerCase('tr'), cm[2].trim());
@@ -328,6 +376,10 @@ function startServer(opts = {}) {
         case 'botCmd':
           // Müzik panelindeki düğmelerden gelen komutlar (sohbete yazılmaz)
           if (!me.bot) forwardToBot(me, m.cmd, m.arg);
+          break;
+        case 'openText':
+          // Yazı kanalı açılınca geçmişini gönder
+          if (isText(m.channelId)) send(ws, { t: 'history', channelId: m.channelId, messages: (chatHistory.get(m.channelId) || []).map(pubMsg) });
           break;
         case 'botState':
           if (!me.bot) break;
@@ -350,24 +402,29 @@ function startServer(opts = {}) {
           break;
         }
         case 'chatEdit': {
-          const msg = findMsg(me.channelId, m.id);
+          const cid = chatTarget(me, m.channelId);
+          const msg = findMsg(cid, m.id);
           const text = String(m.text || '').slice(0, 2000).trim();
           if (!canModify(me, msg) || msg._k !== me.clientKey || (!text && !msg.image)) break; // düzenlemeyi sadece yazan yapar
           msg.text = text;
           msg.edited = Date.now();
-          broadcast({ t: 'chatUpdate', channelId: me.channelId, msg: pubMsg(msg) }, (u) => u.channelId === me.channelId);
+          broadcast({ t: 'chatUpdate', channelId: cid, msg: pubMsg(msg) }, audience(cid));
+          if (isText(cid)) saveTextHistory();
           break;
         }
         case 'chatDelete': {
-          const msg = findMsg(me.channelId, m.id);
+          const cid = chatTarget(me, m.channelId);
+          const msg = findMsg(cid, m.id);
           if (!canModify(me, msg)) break; // yazan ya da yönetici silebilir
-          const arr = chatHistory.get(me.channelId);
+          const arr = chatHistory.get(cid);
           arr.splice(arr.indexOf(msg), 1);
-          broadcast({ t: 'chatDelete', channelId: me.channelId, id: msg.id }, (u) => u.channelId === me.channelId);
+          broadcast({ t: 'chatDelete', channelId: cid, id: msg.id }, audience(cid));
+          if (isText(cid)) saveTextHistory();
           break;
         }
         case 'react': {
-          const msg = findMsg(me.channelId, m.id);
+          const cid = chatTarget(me, m.channelId);
+          const msg = findMsg(cid, m.id);
           const emoji = String(m.emoji || '').slice(0, 16);
           if (!msg || msg.system || !emoji) break;
           msg.reactions = msg.reactions || {};
@@ -375,7 +432,8 @@ function startServer(opts = {}) {
           if (list.includes(me.name)) msg.reactions[emoji] = list.filter((n) => n !== me.name);
           else if (Object.keys(msg.reactions).length < 20 || msg.reactions[emoji]) msg.reactions[emoji] = [...list, me.name];
           if (!msg.reactions[emoji]?.length) delete msg.reactions[emoji];
-          broadcast({ t: 'chatUpdate', channelId: me.channelId, msg: pubMsg(msg) }, (u) => u.channelId === me.channelId);
+          broadcast({ t: 'chatUpdate', channelId: cid, msg: pubMsg(msg) }, audience(cid));
+          if (isText(cid)) saveTextHistory();
           break;
         }
         case 'profile': {
@@ -394,7 +452,11 @@ function startServer(opts = {}) {
         }
         case 'typing':
           // "X yazıyor…" göstergesi: sadece aynı kanaldakilere, saklanmaz
-          if (me.channelId) broadcast({ t: 'typing', from: me.id, name: me.name, channelId: me.channelId }, (u) => u.channelId === me.channelId && u.id !== me.id);
+          {
+            const cid = chatTarget(me, m.channelId);
+            const aud = cid && audience(cid);
+            if (cid) broadcast({ t: 'typing', from: me.id, name: me.name, channelId: cid }, (u) => aud(u) && u.id !== me.id);
+          }
           break;
         case 'poke': {
           const target = users.get(m.to);
@@ -404,8 +466,10 @@ function startServer(opts = {}) {
         case 'createChannel': {
           const name = String(m.name || '').trim().slice(0, 40);
           if (!name) break;
-          const parent = channels.find((c) => c.id === m.parent) ? m.parent : null;
-          const ch = { id: crypto.randomUUID(), name, parent, order: channels.length, topic: String(m.topic || '').slice(0, 200) };
+          const text = m.type === 'text';
+          const parent = !text && channels.find((c) => c.id === m.parent && c.type !== 'text') ? m.parent : null;
+          const ch = { id: crypto.randomUUID(), name: text ? name.toLocaleLowerCase('tr').replace(/\s+/g, '-') : name, parent, order: channels.length, topic: String(m.topic || '').slice(0, 200) };
+          if (text) ch.type = 'text';
           channels.push(ch);
           saveChannels();
           broadcastState();
@@ -435,7 +499,9 @@ function startServer(opts = {}) {
             break;
           }
           channels = channels.filter((c) => !ids.has(c.id));
+          for (const id of ids) chatHistory.delete(id);
           saveChannels();
+          if (ch.type === 'text') saveTextHistory();
           broadcastState();
           break;
         }
