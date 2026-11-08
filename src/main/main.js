@@ -68,9 +68,31 @@ function createWindow() {
     },
   });
   win.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
-  win.webContents.setWindowOpenHandler(({ url }) => {
+  win.webContents.setWindowOpenHandler(({ url, frameName }) => {
+    // Yayını ayrı pencerede açma: boş sayfa, içeriğini ana pencere doldurur
+    if (frameName.startsWith('kanki-pop-') && (url === 'about:blank' || url === '')) {
+      return {
+        action: 'allow',
+        overrideBrowserWindowOptions: {
+          width: 1100,
+          height: 650,
+          minWidth: 320,
+          minHeight: 200,
+          backgroundColor: '#000000',
+          autoHideMenuBar: true,
+          title: 'Kanki — Yayın',
+          icon: path.join(__dirname, '..', '..', 'build', IS_ADMIN_BUILD ? 'icon-admin.png' : 'icon.png'),
+          webPreferences: { backgroundThrottling: false },
+        },
+      };
+    }
     if (/^https?:/.test(url)) shell.openExternal(url);
     return { action: 'deny' };
+  });
+  win.webContents.on('did-create-window', (child) => {
+    child.setMenuBarVisibility(false);
+    // Ana pencere kapanınca yayın pencereleri de kapansın
+    win?.once('closed', () => !child.isDestroyed() && child.close());
   });
   win.on('closed', () => (win = null));
   if (process.env.KANKI_AUTOTEST) {

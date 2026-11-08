@@ -138,6 +138,10 @@
             <div class="stage-sub" id="stage-sub"></div>
           </div>
           <div class="stage-actions">
+            <button class="btn hidden" id="btn-grid" title="Yayın pencerelerini ekrana eşit dağıt">
+              <svg viewBox="0 0 24 24"><path d="M4 4h7v7H4V4Zm9 0h7v7h-7V4ZM4 13h7v7H4v-7Zm9 0h7v7h-7v-7Z"/></svg>
+              <span>Izgara</span>
+            </button>
             <button class="btn share" id="btn-share">
               <svg viewBox="0 0 24 24"><path d="M3 5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-6v2h3a1 1 0 1 1 0 2H8a1 1 0 1 1 0-2h3v-2H5a2 2 0 0 1-2-2V5Zm2 0v10h14V5H5Zm7 1.5 3.5 3.5H13v3h-2v-3H8.5L12 6.5Z"/></svg>
               <span>Ekran Paylaş</span>
@@ -146,36 +150,10 @@
         </div>
         <div class="share-strip hidden" id="share-strip"></div>
         <div class="stage-body" id="stage-body">
-          <div class="viewer hidden" id="viewer">
-            <video id="viewer-video" autoplay playsinline></video>
-            <div class="viewer-overlay">
-              <div class="viewer-top">
-                <span class="live">CANLI</span>
-                <span id="viewer-name"></span>
-                <span class="stats" id="viewer-stats"></span>
-              </div>
-              <div class="viewer-bottom">
-                <label class="vol" title="Yayın sesi">
-                  <svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9H4Zm12.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4Z"/></svg>
-                  <input type="range" id="viewer-volume" min="0" max="100" value="100" />
-                </label>
-                <div class="spacer"></div>
-                <button class="icon-btn" id="btn-viewer-stop" title="İzlemeyi bırak"><svg viewBox="0 0 24 24"><path d="M6.4 5 5 6.4 10.6 12 5 17.6 6.4 19l5.6-5.6 5.6 5.6 1.4-1.4-5.6-5.6L19 6.4 17.6 5 12 10.6z"/></svg></button>
-                <button class="icon-btn" id="btn-viewer-full" title="Tam ekran (F)"><svg viewBox="0 0 24 24"><path d="M4 4h6v2H6v4H4V4Zm10 0h6v6h-2V6h-4V4ZM4 14h2v4h4v2H4v-6Zm14 0h2v6h-6v-2h4v-4Z"/></svg></button>
-              </div>
-            </div>
-          </div>
+          <div class="tiles hidden" id="tiles"></div>
           <div class="participants" id="participants"></div>
         </div>
-        <div class="self-share hidden" id="self-share">
-          <video id="self-preview" autoplay muted playsinline></video>
-          <div class="self-share-info">
-            <div><b>Ekranını paylaşıyorsun</b></div>
-            <div class="muted" id="self-share-meta"></div>
-            <div class="muted" id="self-share-viewers"></div>
-          </div>
-          <button class="btn danger" id="btn-stop-share">Paylaşımı Durdur</button>
-        </div>
+        <div class="self-shares hidden" id="self-share"></div>
       </main>
 
       <!-- Sağ: sohbet -->

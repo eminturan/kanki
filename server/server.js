@@ -95,6 +95,7 @@ function startServer(opts = {}) {
     muted: u.muted,
     deafened: u.deafened,
     sharing: u.sharing,
+    shares: u.shares || [],
     away: u.away,
     admin: !!u.admin,
   });
@@ -134,6 +135,7 @@ function startServer(opts = {}) {
     if (old === channelId) return;
     u.channelId = channelId;
     u.sharing = false;
+    u.shares = [];
     if (old) systemChat(old, `${u.name} kanaldan ayrıldı`);
     systemChat(channelId, `${u.name} kanala katıldı`);
     send(u.ws, { t: 'history', channelId, messages: chatHistory.get(channelId) || [] });
@@ -178,6 +180,7 @@ function startServer(opts = {}) {
           muted: !!m.muted,
           deafened: !!m.deafened,
           sharing: false,
+          shares: [],
           away: false,
           admin: isAdmin,
           ip,
@@ -208,6 +211,16 @@ function startServer(opts = {}) {
           if ('muted' in m) me.muted = !!m.muted;
           if ('deafened' in m) me.deafened = !!m.deafened;
           if ('sharing' in m) me.sharing = !!m.sharing;
+          if (Array.isArray(m.shares)) {
+            // Aynı anda en fazla 4 yayın; her biri { id, label }
+            me.shares = m.shares
+              .slice(0, 4)
+              .map((x) => ({ id: String(x?.id || '').slice(0, 40), label: String(x?.label || 'Ekran').slice(0, 60) }))
+              .filter((x) => x.id);
+            me.sharing = me.shares.length > 0;
+          } else if ('sharing' in m && !m.sharing) {
+            me.shares = [];
+          }
           if ('away' in m) me.away = !!m.away;
           broadcastState();
           break;

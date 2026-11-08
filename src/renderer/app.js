@@ -107,12 +107,13 @@ const S = {
   peers: new Map(),
   chat: new Map(), // channelId -> messages
   // ekran paylaşımı
-  screenStream: null,
-  screenOpts: null,
-  watchers: new Set(), // beni izleyenler
-  watching: new Set(), // izlediklerim
-  focusedShare: null, // sahnede gösterilen yayıncı
-  remoteScreens: new Map(), // userId -> { stream, video:MediaStream, audioEl }
+  myShares: new Map(), // shareId -> { id, label, stream, opts, watchers:Set }
+  watching: new Set(), // izlediğim yayınlar: "userId|shareId"
+  knownShares: new Set(), // kanalda gördüğüm yayınlar (yeni yayını fark etmek için)
+  remoteScreens: new Map(), // "userId|shareId" -> { userId, shareId, video, audioEl, volume, trackId }
+  layout: new Map(), // "userId|shareId" -> { x, y, w, h } (sahnenin yüzdesi)
+  layoutCustom: false, // kullanıcı bir pencereyi taşıdıysa otomatik ızgarayı bozma
+  activeTile: null,
   hosting: null,
   variant: 'admin',
   isAdmin: false,
@@ -275,8 +276,10 @@ function applyRemoteVolume(userId) {
     r.el.volume = Math.min(1, (settings.userVolumes[volKey(userId)] ?? 100) / 100);
     r.el.muted = S.deafened || !!settings.localMutes[userName(userId)];
   }
-  const sc = S.remoteScreens.get(userId);
-  if (sc?.audioEl) sc.audioEl.muted = S.deafened;
+  applyScreenVolumes();
+}
+function applyScreenVolumes() {
+  for (const sc of S.remoteScreens.values()) if (sc.audioEl) sc.audioEl.muted = S.deafened;
 }
 const userName = (id) => S.users.get(id)?.name || '';
 const volKey = (id) => userName(id);
@@ -426,8 +429,8 @@ class Peer {
     this.ignoreOffer = false;
     this.queue = Promise.resolve();
     this.micSender = null;
-    this.screenTx = [];
-    this.screenStreamId = null; // karşı tarafın yayın akışı
+    this.screenTx = new Map(); // gönderdiğim yayınlar: shareId -> [transceiver]
+    this.remoteMeta = new Map(); // karşının yayın akışları: streamId -> shareId
     this.pc = new RTCPeerConnection({ iceServers: S.iceServers, bundlePolicy: 'max-bundle', rtcpMuxPolicy: 'require' });
     const pc = this.pc;
 
@@ -453,6 +456,19 @@ class Peer {
 
     if (audio.micTrack) this.setMicTrack(audio.micTrack, audio.micStream);
     else pc.addTransceiver('audio', { direction: 'recvonly' });
+
+    // Bekçi: bağlantı 12 sn içinde kurulamazsa ICE'ı yeniden başlat (aynı anda katılmalarda
+    // çakışan teklifler yüzünden aday kaybolabiliyor). Çakışmasın diye sadece bir taraf yapar.
+    this.lastTry = Date.now();
+    this.watchdog = setInterval(() => {
+      const st = pc.connectionState;
+      if (st === 'connected' || st === 'closed') return;
+      if (!this.polite && pc.signalingState === 'stable' && Date.now() - this.lastTry > 12000) {
+        this.lastTry = Date.now();
+        log('peer', userName(id), 'bağlanamadı, ICE yeniden başlatılıyor');
+        pc.restartIce();
+      }
+    }, 3000);
   }
 
   signal(data) {
@@ -504,77 +520,96 @@ class Peer {
         if (!this.ignoreOffer) log('ice', e);
       }
     } else if (data.kind === 'watch') {
-      if (data.on) {
-        S.watchers.add(this.id);
-        this.sendScreen();
-      } else {
-        S.watchers.delete(this.id);
-        this.stopScreen();
+      // Eski sürümler shareId göndermez: o durumda ilk yayınımı gönder
+      const ids = data.shareId ? [data.shareId] : [...S.myShares.keys()].slice(0, 1);
+      for (const sid of ids) {
+        const sh = S.myShares.get(sid);
+        if (!sh) continue;
+        if (data.on) {
+          sh.watchers.add(this.id);
+          this.sendShare(sid);
+        } else {
+          sh.watchers.delete(this.id);
+          this.stopShare(sid);
+        }
       }
       renderSelfShare();
     } else if (data.kind === 'screen-meta') {
-      this.screenStreamId = data.streamId;
+      this.remoteMeta.set(data.streamId, data.shareId || 'main');
     } else if (data.kind === 'screen-ended') {
-      dropRemoteScreen(this.id);
+      if (data.shareId) dropRemoteScreen(shareKey(this.id, data.shareId));
+      else dropUserScreens(this.id);
     }
   }
 
   onTrack(e) {
     const stream = e.streams[0] || new MediaStream([e.track]);
-    const isScreen = e.track.kind === 'video' || (this.screenStreamId && stream.id === this.screenStreamId);
-    if (isScreen) {
-      addRemoteScreenTrack(this.id, e.track, stream);
-    } else {
-      attachRemoteAudio(this.id, stream);
-    }
+    let shareId = this.remoteMeta.get(stream.id);
+    if (!shareId && e.track.kind === 'video') shareId = 'main';
+    if (shareId) addRemoteScreenTrack(this.id, shareId, e.track);
+    else attachRemoteAudio(this.id, stream);
   }
 
-  sendScreen() {
-    if (!S.screenStream || this.screenTx.length) return;
-    const o = S.screenOpts;
-    this.signal({ kind: 'screen-meta', streamId: S.screenStream.id });
-    for (const track of S.screenStream.getTracks()) {
+  sendShare(shareId) {
+    const sh = S.myShares.get(shareId);
+    if (!sh || this.screenTx.has(shareId)) return;
+    const o = sh.opts;
+    this.signal({ kind: 'screen-meta', shareId, streamId: sh.stream.id });
+    const txs = [];
+    for (const track of sh.stream.getTracks()) {
       const isVideo = track.kind === 'video';
       const tx = this.pc.addTransceiver(track, {
         direction: 'sendonly',
-        streams: [S.screenStream],
+        streams: [sh.stream],
         sendEncodings: isVideo
           ? [{ maxBitrate: o.bitrate * 1000, maxFramerate: o.fps, priority: 'high', networkPriority: 'high' }]
           : [{ maxBitrate: 160000 }],
       });
       if (isVideo) preferCodecs(tx, 'video');
-      this.screenTx.push(tx);
+      txs.push(tx);
     }
+    this.screenTx.set(shareId, txs);
   }
 
-  stopScreen() {
-    if (!this.screenTx.length) return;
-    for (const tx of this.screenTx) {
+  stopShare(shareId, notify = true) {
+    const txs = this.screenTx.get(shareId);
+    if (!txs) return;
+    for (const tx of txs) {
       try {
         tx.sender.replaceTrack(null);
         tx.stop();
       } catch {}
     }
-    this.screenTx = [];
-    this.signal({ kind: 'screen-ended' });
+    this.screenTx.delete(shareId);
+    if (notify) this.signal({ kind: 'screen-ended', shareId });
+  }
+
+  // Belirli bir görüntü izinin (trackId) gelen istatistikleri
+  async inboundVideo(trackId) {
+    const report = await this.pc.getStats();
+    let stat = null;
+    let any = null;
+    report.forEach((x) => {
+      if (x.type === 'inbound-rtp' && x.kind === 'video') {
+        any = any || x;
+        if (!trackId || x.trackIdentifier === trackId) stat = x;
+      }
+    });
+    return { stat: stat || (trackId ? null : any), report };
   }
 
   async stats() {
-    const r = await this.pc.getStats();
-    let out = null;
-    r.forEach((s) => {
-      if (s.type === 'inbound-rtp' && s.kind === 'video') out = s;
-    });
-    return out;
+    return (await this.inboundVideo()).stat;
   }
 
   close() {
+    clearInterval(this.watchdog);
     try {
       this.pc.close();
     } catch {}
     detachRemoteAudio(this.id);
-    dropRemoteScreen(this.id);
-    S.watchers.delete(this.id);
+    dropUserScreens(this.id);
+    for (const sh of S.myShares.values()) sh.watchers.delete(this.id);
   }
 }
 
@@ -587,7 +622,6 @@ function syncPeers() {
     if (!want.has(id)) {
       p.close();
       S.peers.delete(id);
-      S.watching.delete(id);
     }
   }
   for (const id of want) if (!S.peers.has(id)) S.peers.set(id, new Peer(id));
@@ -597,13 +631,14 @@ function closeAllPeers() {
   for (const p of S.peers.values()) p.close();
   S.peers.clear();
   S.watching.clear();
-  S.watchers.clear();
+  for (const sh of S.myShares.values()) sh.watchers.clear();
 }
 
 // =====================================================================
-//  Ekran paylaşımı — gönderen
+//  Ekran paylaşımı — gönderen (aynı anda birden fazla yayın)
 // =====================================================================
 const RES = { 720: [1280, 720], 1080: [1920, 1080], 1440: [2560, 1440], 2160: [3840, 2160] };
+const MAX_SHARES = 3;
 function autoBitrate(res, fps) {
   const base = { 720: 2500, 1080: 4500, 1440: 8000, 2160: 14000, 0: 9000 }[res] || 4500;
   return Math.round(base * (fps >= 60 ? 1.6 : fps >= 30 ? 1 : 0.6));
@@ -614,8 +649,11 @@ let pickerType = 'screen';
 let pickerSelected = null;
 
 async function openPicker() {
-  if (S.screenStream) return stopShare();
   if (!S.channelId) return;
+  if (S.myShares.size >= MAX_SHARES) {
+    toast(`En fazla ${MAX_SHARES} yayın açabilirsin`, 'Yeni bir tane eklemek için önce birini durdur.');
+    return;
+  }
   const perm = await kanki.ensurePermissions();
   if (S.platform === 'darwin' && perm.screen !== 'granted' && perm.screen !== 'not-determined') {
     toast('Ekran kaydı izni gerekli', 'Sistem Ayarları › Gizlilik ve Güvenlik › Ekran Kaydı bölümünden Kanki’ye izin verip uygulamayı yeniden başlat.', 'err', 9000);
@@ -667,6 +705,9 @@ function renderSources() {
 
 async function goLive() {
   if (!pickerSelected) return;
+  const sourceId = pickerSelected;
+  const src = pickerSources.find((x) => x.id === sourceId);
+  const label = src ? (src.type === 'screen' ? src.name.replace(/^Entire screen$/i, 'Ekran') : src.name) : 'Ekran';
   const sh = (settings.share = {
     res: $('#opt-res').value,
     fps: $('#opt-fps').value,
@@ -684,16 +725,19 @@ async function goLive() {
     video.width = { max: RES[res][0] };
     video.height = { max: RES[res][1] };
   }
+  // Aynı anda birden fazla yayında sistem sesi sadece bir kez gönderilsin (yoksa yankı olur)
+  const audioTaken = [...S.myShares.values()].some((x) => x.stream.getAudioTracks().length);
+  const wantAudio = sh.audio && !audioTaken;
   let stream = null;
   const tryCapture = async (withAudio) => {
-    await kanki.selectSource(pickerSelected, withAudio);
+    await kanki.selectSource(sourceId, withAudio);
     return navigator.mediaDevices.getDisplayMedia({ video, audio: withAudio, selfBrowserSurface: 'exclude', systemAudio: 'include' });
   };
   try {
-    stream = await tryCapture(sh.audio);
+    stream = await tryCapture(wantAudio);
   } catch (e) {
     log('capture with audio failed', e);
-    if (sh.audio) {
+    if (wantAudio) {
       try {
         stream = await tryCapture(false);
         toast('Sistem sesi paylaşılamadı', 'Yayın sadece görüntü ile başlatıldı.');
@@ -707,120 +751,471 @@ async function goLive() {
     if (S.platform === 'darwin') kanki.openScreenSettings();
     return;
   }
-  startShareWithStream(stream, { fps, res, bitrate, hint: sh.hint });
+  if (sh.audio && audioTaken) toast('Sistem sesi diğer yayında', 'Ses yankı yapmasın diye sadece ilk yayına ekleniyor.');
+  addShare(stream, { fps, res, bitrate, hint: sh.hint }, label);
 }
 
-function startShareWithStream(stream, opts) {
+let shareSeq = 0;
+function sendShareStatus() {
+  send({
+    t: 'status',
+    sharing: S.myShares.size > 0,
+    shares: [...S.myShares.values()].map((x) => ({ id: x.id, label: x.label })),
+  });
+}
+
+function addShare(stream, opts, label) {
+  const id = 's' + Date.now().toString(36) + shareSeq++;
   const vt = stream.getVideoTracks()[0];
   if (vt) {
     vt.contentHint = opts.hint === 'detail' ? 'detail' : 'motion';
-    vt.addEventListener('ended', () => stopShare());
+    vt.addEventListener('ended', () => removeShare(id));
   }
-  S.screenStream = stream;
-  S.screenOpts = opts;
-  send({ t: 'status', sharing: true });
-  $('#self-preview').srcObject = stream;
-  const st = vt?.getSettings() || {};
-  $('#self-share-meta').textContent = `${st.width || '?'}×${st.height || '?'} · ${opts.fps} FPS · en fazla ${(opts.bitrate / 1000).toFixed(1)} Mbps${stream.getAudioTracks().length ? ' · sistem sesi açık' : ''}`;
+  // Aynı adı taşıyan yayınları ayırt et (ör. "Ekran", "Ekran 2")
+  let name = String(label || 'Ekran').slice(0, 60);
+  const taken = new Set([...S.myShares.values()].map((x) => x.label));
+  for (let n = 2; taken.has(name); n++) name = `${String(label || 'Ekran').slice(0, 55)} ${n}`;
+  S.myShares.set(id, { id, label: name, stream, opts, watchers: new Set() });
+  sendShareStatus();
   renderSelfShare();
-  // Zaten izlemek isteyen varsa (otomatik izleme) watch mesajı bekleriz.
   beep('unmute');
+  return id;
 }
 
-function stopShare() {
-  if (!S.screenStream) return;
-  for (const p of S.peers.values()) p.stopScreen();
-  S.screenStream.getTracks().forEach((t) => t.stop());
-  S.screenStream = null;
-  S.watchers.clear();
-  $('#self-preview').srcObject = null;
-  send({ t: 'status', sharing: false });
+function removeShare(id, notify = true) {
+  const sh = S.myShares.get(id);
+  if (!sh) return;
+  for (const p of S.peers.values()) p.stopShare(id, notify);
+  sh.stream.getTracks().forEach((t) => t.stop());
+  S.myShares.delete(id);
+  if (notify) {
+    sendShareStatus();
+    beep('mute');
+  }
   renderSelfShare();
-  beep('mute');
+}
+
+function stopAllShares(notify = true) {
+  for (const id of [...S.myShares.keys()]) removeShare(id, notify);
 }
 
 function renderSelfShare() {
-  const on = !!S.screenStream;
-  $('#self-share').classList.toggle('hidden', !on);
+  const box = $('#self-share');
+  const on = S.myShares.size > 0;
+  box.classList.toggle('hidden', !on);
   const btn = $('#btn-share');
-  btn.classList.toggle('live', on);
-  btn.querySelector('span').textContent = on ? 'Paylaşımı Durdur' : 'Ekran Paylaş';
-  if (on) {
-    const names = [...S.watchers].map(userName).filter(Boolean);
-    $('#self-share-viewers').textContent = names.length ? `İzleyenler (${names.length}): ${names.join(', ')}` : 'Henüz izleyen yok';
+  btn.querySelector('span').textContent = on ? 'Başka Ekran Paylaş' : 'Ekran Paylaş';
+  btn.disabled = !S.channelId || S.myShares.size >= MAX_SHARES;
+  btn.title = S.myShares.size >= MAX_SHARES ? `En fazla ${MAX_SHARES} yayın` : '';
+  const existing = new Map([...box.children].map((el) => [el.dataset.id, el]));
+  for (const [id, el] of existing) {
+    if (!S.myShares.has(id)) {
+      el.querySelector('video').srcObject = null;
+      el.remove();
+    }
+  }
+  for (const sh of S.myShares.values()) {
+    let el = existing.get(sh.id);
+    if (!el) {
+      const v = h('video', { autoplay: true, playsinline: true });
+      v.muted = true;
+      v.srcObject = sh.stream;
+      el = h(
+        'div',
+        { class: 'self-share-item', 'data-id': sh.id },
+        v,
+        h('div', { class: 'self-share-info' }, h('div', {}, h('span', { class: 'live' }, 'CANLI'), ' ', h('b', { class: 'ss-label' })), h('div', { class: 'muted ss-meta' }), h('div', { class: 'muted ss-viewers' })),
+        h('button', { class: 'btn danger sm', onclick: () => removeShare(sh.id) }, 'Durdur')
+      );
+      box.append(el);
+    }
+    const st = sh.stream.getVideoTracks()[0]?.getSettings() || {};
+    el.querySelector('.ss-label').textContent = sh.label;
+    el.querySelector('.ss-meta').textContent = `${st.width || '?'}×${st.height || '?'} · ${sh.opts.fps} FPS · en fazla ${(sh.opts.bitrate / 1000).toFixed(1)} Mbps${sh.stream.getAudioTracks().length ? ' · sistem sesi açık' : ''}`;
+    const names = [...sh.watchers].map(userName).filter(Boolean);
+    el.querySelector('.ss-viewers').textContent = names.length ? `İzleyenler (${names.length}): ${names.join(', ')}` : 'Henüz izleyen yok';
   }
 }
 
 // =====================================================================
-//  Ekran paylaşımı — izleyen
+//  Ekran paylaşımı — izleyen (birden fazla yayın, serbest yerleşim)
 // =====================================================================
-function watch(userId, on = true) {
+const shareKey = (uid, sid) => uid + '|' + sid;
+const splitKey = (key) => {
+  const i = key.indexOf('|');
+  return [key.slice(0, i), key.slice(i + 1)];
+};
+function sharesOf(u) {
+  if (!u) return [];
+  if (Array.isArray(u.shares) && u.shares.length) return u.shares;
+  return u.sharing ? [{ id: 'main', label: 'Ekran' }] : []; // eski sürüm / eski sunucu
+}
+function shareLabel(key) {
+  const [uid, sid] = splitKey(key);
+  const u = S.users.get(uid);
+  const list = sharesOf(u);
+  const sh = list.find((x) => x.id === sid);
+  const extra = sh && (list.length > 1 || sh.label !== 'Ekran') ? ' · ' + sh.label : '';
+  return (u?.name || '?') + extra;
+}
+const isWatchingUser = (uid) => [...S.watching].some((k) => k.startsWith(uid + '|'));
+
+function watchShare(userId, shareId, on = true) {
   const p = S.peers.get(userId);
   if (!p) return;
+  const key = shareKey(userId, shareId);
+  const sid = shareId === 'main' ? undefined : shareId;
   if (on) {
-    S.watching.add(userId);
-    S.focusedShare = userId;
-    p.signal({ kind: 'watch', on: true });
+    if (S.watching.has(key)) return;
+    S.watching.add(key);
+    placeTile(key);
+    p.signal({ kind: 'watch', shareId: sid, on: true });
   } else {
-    S.watching.delete(userId);
-    p.signal({ kind: 'watch', on: false });
-    dropRemoteScreen(userId);
-    if (S.focusedShare === userId) S.focusedShare = [...S.watching][0] || null;
+    S.watching.delete(key);
+    p.signal({ kind: 'watch', shareId: sid, on: false });
+    dropRemoteScreen(key);
   }
   renderStage();
 }
 
-function addRemoteScreenTrack(userId, track, stream) {
-  let sc = S.remoteScreens.get(userId);
+function watchUser(userId, on = true) {
+  for (const sh of sharesOf(S.users.get(userId))) watchShare(userId, sh.id, on);
+}
+
+function addRemoteScreenTrack(userId, shareId, track) {
+  const key = shareKey(userId, shareId);
+  let sc = S.remoteScreens.get(key);
   if (!sc) {
-    sc = { video: new MediaStream(), audioEl: null };
-    S.remoteScreens.set(userId, sc);
+    sc = { key, userId, shareId, video: new MediaStream(), audioEl: null, volume: 1, trackId: null };
+    S.remoteScreens.set(key, sc);
+  }
+  if (!S.watching.has(key)) {
+    S.watching.add(key);
+    placeTile(key);
   }
   if (track.kind === 'video') {
     sc.video.getVideoTracks().forEach((t) => sc.video.removeTrack(t));
     sc.video.addTrack(track);
+    sc.trackId = track.id;
     track.addEventListener('ended', () => renderStage());
+    const pop = popouts.get(key);
+    if (pop) pop.video.srcObject = sc.video;
   } else {
     if (!sc.audioEl) {
       sc.audioEl = new Audio();
       sc.audioEl.autoplay = true;
     }
     sc.audioEl.srcObject = new MediaStream([track]);
-    sc.audioEl.volume = Number($('#viewer-volume').value) / 100;
+    sc.audioEl.volume = sc.volume;
     sc.audioEl.muted = S.deafened;
     if (settings.outputId && sc.audioEl.setSinkId) sc.audioEl.setSinkId(settings.outputId).catch(() => {});
     sc.audioEl.play().catch(() => {});
   }
-  if (!S.focusedShare) S.focusedShare = userId;
   renderStage();
 }
 
-function dropRemoteScreen(userId) {
-  const sc = S.remoteScreens.get(userId);
+function dropRemoteScreen(key) {
+  const sc = S.remoteScreens.get(key);
   if (sc) {
     if (sc.audioEl) sc.audioEl.srcObject = null;
-    S.remoteScreens.delete(userId);
+    S.remoteScreens.delete(key);
   }
-  if (S.focusedShare === userId && !S.watching.has(userId)) S.focusedShare = [...S.watching][0] || null;
+  S.watching.delete(key);
+  const pop = popouts.get(key);
+  if (pop) {
+    popouts.delete(key);
+    try {
+      pop.win.close();
+    } catch {}
+  }
   renderStage();
 }
 
-let lastStats = null;
-async function updateViewerStats() {
-  const id = S.focusedShare;
-  const p = id && S.peers.get(id);
-  if (!p || $('#viewer').classList.contains('hidden')) return;
-  const s = await p.stats();
-  if (!s) return;
-  let kbps = 0;
-  if (lastStats && lastStats.id === s.id) kbps = ((s.bytesReceived - lastStats.bytes) * 8) / (s.timestamp - lastStats.ts);
-  lastStats = { id: s.id, bytes: s.bytesReceived, ts: s.timestamp };
-  const codec = s.codecId ? (await p.pc.getStats()).get(s.codecId)?.mimeType?.split('/')[1] : '';
-  $('#viewer-stats').textContent = s.frameWidth
-    ? `${s.frameWidth}×${s.frameHeight} · ${Math.round(s.framesPerSecond || 0)} FPS · ${(kbps / 1000).toFixed(1)} Mbps${codec ? ' · ' + codec : ''}`
-    : '';
+function dropUserScreens(userId) {
+  const keys = new Set([...S.watching, ...S.remoteScreens.keys()].filter((k) => k.startsWith(userId + '|')));
+  for (const k of keys) dropRemoteScreen(k);
 }
-setInterval(updateViewerStats, 1000);
+
+// ---------- Sahne düzeni: taşınabilir, boyutlandırılabilir yayın pencereleri ----------
+const tileEls = new Map(); // key -> element
+const popouts = new Map(); // key -> { win, video }
+let zTop = 10;
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const visibleTileKeys = () => [...S.watching].filter((k) => !popouts.has(k));
+
+function placeTile(key) {
+  if (!S.layoutCustom || S.layout.has(key)) return; // otomatik ızgarada yer render sırasında hesaplanır
+  const n = visibleTileKeys().length;
+  S.layout.set(key, { x: 4 + (n % 5) * 5, y: 4 + (n % 5) * 5, w: 48, h: 48 });
+}
+
+// Otomatik ızgara: yayınları 16:9 oranında, sahneye en büyük sığacak sütun sayısıyla dizer
+function gridLayout() {
+  const keys = visibleTileKeys();
+  const n = keys.length;
+  if (!n) return;
+  const box = $('#tiles').getBoundingClientRect();
+  const W = box.width || 1200;
+  const H = box.height || 700;
+  const GAP = 10; // px
+  const AR = 16 / 9;
+  const options = [];
+  for (let cols = 1; cols <= n; cols++) {
+    const rows = Math.ceil(n / cols);
+    const cellW = (W - GAP * (cols - 1)) / cols;
+    const cellH = (H - GAP * (rows - 1)) / rows;
+    const tw = Math.min(cellW, cellH * AR);
+    options.push({ cols, rows, tw, th: tw / AR, area: tw * (tw / AR) });
+  }
+  // En büyük boyuta yakın (%85) seçenekler arasından kareye en yakın ızgarayı seç
+  const maxArea = Math.max(...options.map((o) => o.area));
+  const best = options
+    .filter((o) => o.area >= maxArea * 0.85)
+    .sort((a, b) => Math.abs(a.cols - a.rows) - Math.abs(b.cols - b.rows) || b.area - a.area)[0];
+  const { cols, rows, tw, th } = best;
+  const totalH = rows * th + GAP * (rows - 1);
+  const top = (H - totalH) / 2;
+  keys.forEach((k, i) => {
+    const r = Math.floor(i / cols);
+    const c = i % cols;
+    const inRow = r === rows - 1 ? n - r * cols : cols;
+    const rowW = inRow * tw + GAP * (inRow - 1);
+    const left = (W - rowW) / 2; // her satırı ortala
+    const x = left + c * (tw + GAP);
+    const y = top + r * (th + GAP);
+    S.layout.set(k, { x: (x / W) * 100, y: (y / H) * 100, w: (tw / W) * 100, h: (th / H) * 100 });
+  });
+}
+
+function svgEl(html) {
+  const s = document.createElement('span');
+  s.innerHTML = html;
+  return s.firstElementChild;
+}
+const ICON_POP = '<svg viewBox="0 0 24 24"><path d="M14 3h7v7h-2V6.41l-9.29 9.3-1.42-1.42L17.59 5H14V3ZM5 5h6v2H5v12h12v-6h2v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z"/></svg>';
+const ICON_FULL = '<svg viewBox="0 0 24 24"><path d="M4 4h6v2H6v4H4V4Zm10 0h6v6h-2V6h-4V4ZM4 14h2v4h4v2H4v-6Zm14 0h2v6h-6v-2h4v-4Z"/></svg>';
+const ICON_MAX = '<svg viewBox="0 0 24 24"><path d="M4 4h16v16H4V4Zm2 2v12h12V6H6Z"/></svg>';
+const ICON_X = '<svg viewBox="0 0 24 24"><path d="M6.4 5 5 6.4 10.6 12 5 17.6 6.4 19l5.6-5.6 5.6 5.6 1.4-1.4-5.6-5.6L19 6.4 17.6 5 12 10.6z"/></svg>';
+
+function bringFront(el, key) {
+  el.style.zIndex = ++zTop;
+  S.activeTile = key;
+}
+
+function buildTile(key) {
+  const sc = S.remoteScreens.get(key);
+  const vol = h('input', { type: 'range', min: 0, max: 100, value: Math.round((sc?.volume ?? 1) * 100), title: 'Yayın sesi' });
+  vol.addEventListener('input', () => {
+    const cur = S.remoteScreens.get(key);
+    if (!cur) return;
+    cur.volume = Number(vol.value) / 100;
+    if (cur.audioEl) cur.audioEl.volume = cur.volume;
+  });
+  const btn = (title, icon, fn) => {
+    const b = h('button', { class: 'tile-btn', title });
+    b.append(svgEl(icon));
+    b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      fn();
+    });
+    return b;
+  };
+  const bar = h(
+    'div',
+    { class: 'tile-bar' },
+    h('span', { class: 'live' }, 'CANLI'),
+    h('span', { class: 'tile-name' }),
+    h('span', { class: 'tile-stats' }),
+    h('span', { class: 'spacer' }),
+    h('label', { class: 'tile-vol' }, svgEl(ICON.speaker), vol),
+    btn('Ayrı pencerede aç (istediğin yere, başka monitöre taşıyabilirsin)', ICON_POP, () => popOut(key)),
+    btn('Tam ekran (F)', ICON_FULL, () => tileFullscreen(key)),
+    btn('Sahneyi kapla / eski boyutuna dön (çift tıkla)', ICON_MAX, () => toggleMax(key)),
+    btn('İzlemeyi bırak', ICON_X, () => {
+      const [u, sid] = splitKey(key);
+      watchShare(u, sid, false);
+    })
+  );
+  const video = h('video', { autoplay: true, playsinline: true });
+  video.muted = true; // ses ayrı <audio> ile çalınıyor
+  const el = h('div', { class: 'tile', 'data-key': key }, video, h('div', { class: 'tile-waiting' }, 'Bağlanıyor…'), bar, h('div', { class: 'tile-resize', title: 'Boyutlandır' }));
+  bar.addEventListener('pointerdown', (e) => startDrag(e, key, el, 'move'));
+  el.querySelector('.tile-resize').addEventListener('pointerdown', (e) => startDrag(e, key, el, 'resize'));
+  el.addEventListener('pointerdown', () => bringFront(el, key), true);
+  bar.addEventListener('dblclick', (e) => !e.target.closest('button, input') && toggleMax(key));
+  video.addEventListener('dblclick', () => tileFullscreen(key));
+  for (const ev of ['loadeddata', 'playing']) video.addEventListener(ev, () => el.classList.remove('waiting'));
+  bringFront(el, key);
+  return el;
+}
+
+function startDrag(e, key, el, mode) {
+  if (e.button !== 0 || e.target.closest('button, input')) return;
+  e.preventDefault();
+  const box = $('#tiles').getBoundingClientRect();
+  if (el.classList.contains('maxed')) el.classList.remove('maxed');
+  const L = { ...(S.layout.get(key) || { x: 0, y: 0, w: 50, h: 50 }) };
+  const sx = e.clientX;
+  const sy = e.clientY;
+  el.classList.add('dragging');
+  const move = (ev) => {
+    const dx = ((ev.clientX - sx) / box.width) * 100;
+    const dy = ((ev.clientY - sy) / box.height) * 100;
+    const n =
+      mode === 'move'
+        ? { ...L, x: clamp(L.x + dx, 0, 100 - L.w), y: clamp(L.y + dy, 0, 100 - L.h) }
+        : { ...L, w: clamp(L.w + dx, 18, 100 - L.x), h: clamp(L.h + dy, 16, 100 - L.y) };
+    S.layout.set(key, n);
+    if (!S.layoutCustom) {
+      // İlk elle düzenlemede diğer pencerelerin mevcut yerleri sabitlensin
+      S.layoutCustom = true;
+    }
+    Object.assign(el.style, { left: n.x + '%', top: n.y + '%', width: n.w + '%', height: n.h + '%' });
+  };
+  const up = () => {
+    document.removeEventListener('pointermove', move);
+    document.removeEventListener('pointerup', up);
+    el.classList.remove('dragging');
+    $('#btn-grid').classList.toggle('hidden', visibleTileKeys().length < 1 || !S.layoutCustom);
+  };
+  document.addEventListener('pointermove', move);
+  document.addEventListener('pointerup', up);
+}
+
+function toggleMax(key) {
+  const el = tileEls.get(key);
+  if (!el) return;
+  el.classList.toggle('maxed');
+  bringFront(el, key);
+}
+
+function tileFullscreen(key) {
+  const el = tileEls.get(key);
+  if (!el) return;
+  if (document.fullscreenElement === el) document.exitFullscreen();
+  else el.requestFullscreen().catch(() => {});
+}
+
+function renderTiles() {
+  const box = $('#tiles');
+  const keys = visibleTileKeys();
+  if (!S.layoutCustom) gridLayout();
+  for (const [k, el] of tileEls) {
+    if (!keys.includes(k)) {
+      el.querySelector('video').srcObject = null;
+      el.remove();
+      tileEls.delete(k);
+    }
+  }
+  for (const k of keys) {
+    let el = tileEls.get(k);
+    if (!el) {
+      if (!S.layout.has(k)) placeTile(k);
+      el = buildTile(k);
+      tileEls.set(k, el);
+      box.append(el);
+    }
+    const L = S.layout.get(k) || { x: 5, y: 5, w: 50, h: 50 };
+    Object.assign(el.style, { left: L.x + '%', top: L.y + '%', width: L.w + '%', height: L.h + '%' });
+    el.querySelector('.tile-name').textContent = shareLabel(k);
+    const sc = S.remoteScreens.get(k);
+    const v = el.querySelector('video');
+    const want = sc?.video || null;
+    if (v.srcObject !== want) v.srcObject = want;
+    // İlk kare gelene kadar "Bağlanıyor…" göster
+    el.classList.toggle('waiting', !sc || !sc.video.getVideoTracks().length || v.readyState < 2);
+  }
+  $('#btn-grid').classList.toggle('hidden', keys.length < 1 || !S.layoutCustom);
+}
+
+// ---------- Ayrı pencere (pop-out) ----------
+function popOut(key) {
+  const existing = popouts.get(key);
+  if (existing) return existing.win.focus();
+  const sc = S.remoteScreens.get(key);
+  const win = window.open('', 'kanki-pop-' + key.replace(/[^a-z0-9]/gi, ''), 'width=1100,height=650');
+  if (!win) return toast('Pencere açılamadı', 'Tekrar dene.', 'err');
+  const d = win.document;
+  d.title = shareLabel(key) + ' — Kanki';
+  const style = d.createElement('style');
+  style.textContent = `
+    html,body{margin:0;height:100%;background:#000;overflow:hidden;color:#fff;font:13px -apple-system,"Segoe UI",sans-serif}
+    video{width:100%;height:100%;object-fit:contain;background:#000;display:block}
+    .bar{position:fixed;top:0;left:0;right:0;display:flex;gap:10px;align-items:center;padding:10px 12px 18px;
+      background:linear-gradient(rgba(0,0,0,.7),transparent);opacity:0;transition:opacity .15s}
+    body:hover .bar{opacity:1}
+    .live{background:#f0524f;font-weight:700;font-size:10.5px;padding:2px 7px;border-radius:4px;letter-spacing:.5px}
+    .nm{font-weight:600}.sp{flex:1}
+    button{background:rgba(255,255,255,.14);color:#fff;border:0;border-radius:8px;height:30px;padding:0 12px;cursor:pointer;font:inherit}
+    button:hover{background:rgba(255,255,255,.26)}`;
+  d.head.append(style);
+  d.body.innerHTML = '';
+  const video = d.createElement('video');
+  video.autoplay = true;
+  video.playsInline = true;
+  video.muted = true;
+  video.srcObject = sc?.video || null;
+  const bar = d.createElement('div');
+  bar.className = 'bar';
+  bar.innerHTML = '<span class="live">CANLI</span><span class="nm"></span><span class="sp"></span>';
+  bar.querySelector('.nm').textContent = shareLabel(key);
+  const fs = d.createElement('button');
+  fs.textContent = 'Tam ekran';
+  fs.onclick = () => (d.fullscreenElement ? d.exitFullscreen() : d.documentElement.requestFullscreen());
+  const back = d.createElement('button');
+  back.textContent = 'Uygulamaya geri al';
+  back.onclick = () => win.close();
+  bar.append(fs, back);
+  d.body.append(video, bar);
+  video.addEventListener('dblclick', () => fs.onclick());
+  video.play().catch(() => {});
+  popouts.set(key, { win, video });
+  const onGone = () => {
+    if (popouts.get(key)?.win === win) {
+      popouts.delete(key);
+      renderStage();
+    }
+  };
+  win.addEventListener('pagehide', onGone);
+  const poll = setInterval(() => {
+    if (win.closed) {
+      clearInterval(poll);
+      onGone();
+    }
+  }, 800);
+  renderStage();
+}
+
+function closeAllPopouts() {
+  for (const { win } of popouts.values()) {
+    try {
+      win.close();
+    } catch {}
+  }
+  popouts.clear();
+}
+window.addEventListener('beforeunload', closeAllPopouts);
+
+// ---------- Yayın istatistikleri (her pencerede) ----------
+const tileStats = new Map();
+async function updateTileStats() {
+  for (const [key, el] of tileEls) {
+    const sc = S.remoteScreens.get(key);
+    const p = sc && S.peers.get(sc.userId);
+    if (!p || !sc.trackId) continue;
+    const { stat, report } = await p.inboundVideo(sc.trackId);
+    if (!stat) continue;
+    const last = tileStats.get(key);
+    let kbps = 0;
+    if (last && last.id === stat.id) kbps = ((stat.bytesReceived - last.bytes) * 8) / (stat.timestamp - last.ts);
+    tileStats.set(key, { id: stat.id, bytes: stat.bytesReceived, ts: stat.timestamp });
+    const codec = stat.codecId ? report.get(stat.codecId)?.mimeType?.split('/')[1] : '';
+    el.querySelector('.tile-stats').textContent = stat.frameWidth
+      ? `${stat.frameWidth}×${stat.frameHeight} · ${Math.round(stat.framesPerSecond || 0)} FPS · ${(kbps / 1000).toFixed(1)} Mbps${codec ? ' · ' + codec : ''}`
+      : '';
+  }
+}
+setInterval(updateTileStats, 1000);
 
 // =====================================================================
 //  Sunucu bağlantısı
@@ -912,11 +1307,9 @@ function connect(url, password) {
 
 function onDisconnected() {
   closeAllPeers();
-  if (S.screenStream) {
-    S.screenStream.getTracks().forEach((t) => t.stop());
-    S.screenStream = null;
-    renderSelfShare();
-  }
+  stopAllShares(false);
+  closeAllPopouts();
+  S.knownShares = new Set();
   S.lastChannelId = S.channelId || S.lastChannelId;
   S.channelId = null;
   S.myId = null;
@@ -932,8 +1325,12 @@ function onDisconnected() {
 function disconnect() {
   S.intentionalClose = true;
   clearTimeout(S.reconnectTimer);
-  stopShare();
+  stopAllShares();
   closeAllPeers();
+  closeAllPopouts();
+  S.knownShares = new Set();
+  S.layout.clear();
+  S.layoutCustom = false;
   S.ws?.close();
   S.ws = null;
   S.channelId = S.lastChannelId = null;
@@ -980,8 +1377,10 @@ function onMessage(m) {
       if (S.channelId) S.lastChannelId = S.channelId;
       if (prevChannel !== S.channelId) {
         closeAllPeers();
-        if (S.screenStream) stopShare();
-        S.focusedShare = null;
+        stopAllShares(false); // sunucu kanal değişince yayınları zaten kapatır
+        closeAllPopouts();
+        S.layout.clear();
+        S.layoutCustom = false;
         renderChat();
       } else if (prevChannel) {
         // Kanal içi giriş/çıkış sesleri
@@ -991,21 +1390,24 @@ function onMessage(m) {
           if (u.channelId === S.channelId && u.id !== S.myId && S.users.get(u.id)?.channelId !== S.channelId) beep('leave');
       }
       syncPeers();
-      // Yayını kapatanları temizle, otomatik izleme
-      for (const id of [...S.watching]) {
-        const u = S.users.get(id);
-        if (!u || !u.sharing || u.channelId !== S.channelId) {
-          S.watching.delete(id);
-          dropRemoteScreen(id);
+      // Biten yayınları kapat, yeni yayınları otomatik izle
+      const liveKeys = new Set();
+      for (const u of S.users.values())
+        if (u.id !== S.myId && u.channelId === S.channelId) for (const sh of sharesOf(u)) liveKeys.add(shareKey(u.id, sh.id));
+      for (const key of [...S.watching]) if (!liveKeys.has(key)) dropRemoteScreen(key);
+      for (const key of liveKeys) {
+        if (S.knownShares.has(key)) continue;
+        const [uid, sid] = splitKey(key);
+        if (settings.autoWatch) {
+          setTimeout(() => {
+            const still = sharesOf(S.users.get(uid)).some((x) => x.id === sid);
+            if (still && !S.watching.has(key)) watchShare(uid, sid, true);
+          }, 300);
+        } else {
+          toast(`${userName(uid)} ekran paylaşıyor`, 'İzlemek için adına ya da üstteki yayın düğmesine tıkla.');
         }
       }
-      for (const u of S.users.values()) {
-        const was = prevUsers.get(u.id);
-        if (u.id !== S.myId && u.channelId === S.channelId && u.sharing && !(was && was.sharing && was.channelId === S.channelId)) {
-          if (settings.autoWatch) setTimeout(() => S.users.get(u.id)?.sharing && !S.watching.has(u.id) && watch(u.id, true), 300);
-          else toast(`${u.name} ekran paylaşıyor`, 'İzlemek için adına tıkla.');
-        }
-      }
+      S.knownShares = liveKeys;
       for (const id of audio.remote.keys()) applyRemoteVolume(id);
       renderAll();
       break;
@@ -1140,16 +1542,17 @@ function userRow(u, depth) {
   av.dataset.av = u.id;
   if (u.id === S.myId ? S.transmitting : audio.remote.get(u.id)?.speaking) av.classList.add('speaking');
   const badges = h('span', { class: 'badges' });
-  if (u.sharing)
+  const nShares = sharesOf(u).length;
+  if (nShares)
     badges.append(
       h(
         'span',
         {
           class: 'live-badge',
-          title: 'Ekran paylaşıyor — izlemek için tıkla',
-          onclick: () => u.id !== S.myId && u.channelId === S.channelId && watch(u.id, !S.watching.has(u.id) || S.focusedShare !== u.id),
+          title: nShares > 1 ? `${nShares} ekran paylaşıyor — izlemek için tıkla` : 'Ekran paylaşıyor — izlemek için tıkla',
+          onclick: () => u.id !== S.myId && u.channelId === S.channelId && watchUser(u.id, !isWatchingUser(u.id)),
         },
-        'CANLI'
+        nShares > 1 ? `CANLI ${nShares}` : 'CANLI'
       )
     );
   if (u.admin) badges.append(h('span', { class: 'crown', title: 'Yönetici' }, ICON_CROWN()));
@@ -1167,7 +1570,7 @@ function userRow(u, depth) {
       draggable: u.id === S.myId || S.isAdmin ? 'true' : null,
       ondragstart: (e) => e.dataTransfer.setData('text/kanki-user', u.id),
       oncontextmenu: (e) => userMenu(e, u),
-      ondblclick: () => u.sharing && u.id !== S.myId && u.channelId === S.channelId && watch(u.id, true),
+      ondblclick: () => sharesOf(u).length && u.id !== S.myId && u.channelId === S.channelId && watchUser(u.id, true),
     },
     av,
     h('span', { class: 'uname' }, u.name),
@@ -1185,54 +1588,58 @@ function renderStage() {
   $('#stage-sub').textContent = `${members.length} kişi`;
   $('#chat-head').textContent = ch ? `# ${ch.name}` : 'Sohbet';
 
-  // Yayın şeridi
-  const sharers = members.filter((u) => u.sharing && u.id !== S.myId);
+  // Yayın şeridi: kanaldaki her yayın için bir düğme
   const strip = $('#share-strip');
   strip.innerHTML = '';
-  strip.classList.toggle('hidden', sharers.length === 0);
-  for (const u of sharers) {
-    const active = S.focusedShare === u.id && S.watching.has(u.id);
-    strip.append(
-      h(
+  let pills = 0;
+  for (const u of members) {
+    if (u.id === S.myId) continue;
+    for (const sh of sharesOf(u)) {
+      const key = shareKey(u.id, sh.id);
+      const on = S.watching.has(key);
+      const popped = popouts.has(key);
+      const pill = h(
         'div',
         {
-          class: `share-pill ${active ? 'active' : ''}`,
+          class: `share-pill ${on ? 'active' : ''}`,
+          title: on ? (popped ? 'Ayrı pencerede — öne getirmek için tıkla' : 'Öne getir') : 'İzlemeye başla',
           onclick: () => {
-            if (!S.watching.has(u.id)) watch(u.id, true);
-            else {
-              S.focusedShare = u.id;
-              renderStage();
+            if (!on) return watchShare(u.id, sh.id, true);
+            if (popped) return popouts.get(key).win.focus();
+            const el = tileEls.get(key);
+            if (el) {
+              bringFront(el, key);
+              el.classList.remove('pulse');
+              void el.offsetWidth;
+              el.classList.add('pulse');
             }
           },
         },
         avatar(u.name),
         h('span', { class: 'dotlive' }),
-        `${u.name}${S.watching.has(u.id) ? '' : ' — İzle'}`
-      )
-    );
+        shareLabel(key) + (on ? (popped ? ' · ayrı pencerede' : '') : ' — İzle')
+      );
+      if (on) {
+        const x = h('span', { class: 'pill-x', title: 'İzlemeyi bırak' }, '×');
+        x.addEventListener('click', (e) => {
+          e.stopPropagation();
+          watchShare(u.id, sh.id, false);
+        });
+        pill.append(x);
+      }
+      strip.append(pill);
+      pills++;
+    }
   }
+  strip.classList.toggle('hidden', pills === 0);
 
-  // İzleyici
-  const viewer = $('#viewer');
-  const vid = $('#viewer-video');
-  const focus = S.focusedShare && S.watching.has(S.focusedShare) ? S.focusedShare : null;
-  if (focus) {
-    viewer.classList.remove('hidden');
-    $('#participants').classList.add('hidden');
-    $('#viewer-name').textContent = userName(focus);
-    const sc = S.remoteScreens.get(focus);
-    const want = sc?.video || null;
-    if (vid.srcObject !== want) vid.srcObject = want;
-    viewer.classList.toggle('waiting', !sc || !sc.video.getVideoTracks().length);
-    if (!sc) $('#viewer-stats').textContent = 'Bağlanıyor…';
-    if (sc?.audioEl) $('#viewer-volume').value = Math.round(sc.audioEl.volume * 100);
-  } else {
-    viewer.classList.add('hidden');
-    vid.srcObject = null;
-    $('#participants').classList.remove('hidden');
-    renderParticipants(members);
-  }
-  $('#btn-share').disabled = !S.channelId;
+  // İzlenen yayınlar sahnede serbest yerleşimli pencereler olarak durur
+  const showTiles = visibleTileKeys().length > 0;
+  $('#tiles').classList.toggle('hidden', !showTiles);
+  $('#participants').classList.toggle('hidden', showTiles);
+  renderTiles();
+  if (!showTiles) renderParticipants(members);
+  renderSelfShare();
 }
 
 function renderParticipants(members) {
@@ -1253,15 +1660,15 @@ function renderParticipants(members) {
       h(
         'div',
         {
-          class: `p-card ${u.sharing && isOther ? 'sharing' : ''}`,
-          onclick: () => u.sharing && isOther && watch(u.id, true),
+          class: `p-card ${sharesOf(u).length && isOther ? 'sharing' : ''}`,
+          onclick: () => sharesOf(u).length && isOther && watchUser(u.id, true),
           oncontextmenu: (e) => userMenu(e, u),
         },
-        u.sharing ? h('span', { class: 'live' }, 'CANLI') : null,
+        sharesOf(u).length ? h('span', { class: 'live' }, sharesOf(u).length > 1 ? `CANLI ${sharesOf(u).length}` : 'CANLI') : null,
         flags,
         av,
         h('div', { class: 'p-name' }, u.name + (u.id === S.myId ? ' (sen)' : '')),
-        u.sharing && isOther ? h('button', { class: 'btn share watch-btn' }, 'Yayını İzle') : null
+        sharesOf(u).length && isOther ? h('button', { class: 'btn share watch-btn' }, sharesOf(u).length > 1 ? 'Yayınları İzle' : 'Yayını İzle') : null
       )
     );
   }
@@ -1366,7 +1773,7 @@ function userMenu(e, u) {
       },
     },
     '-',
-    u.sharing && sameChannel && { label: S.watching.has(u.id) ? 'Yayını izlemeyi bırak' : 'Yayını izle', run: () => watch(u.id, !S.watching.has(u.id)) },
+    sharesOf(u).length && sameChannel && { label: isWatchingUser(u.id) ? 'Yayınlarını izlemeyi bırak' : 'Yayınlarını izle', run: () => watchUser(u.id, !isWatchingUser(u.id)) },
     {
       label: settings.localMutes[u.name] ? 'Sesini aç (yerel)' : 'Sustur (sadece benim için)',
       run: () => {
@@ -1503,7 +1910,7 @@ function toggleDeafen() {
   beep(S.deafened ? 'mute' : 'unmute');
   send({ t: 'status', muted: S.muted, deafened: S.deafened });
   for (const id of audio.remote.keys()) applyRemoteVolume(id);
-  for (const id of S.remoteScreens.keys()) applyRemoteVolume(id);
+  applyScreenVolumes();
   renderControls();
 }
 
@@ -1652,7 +2059,7 @@ window.addEventListener('keydown', (e) => {
     e.preventDefault();
     toggleDeafen();
   }
-  if (e.key === 'f' && document.activeElement?.tagName !== 'INPUT' && !$('#viewer').classList.contains('hidden')) toggleFullscreen();
+  if (e.key === 'f' && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName || '') && tileEls.size) toggleFullscreen();
   if (e.key === 'Escape') {
     hideCtx();
     $$('.modal').forEach((m) => m.classList.add('hidden'));
@@ -1666,8 +2073,9 @@ window.addEventListener('blur', () => {
 });
 
 function toggleFullscreen() {
-  if (document.fullscreenElement) document.exitFullscreen();
-  else $('#viewer').requestFullscreen().catch(() => {});
+  if (document.fullscreenElement) return document.exitFullscreen();
+  const key = S.activeTile && tileEls.has(S.activeTile) ? S.activeTile : [...tileEls.keys()][0];
+  if (key) tileFullscreen(key);
 }
 
 // =====================================================================
@@ -1841,16 +2249,14 @@ $('#btn-deafen').addEventListener('click', toggleDeafen);
 $('#btn-settings').addEventListener('click', openSettings);
 $('#btn-disconnect').addEventListener('click', disconnect);
 $('#btn-share').addEventListener('click', openPicker);
-$('#btn-stop-share').addEventListener('click', stopShare);
 $('#btn-go-live').addEventListener('click', goLive);
 $('#btn-add-channel').addEventListener('click', () => promptChannel(null));
-$('#btn-viewer-full').addEventListener('click', toggleFullscreen);
-$('#viewer-video').addEventListener('dblclick', toggleFullscreen);
-$('#btn-viewer-stop').addEventListener('click', () => S.focusedShare && watch(S.focusedShare, false));
-$('#viewer-volume').addEventListener('input', (e) => {
-  const sc = S.remoteScreens.get(S.focusedShare);
-  if (sc?.audioEl) sc.audioEl.volume = Number(e.target.value) / 100;
+$('#btn-grid').addEventListener('click', () => {
+  S.layoutCustom = false;
+  for (const el of tileEls.values()) el.classList.remove('maxed');
+  renderStage();
 });
+window.addEventListener('resize', () => tileEls.size && renderTiles());
 $$('#picker-tabs .tab').forEach((t) =>
   t.addEventListener('click', () => {
     $$('#picker-tabs .tab').forEach((x) => x.classList.toggle('active', x === t));
@@ -2245,7 +2651,34 @@ $('#btn-update').addEventListener('click', () => {
         g.font = '30px -apple-system, sans-serif';
         g.fillText('Bölüm 3 · Gün batımı vadisi', 90, 158);
       }, 1000 / 30);
-      startShareWithStream(c.captureStream(30), { fps: 30, res: 1080, bitrate: 6000, hint: 'detail' });
+      addShare(c.captureStream(30), { fps: 30, res: 1080, bitrate: 6000, hint: 'motion' }, 'Oyun');
+      if (t.shares >= 2) {
+        // İkinci test yayını: kod editörü görünümü
+        const c2 = document.createElement('canvas');
+        c2.width = 1600;
+        c2.height = 900;
+        const g2 = c2.getContext('2d');
+        let k = 0;
+        const lines = ['function kanki() {', '  const arkadaslar = ["Ali", "Deniz", "Emin"];', '  for (const a of arkadaslar) {', '    selamla(a);', '  }', '  return "ekran paylaşımı açık";', '}'];
+        setInterval(() => {
+          k++;
+          g2.fillStyle = '#1e1f29';
+          g2.fillRect(0, 0, 1600, 900);
+          g2.fillStyle = '#282a36';
+          g2.fillRect(0, 0, 1600, 54);
+          g2.fillStyle = '#8be9fd';
+          g2.font = '24px Menlo, monospace';
+          g2.fillText('kanki.js — Kod editörü', 24, 36);
+          g2.font = '30px Menlo, monospace';
+          lines.forEach((ln, i) => {
+            g2.fillStyle = '#6272a4';
+            g2.fillText(String(i + 1).padStart(2, ' '), 30, 130 + i * 52);
+            g2.fillStyle = i === (k >> 4) % lines.length ? '#f1fa8c' : '#f8f8f2';
+            g2.fillText(ln, 100, 130 + i * 52);
+          });
+        }, 1000 / 30);
+        addShare(c2.captureStream(30), { fps: 30, res: 1080, bitrate: 4000, hint: 'detail' }, 'Kod editörü');
+      }
     }
     setInterval(async () => {
       const report = { me: S.myName, peers: [] };
@@ -2258,8 +2691,8 @@ $('#btn-update').addEventListener('click', () => {
           speakingAudio: audio.remote.has(p.id),
         });
       }
-      report.watching = [...S.watching].map(userName);
-      report.watchers = [...S.watchers].map(userName);
+      report.watching = [...S.watching].map(shareLabel);
+      report.myShares = [...S.myShares.values()].map((x) => `${x.label}: ${[...x.watchers].map(userName).join(',')}`);
       console.log('AUTOTEST ' + JSON.stringify(report));
     }, 3000);
   }
