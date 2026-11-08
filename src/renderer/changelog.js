@@ -6,6 +6,15 @@
  */
 const CHANGELOG = [
   {
+    version: '1.0.15',
+    date: '2026-11-09',
+    title: 'Yayını düzenle',
+    added: [
+      'Yayın yaparken "Düzenle": paylaşılan ekranı ya da pencereyi yayını durdurmadan değiştir; izleyenler aynı pencerede kesintisiz izlemeye devam eder.',
+      'Düzenle ile çözünürlük, kare hızı, öncelik ve bit hızı anında değişir; sistem sesi açılıp kapatılabilir.',
+    ],
+  },
+  {
     version: '1.0.14',
     date: '2026-11-09',
     title: 'Müzik botu ve yazı stilleri',

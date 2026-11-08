@@ -657,6 +657,31 @@ class Peer {
     this.screenTx.set(shareId, txs);
   }
 
+  // Yayın düzenlenince: aynı gönderim kanalında izi değiştir (yeniden bağlanma yok)
+  async replaceShareTrack(shareId, kind, track) {
+    const tx = (this.screenTx.get(shareId) || []).find((t) => t.receiver.track.kind === kind);
+    if (tx) await tx.sender.replaceTrack(track).catch((e) => log('replaceTrack', e.message));
+  }
+  addShareTrack(shareId, track, stream) {
+    const txs = this.screenTx.get(shareId);
+    if (!txs) return;
+    txs.push(this.pc.addTransceiver(track, { direction: 'sendonly', streams: [stream], sendEncodings: [{ maxBitrate: 160000 }] }));
+  }
+  async updateShareEncoding(shareId, bitrate, fps) {
+    for (const tx of this.screenTx.get(shareId) || []) {
+      if (tx.receiver.track.kind !== 'video') continue;
+      try {
+        const p = tx.sender.getParameters();
+        if (!p.encodings?.length) continue;
+        p.encodings[0].maxBitrate = bitrate * 1000;
+        p.encodings[0].maxFramerate = fps;
+        await tx.sender.setParameters(p);
+      } catch (e) {
+        log('setParameters', e.message);
+      }
+    }
+  }
+
   stopShare(shareId, notify = true) {
     const txs = this.screenTx.get(shareId);
     if (!txs) return;
@@ -753,13 +778,16 @@ function autoBitrate(res, fps) {
 let pickerSources = [];
 let pickerType = 'screen';
 let pickerSelected = null;
+let pickerEdit = null; // düzenlenen yayının kimliği (yoksa yeni yayın)
 
 const myScreenShares = () => [...S.myShares.values()].filter((x) => x.kind !== 'camera');
 const myCamera = () => [...S.myShares.values()].find((x) => x.kind === 'camera') || null;
 
-async function openPicker() {
+async function openPicker(arg) {
   if (!S.channelId) return;
-  if (myScreenShares().length >= MAX_SHARES) {
+  const editId = typeof arg === 'string' && S.myShares.has(arg) ? arg : null;
+  pickerEdit = editId;
+  if (!editId && myScreenShares().length >= MAX_SHARES) {
     toast(`En fazla ${MAX_SHARES} yayın açabilirsin`, 'Yeni bir tane eklemek için önce birini durdur.');
     return;
   }
@@ -768,17 +796,26 @@ async function openPicker() {
     toast('Ekran kaydı izni gerekli', 'Sistem Ayarları › Gizlilik ve Güvenlik › Ekran Kaydı bölümünden Kanki’ye izin verip uygulamayı yeniden başlat.', 'err', 9000);
     kanki.openScreenSettings();
   }
-  const sh = settings.share;
+  const cur = editId ? S.myShares.get(editId) : null;
+  const sh = cur
+    ? { res: String(cur.opts.res), fps: String(cur.opts.fps), hint: cur.opts.hint, bitrate: String(cur.opts.bitrateSel ?? 0), audio: !!cur.stream.getAudioTracks().length }
+    : settings.share;
   $('#opt-res').value = sh.res;
   $('#opt-fps').value = sh.fps;
   $('#opt-hint').value = sh.hint;
   $('#opt-bitrate').value = sh.bitrate;
   $('#opt-audio').checked = sh.audio;
+  $('#picker-title').textContent = cur ? `Yayını düzenle: ${cur.label}` : 'Ekran Paylaş';
+  $('#btn-go-live').textContent = cur ? 'Değişiklikleri uygula' : 'Yayına Başla';
   $('#picker-note').textContent =
     (S.platform === 'darwin' ? 'macOS 14.2+ gerekir. ' : '') +
     'Sistem sesi, pencere seçsen de bilgisayarın tüm sesini gönderir; Kanki’den duyduğun arkadaş sesleri hariç.';
-  pickerSelected = null;
-  $('#btn-go-live').disabled = true;
+  pickerSelected = cur ? cur.opts.sourceId || null : null;
+  if (cur) {
+    pickerType = cur.opts.surface === 'window' ? 'window' : 'screen';
+    $$('#picker-tabs .tab').forEach((x) => x.classList.toggle('active', x.dataset.type === pickerType));
+  }
+  $('#btn-go-live').disabled = !cur;
   $('#sources').innerHTML = '<div class="muted">Kaynaklar yükleniyor…</div>';
   showModal('picker');
   pickerSources = await kanki.getSources();
@@ -793,10 +830,12 @@ function renderSources() {
   for (const s of list) {
     const thumb = h('div', { class: 'thumb' });
     if (s.thumbnail) thumb.style.backgroundImage = `url(${s.thumbnail})`;
+    const isCurrent = pickerEdit && S.myShares.get(pickerEdit)?.opts.sourceId === s.id;
+    if (isCurrent) thumb.append(h('span', { class: 'src-current' }, 'Şu an paylaşılan'));
     const card = h(
       'div',
       {
-        class: `source ${pickerSelected === s.id ? 'selected' : ''}`,
+        class: `source ${pickerSelected === s.id ? 'selected' : ''} ${isCurrent ? 'current' : ''}`,
         onclick: () => {
           pickerSelected = s.id;
           $('#btn-go-live').disabled = false;
@@ -828,36 +867,18 @@ async function goLive() {
   });
   saveSettings();
   hideModal('picker');
+  const editId = pickerEdit;
+  pickerEdit = null;
   const fps = Number(sh.fps);
   const res = Number(sh.res);
   const bitrate = Number(sh.bitrate) || autoBitrate(res, fps);
-  const video = { frameRate: { ideal: fps, max: fps } };
-  if (RES[res]) {
-    video.width = { max: RES[res][0] };
-    video.height = { max: RES[res][1] };
-  }
+  const surface = src?.type === 'window' ? 'window' : 'screen';
+  if (editId) return applyShareEdit(editId, { sourceId, label, surface, fps, res, bitrate, bitrateSel: sh.bitrate, hint: sh.hint, audio: sh.audio });
+  const video = videoConstraints(res, fps);
   // Aynı anda birden fazla yayında sistem sesi sadece bir kez gönderilsin (yoksa yankı olur)
   const audioTaken = [...S.myShares.values()].some((x) => x.stream.getAudioTracks().length);
   const wantAudio = sh.audio && !audioTaken;
-  let stream = null;
-  let audioMode = false;
-  // audioMode: 'clean' = Kanki'nin kendi sesi hariç sistem sesi (yankı yok), 'plain' = tüm sistem sesi, false = sessiz
-  const tryCapture = async (mode) => {
-    await kanki.selectSource(sourceId, mode);
-    const audio = mode
-      ? { echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: 2, sampleRate: 48000, suppressLocalAudioPlayback: false }
-      : false;
-    return navigator.mediaDevices.getDisplayMedia({ video, audio, selfBrowserSurface: 'exclude', systemAudio: 'include' });
-  };
-  for (const mode of wantAudio ? ['clean', 'plain', false] : [false]) {
-    try {
-      stream = await tryCapture(mode);
-      audioMode = mode && stream.getAudioTracks().length ? mode : false;
-      break;
-    } catch (e) {
-      log('capture failed', mode, e?.name, e?.message);
-    }
-  }
+  const { stream, audioMode } = await captureDisplay(sourceId, video, wantAudio);
   if (stream && wantAudio) {
     if (audioMode === 'plain') toast('Sistem sesi yankı korumasız', 'Bu bilgisayar Kanki’nin kendi sesini ayıramadı; izleyenler kendi seslerini geri duyabilir. Kulaklık kullanman yankıyı azaltır.', '', 8000);
     else if (!audioMode) toast('Sistem sesi paylaşılamadı', 'Yayın sadece görüntü ile başlatıldı.');
@@ -868,7 +889,126 @@ async function goLive() {
     return;
   }
   if (sh.audio && audioTaken) toast('Sistem sesi diğer yayında', 'Ses yankı yapmasın diye sadece ilk yayına ekleniyor.');
-  addShare(stream, { fps, res, bitrate, hint: sh.hint, audioMode, sourceId, surface: src?.type === 'window' ? 'window' : 'screen' }, label);
+  addShare(stream, { fps, res, bitrate, bitrateSel: sh.bitrate, hint: sh.hint, audioMode, sourceId, surface }, label);
+}
+
+function videoConstraints(res, fps) {
+  const video = { frameRate: { ideal: fps, max: fps } };
+  if (RES[res]) {
+    video.width = { max: RES[res][0] };
+    video.height = { max: RES[res][1] };
+  }
+  return video;
+}
+// Ekran/pencere yakala. audioMode: 'clean' = Kanki'nin kendi sesi hariç sistem sesi (yankı yok),
+// 'plain' = tüm sistem sesi, false = sessiz. Önce yankısız, olmazsa düz, o da olmazsa sessiz dener.
+async function captureDisplay(sourceId, video, wantAudio) {
+  const tryCapture = async (mode) => {
+    await kanki.selectSource(sourceId, mode);
+    const audio = mode
+      ? { echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: 2, sampleRate: 48000, suppressLocalAudioPlayback: false }
+      : false;
+    return navigator.mediaDevices.getDisplayMedia({ video, audio, selfBrowserSurface: 'exclude', systemAudio: 'include' });
+  };
+  for (const mode of wantAudio ? ['clean', 'plain', false] : [false]) {
+    try {
+      const stream = await tryCapture(mode);
+      return { stream, audioMode: mode && stream.getAudioTracks().length ? mode : false };
+    } catch (e) {
+      log('capture failed', mode, e?.name, e?.message);
+    }
+  }
+  return { stream: null, audioMode: false };
+}
+
+// Sistem sesi ölçeri (yayın panelindeki "ses gidiyor mu" çubuğu)
+function shareAnalyser(at) {
+  if (!at) return null;
+  at.contentHint = 'music'; // kodlayıcı konuşmaya göre değil müziğe göre ayarlansın
+  at.applyConstraints({ echoCancellation: false, noiseSuppression: false, autoGainControl: false }).catch(() => {});
+  try {
+    const ctx = getCtx();
+    const an = ctx.createAnalyser();
+    an.fftSize = 1024;
+    ctx.createMediaStreamSource(new MediaStream([at])).connect(an); // hoparlöre bağlanmaz, sadece ölçer
+    return an;
+  } catch {
+    return null;
+  }
+}
+
+// Yayını durdurmadan düzenle: kaynağı değiştir (izleyenler kesintisiz devam eder), kaliteyi ve sistem sesini ayarla
+async function applyShareEdit(id, o) {
+  const sh = S.myShares.get(id);
+  if (!sh) return;
+  const sourceChanged = !!o.sourceId && o.sourceId !== sh.opts.sourceId;
+  const hadAudio = sh.stream.getAudioTracks().length > 0;
+  const audioTakenElsewhere = [...S.myShares.values()].some((x) => x.id !== id && x.stream.getAudioTracks().length);
+  const wantAudio = !!o.audio && !audioTakenElsewhere;
+  const watchers = () => [...sh.watchers].map((pid) => S.peers.get(pid)).filter(Boolean);
+  const changes = [];
+  // 1) Yeni kaynak ya da sistem sesi açılacaksa yeniden yakala (eski yayın bu sırada sürer)
+  if (sourceChanged || (wantAudio && !hadAudio)) {
+    const cap = await captureDisplay(sourceChanged ? o.sourceId : sh.opts.sourceId, videoConstraints(o.res, o.fps), wantAudio && !hadAudio);
+    if (!cap.stream) return toast('Yayın değiştirilemedi', 'Yeni kaynak yakalanamadı; yayın eskisi gibi devam ediyor.', 'err', 7000);
+    const nv = cap.stream.getVideoTracks()[0];
+    if (sourceChanged && nv) {
+      const ov = sh.stream.getVideoTracks()[0];
+      nv.addEventListener('ended', () => removeShare(id));
+      for (const p of watchers()) await p.replaceShareTrack(id, 'video', nv);
+      if (ov) {
+        sh.stream.removeTrack(ov);
+        ov.stop();
+      }
+      sh.stream.addTrack(nv); // aynı akış kimliği: izleyenler yayını aynı pencerede görmeye devam eder
+      changes.push('kaynak');
+    } else if (nv) nv.stop();
+    const na = cap.stream.getAudioTracks()[0];
+    if (na && wantAudio && !hadAudio) {
+      sh.stream.addTrack(na);
+      for (const p of watchers()) p.addShareTrack(id, na, sh.stream);
+      sh.analyser = shareAnalyser(na);
+      sh.opts.audioMode = cap.audioMode;
+      changes.push('sistem sesi açıldı');
+    } else if (na) na.stop();
+    if (wantAudio && !hadAudio && !na) toast('Sistem sesi eklenemedi', 'Yayın görüntü ile devam ediyor.');
+  }
+  // 2) Sistem sesi kapatılacaksa
+  if (!wantAudio && hadAudio) {
+    const oa = sh.stream.getAudioTracks()[0];
+    for (const p of watchers()) await p.replaceShareTrack(id, 'audio', null);
+    sh.stream.removeTrack(oa);
+    oa.stop();
+    sh.analyser = null;
+    sh.opts.audioMode = false;
+    changes.push('sistem sesi kapatıldı');
+  }
+  // 3) Kalite: yeniden yakalamadan anında uygulanır
+  const vt = sh.stream.getVideoTracks()[0];
+  const qualityChanged = o.fps !== sh.opts.fps || o.res !== sh.opts.res || o.bitrate !== sh.opts.bitrate || o.hint !== sh.opts.hint;
+  if (vt) {
+    vt.contentHint = o.hint === 'detail' ? 'detail' : 'motion';
+    await vt.applyConstraints(videoConstraints(o.res, o.fps)).catch((e) => log('constraints', e.message));
+  }
+  for (const p of S.peers.values()) await p.updateShareEncoding(id, o.bitrate, o.fps);
+  if (qualityChanged) changes.push('kalite');
+  Object.assign(sh.opts, { fps: o.fps, res: o.res, bitrate: o.bitrate, bitrateSel: o.bitrateSel, hint: o.hint });
+  if (sourceChanged) {
+    Object.assign(sh.opts, { sourceId: o.sourceId, surface: o.surface });
+    sh.label = uniqueShareLabel(o.label, id);
+    // İzleyenlere yeni kaynağın türünü bildir (pencerede uzaktan kontrol olmaz)
+    for (const p of watchers()) p.signal({ kind: 'screen-meta', shareId: id, streamId: sh.stream.id, surface: o.surface });
+    if (S.rcHost?.shareId === id) stopRcHost(true, 'Yayın kaynağı değiştiği için uzaktan kontrol durduruldu.');
+    sendShareStatus();
+  }
+  renderSelfShare();
+  toast('Yayın güncellendi', changes.length ? `Değişen: ${changes.join(', ')}. İzleyenler kesintisiz izlemeye devam ediyor.` : 'Değişiklik yok.');
+}
+function uniqueShareLabel(label, exceptId) {
+  let name = String(label || 'Ekran').slice(0, 60);
+  const taken = new Set([...S.myShares.values()].filter((x) => x.id !== exceptId).map((x) => x.label));
+  for (let n = 2; taken.has(name); n++) name = `${String(label || 'Ekran').slice(0, 55)} ${n}`;
+  return name;
 }
 
 let shareSeq = 0;
@@ -891,18 +1031,7 @@ function addShare(stream, opts, label) {
   let name = String(label || 'Ekran').slice(0, 60);
   const taken = new Set([...S.myShares.values()].map((x) => x.label));
   for (let n = 2; taken.has(name); n++) name = `${String(label || 'Ekran').slice(0, 55)} ${n}`;
-  const at = stream.getAudioTracks()[0];
-  let analyser = null;
-  if (at) {
-    at.contentHint = 'music'; // kodlayıcı konuşmaya göre değil müziğe göre ayarlansın
-    at.applyConstraints({ echoCancellation: false, noiseSuppression: false, autoGainControl: false }).catch(() => {});
-    try {
-      const ctx = getCtx();
-      analyser = ctx.createAnalyser();
-      analyser.fftSize = 1024;
-      ctx.createMediaStreamSource(new MediaStream([at])).connect(analyser); // hoparlöre bağlanmaz, sadece ölçer
-    } catch {}
-  }
+  const analyser = shareAnalyser(stream.getAudioTracks()[0]);
   S.myShares.set(id, { id, label: name, stream, opts, kind: opts.kind || 'screen', watchers: new Set(), analyser, lastSound: 0 });
   sendShareStatus();
   renderSelfShare();
@@ -997,7 +1126,7 @@ function renderSelfShare() {
           h('div', { class: 'ss-audio' }, h('span', { class: 'ss-audio-label' }), h('span', { class: 'ss-meter' }, h('span', { class: 'ss-meter-fill' }))),
           h('div', { class: 'muted ss-viewers' })
         ),
-        h('button', { class: 'btn danger sm', onclick: () => removeShare(sh.id) }, 'Durdur')
+        h('div', { class: 'ss-btns' }, h('button', { class: 'btn sm', title: 'Kaynağı (ekran/pencere), kaliteyi ve sistem sesini yayını durdurmadan değiştir', onclick: () => openPicker(sh.id) }, 'Düzenle'), h('button', { class: 'btn danger sm', onclick: () => removeShare(sh.id) }, 'Durdur'))
       );
       box.append(el);
     }
