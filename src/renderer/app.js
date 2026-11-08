@@ -3201,10 +3201,87 @@ setInterval(updateVoiceState, 1500);
 window.addEventListener('resize', () => !$('#participants').classList.contains('hidden') && renderStage());
 
 // =====================================================================
+//  Yenilikler: güncellemeden sonra, eski sürümden yenisine kadar olan değişiklikler
+// =====================================================================
+const LAST_VERSION_KEY = 'kanki-last-version';
+const CL_TYPES = [
+  ['added', 'Yeni'],
+  ['changed', 'Değişti'],
+  ['fixed', 'Düzeltildi'],
+  ['removed', 'Kaldırıldı'],
+];
+function cmpVer(a, b) {
+  const pa = String(a).split('.').map(Number);
+  const pb = String(b).split('.').map(Number);
+  for (let i = 0; i < 3; i++) {
+    const d = (pa[i] || 0) - (pb[i] || 0);
+    if (d) return d;
+  }
+  return 0;
+}
+function showWhatsNew(from, to, all = false) {
+  const list = (typeof CHANGELOG !== 'undefined' ? CHANGELOG : [])
+    .filter((e) => cmpVer(e.version, to) <= 0 && (all || cmpVer(e.version, from) > 0))
+    .sort((a, b) => cmpVer(b.version, a.version));
+  if (!list.length) return false;
+  $('#wn-title').textContent = all ? 'Sürüm notları' : 'Kanki güncellendi';
+  $('#wn-sub').innerHTML = all
+    ? `Şu an kullandığın sürüm: <b>${esc(to)}</b>`
+    : `<span class="wn-ver old">${esc(from)}</span><span class="wn-arrow">→</span><span class="wn-ver">${esc(to)}</span>`;
+  const totals = { added: 0, changed: 0, fixed: 0, removed: 0 };
+  const body = $('#wn-body');
+  body.innerHTML = '';
+  for (const e of list) {
+    const sec = h(
+      'section',
+      { class: 'wn-release' },
+      h('div', { class: 'wn-rel-head' }, h('span', { class: 'wn-rel-ver' }, e.version), h('span', { class: 'wn-rel-title' }, e.title || ''), h('span', { class: 'wn-rel-date' }, e.date ? new Date(e.date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' }) : ''))
+    );
+    for (const [type, label] of CL_TYPES) {
+      const items = e[type] || [];
+      if (!items.length) continue;
+      totals[type] += items.length;
+      const ul = h('ul', { class: 'wn-list' });
+      for (const it of items) {
+        const li = h('li', {}, h('span', { class: `wn-tag ${type}` }, label), h('span', { class: 'wn-text' }));
+        li.querySelector('.wn-text').innerHTML = formatText(it);
+        ul.append(li);
+      }
+      sec.append(ul);
+    }
+    body.append(sec);
+  }
+  const sum = $('#wn-summary');
+  sum.innerHTML = '';
+  for (const [type, label] of CL_TYPES)
+    if (totals[type]) sum.append(h('span', { class: `wn-count ${type}` }, h('b', {}, String(totals[type])), ` ${label.toLowerCase()}`));
+  $('#wn-note').textContent = all ? '' : list.length > 1 ? `${list.length} sürümün değişiklikleri` : '';
+  body.scrollTop = 0;
+  showModal('whatsnew');
+  return true;
+}
+function checkWhatsNew(current) {
+  let last = null;
+  try {
+    last = localStorage.getItem(LAST_VERSION_KEY);
+    if (!last && localStorage.getItem('kanki-settings')) {
+      // Bu özellik gelmeden önce kullananlar: önceki sürümü bilmiyoruz, en azından bu sürümün notlarını göster
+      const older = (typeof CHANGELOG !== 'undefined' ? CHANGELOG : []).map((e) => e.version).filter((v) => cmpVer(v, current) < 0).sort(cmpVer).pop();
+      last = older || null;
+    }
+    localStorage.setItem(LAST_VERSION_KEY, current);
+  } catch {}
+  if (last && cmpVer(current, last) > 0) setTimeout(() => showWhatsNew(last, current), 600);
+}
+$('#btn-release-notes').addEventListener('click', () => showWhatsNew('0.0.0', S.appVersion || '999.0.0', true));
+
+// =====================================================================
 //  Başlangıç
 // =====================================================================
 (async function init() {
   const info = await kanki.info();
+  S.appVersion = info.version;
+  checkWhatsNew(info.version);
   $('#about-name').textContent = info.title;
   $('#about-version').textContent = `Sürüm ${info.version} · ${info.platform === 'darwin' ? 'macOS' : info.platform === 'win32' ? 'Windows' : info.platform}`;
   S.platform = info.platform;
