@@ -3,25 +3,26 @@
    Bölgeler kenarlıkla değil, arka plan tonuyla ayrılır.
    ===================================================================== */
 :root {
-  --bg-0: #1e1f22; /* en koyu: başlık çubuğu, giriş kutuları */
-  --bg-1: #2b2d31; /* kenar çubuğu, sohbet */
-  --bg-2: #313338; /* sahne, pencereler */
-  --bg-3: #3a3c42; /* üzerine gelince */
-  --bg-4: #45474e; /* seçili, kaydırma çubuğu */
-  --floating: #111214; /* menü, ipucu */
-  --line: rgba(255, 255, 255, 0.06);
-  --text: #f2f3f5;
-  --text-2: #b5bac1;
-  --text-3: #80848e;
-  --accent: #4c8dff;
-  --accent-2: #3b78e7;
-  --accent-soft: rgba(76, 141, 255, 0.16);
-  --green: #2fb565;
-  --red: #ed4a4a;
+  --bg-0: #050607; /* en koyu: çerçeve, giriş kutuları */
+  --bg-1: #0b0d0e; /* kenar çubuğu, sohbet */
+  --bg-2: #0e1112; /* sahne, pencereler */
+  --bg-3: #151a1b; /* üzerine gelince */
+  --bg-4: #1d2426; /* seçili, kaydırma çubuğu */
+  --floating: #000000; /* menü, ipucu */
+  --line: rgba(46, 230, 140, 0.10);
+  --text: #dfe8e3;
+  --text-2: #9fb0a8;
+  --text-3: #5f6f68;
+  --accent: #22d47e;
+  --accent-2: #1bb86b;
+  --accent-soft: rgba(34, 212, 126, 0.12);
+  --green: #22d47e;
+  --red: #ff4d5e;
   --amber: #f0b232;
-  --hover: rgba(78, 80, 88, 0.3);
-  --selected: rgba(78, 80, 88, 0.6);
+  --hover: rgba(34, 212, 126, 0.06);
+  --selected: rgba(34, 212, 126, 0.12);
   --font: -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --mono: "JetBrains Mono", "SF Mono", ui-monospace, Menlo, Consolas, "Cascadia Mono", monospace;
 }
 
 * { box-sizing: border-box; }
@@ -487,3 +488,137 @@ body.mac .titlebar { padding-left: 84px; }
 .screen.nudge { animation: nudge-shake .6s linear; }
 .connect-error:empty { min-height: 0; margin: 0; }
 .recent:empty { display: none; }
+
+/* =====================================================================
+   Siyah / yeşil tema (Discord + TeamSpeak karışımı, matrix havası)
+   ===================================================================== */
+/* Windows kendi başlık çubuğunu gösterdiği için içteki başlık gereksiz */
+body.win .titlebar { display: none; }
+body.win .sidebar { border-top-left-radius: 0; }
+.titlebar { height: 28px; border-bottom: 1px solid var(--line); }
+.titlebar-title { font-family: var(--mono); font-size: 12px; letter-spacing: .08em; text-transform: lowercase; color: var(--text-3); }
+.titlebar-icon { background: transparent; color: var(--accent); }
+.titlebar-icon svg { width: 13px; height: 13px; }
+
+/* Bölgeler ince yeşilimsi çizgilerle ayrılır */
+.sidebar { border-right: 1px solid var(--line); border-top-left-radius: 0; }
+.chat { border-left: 1px solid var(--line); }
+.server-header, .stage-head, .chat-head { box-shadow: none; border-bottom: 1px solid var(--line); }
+.server-header { gap: 8px; }
+.server-header .server-meta { flex: 1; }
+.server-header .icon-btn { color: var(--amber); }
+.server-header .icon-btn:hover { background: rgba(240, 178, 50, .1); color: var(--amber); }
+.server-name { letter-spacing: .01em; }
+.server-sub { font-family: var(--mono); font-size: 11px; }
+.server-sub .dot { box-shadow: 0 0 6px currentColor; color: var(--amber); }
+.server-sub.ok .dot { color: var(--green); }
+.server-sub.bad .dot { color: var(--red); }
+
+.host-chip {
+  display: block; margin: 8px 8px 0; padding: 6px 10px; border: 1px dashed rgba(34, 212, 126, .35); border-radius: 4px;
+  background: rgba(34, 212, 126, .05); color: var(--accent); font: 11.5px var(--mono); text-align: left;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer;
+}
+.host-chip:hover { background: rgba(34, 212, 126, .1); }
+
+.sidebar-head, .ctx-label, .admin-section h3, .settings-body h3, .recent-title, .admin-table th {
+  font-family: var(--mono); font-weight: 600; letter-spacing: .08em; font-size: 11px;
+}
+
+/* Kanal ağacı: seçili kanalda solda yeşil çubuk, kişiler TeamSpeak gibi ağaç çizgileriyle */
+.ch { position: relative; height: 30px; }
+.ch.current { background: var(--selected); color: var(--text); }
+.ch.current::before { content: ""; position: absolute; left: 0; top: 6px; bottom: 6px; width: 3px; border-radius: 0 3px 3px 0; background: var(--accent); }
+.ch.current svg { color: var(--accent); }
+.ch .ch-count { font-family: var(--mono); font-size: 11px; }
+.users { position: relative; }
+.user { position: relative; height: 28px; }
+.user::before {
+  content: ""; position: absolute; left: var(--tree-x, 18px); top: -2px; bottom: 50%; width: 9px;
+  border-left: 1px solid rgba(34, 212, 126, .22); border-bottom: 1px solid rgba(34, 212, 126, .22); border-bottom-left-radius: 4px;
+}
+.user + .user::after {
+  content: ""; position: absolute; left: var(--tree-x, 18px); top: -16px; height: 16px;
+  border-left: 1px solid rgba(34, 212, 126, .22);
+}
+.user .avatar { width: 22px; height: 22px; font-size: 10px; }
+.user.me .uname { color: var(--accent); }
+.user .badges .live-badge { border-radius: 3px; font-family: var(--mono); letter-spacing: .04em; }
+
+.avatar.speaking { box-shadow: 0 0 0 2px var(--bg-1), 0 0 0 3px var(--green), 0 0 10px rgba(34, 212, 126, .55); }
+
+/* Alt paneller */
+.voice-panel, .me-panel { background: #070909; }
+.voice-panel { border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.voice-state { font-family: var(--mono); font-size: 12px; letter-spacing: .02em; }
+.voice-ping { display: inline-grid; place-items: center; width: 22px; height: 22px; margin-left: -4px; border-radius: 4px; cursor: help; color: var(--green); }
+.voice-ping:hover { background: var(--hover); }
+.voice-ping.fair { color: var(--amber); }
+.voice-ping.bad { color: var(--red); }
+.voice-ping svg { width: 16px; height: 16px; }
+.voice-where, .me-status, .msg-time, .stage-sub, .tile-stats, .ss-meta, .ss-viewers, .addr, .admin-stat b { font-family: var(--mono); }
+.voice-where, .me-status { font-size: 11px; }
+
+/* Sahne */
+.stage { background: var(--bg-2); background-image: radial-gradient(rgba(34, 212, 126, .05) 1px, transparent 1px); background-size: 22px 22px; }
+.stage-title { letter-spacing: .01em; }
+.stage-sub { font-size: 12px; }
+.p-card { background: rgba(0, 0, 0, .55); border: 1px solid var(--line); border-radius: 6px; }
+.p-card:has(.avatar.speaking) { box-shadow: 0 0 0 1px var(--green), 0 0 18px rgba(34, 212, 126, .18); border-color: transparent; }
+.p-card.sharing:hover { background: #000; }
+.share-pill { background: #000; border: 1px solid var(--line); border-radius: 4px; }
+.share-pill.active { border-color: rgba(34, 212, 126, .45); background: var(--accent-soft); }
+.tile { border: 1px solid var(--line); border-radius: 6px; }
+.tile-waiting { font-family: var(--mono); font-size: 12px; background: #000; }
+.self-share-item { background: #000; border: 1px solid var(--line); border-radius: 6px; }
+.live { border-radius: 3px; font-family: var(--mono); }
+
+/* Düğmeler: yeşil üzerinde koyu yazı */
+.btn { border-radius: 4px; background: #182022; }
+.btn:hover { background: #20292b; }
+.btn.primary, .btn.share { background: var(--accent); color: #03140a; font-weight: 700; }
+.btn.primary:hover:not(:disabled), .btn.share:hover:not(:disabled) { background: #3be691; }
+.ctl.off { color: var(--red); }
+
+/* Sohbet */
+.chat-head { font-family: var(--mono); font-size: 13px; letter-spacing: .02em; }
+.msg-time { font-size: 10.5px; }
+.msg-text { color: #c9d4ce; }
+.msg-text a, a { color: var(--accent); }
+.msg.sys { font-family: var(--mono); font-size: 11px; color: var(--text-3); }
+.chat-form input { background: #000; border: 1px solid var(--line); border-radius: 4px; }
+.chat-form input:focus { border-color: rgba(34, 212, 126, .5); }
+
+/* Form ve pencereler */
+.field input, .field select, .admin-table select { background: #000; border: 1px solid var(--line); }
+.field input:focus, .field select:focus { box-shadow: none; border-color: rgba(34, 212, 126, .55); }
+.modal { background: rgba(0, 0, 0, .8); }
+.modal-card { background: var(--bg-1); border: 1px solid var(--line); border-radius: 6px; }
+.picker-foot { background: #070909; border-top: 1px solid var(--line); }
+.source { background: #000; border: 1px solid var(--line); }
+.ngrok-box, .admin-stat, .addr { background: #000; border: 1px solid var(--line); }
+.tab.active { border-bottom-color: var(--accent); }
+.check input, .meter-wrap input, .ctx-slider input { accent-color: var(--accent); }
+.meter-fill { background: var(--accent); box-shadow: 0 0 8px rgba(34, 212, 126, .6); }
+
+/* Menüler, ipuçları, bildirimler */
+.ctx, .tip-pop, .toast, .update-bar { border: 1px solid var(--line); }
+.ctx-item:hover { background: var(--accent-soft); color: var(--accent); }
+.tip-pop { font-family: var(--mono); font-size: 12px; color: var(--text); }
+.toast, .update-bar { border-left: 3px solid var(--accent); }
+[data-tip]:hover > span:first-child::after, .check[data-tip]:hover > span::after { color: #03140a; }
+
+/* Bağlantı ekranı: siyah, hafif ızgara */
+#connect-screen {
+  background-color: #000;
+  background-image:
+    linear-gradient(rgba(34, 212, 126, .05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(34, 212, 126, .05) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+.connect-card { background: rgba(8, 10, 11, .96); border: 1px solid var(--line); border-radius: 6px; box-shadow: 0 0 40px rgba(34, 212, 126, .06); }
+.brand-logo { background: #000; border: 1px solid rgba(34, 212, 126, .5); color: var(--accent); box-shadow: 0 0 22px rgba(34, 212, 126, .25); }
+.brand h1 { font-family: var(--mono); letter-spacing: .06em; }
+.brand p { font-family: var(--mono); font-size: 12px; color: var(--text-3); }
+
+::-webkit-scrollbar-thumb { background: #1a2224; }

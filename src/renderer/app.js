@@ -1469,12 +1469,23 @@ function onMessage(m) {
       toast('Hata', m.message, 'err');
       break;
     case 'pong':
-      $('#ping-chip').textContent = `${Math.round(performance.now() - m.ts)} ms`;
+      updatePing(Math.round(performance.now() - m.ts));
       break;
   }
 }
 
 setInterval(() => send({ t: 'ping', ts: performance.now() }), 3000);
+
+// Gecikme: ses panelindeki sinyal simgesinin rengi ve üzerine gelince çıkan bilgi
+function updatePing(ms) {
+  const el = $('#voice-ping');
+  if (!el) return;
+  const q = ms < 80 ? 'good' : ms < 200 ? 'fair' : 'bad';
+  el.className = `voice-ping ${q}`;
+  const label = { good: 'İyi', fair: 'Orta', bad: 'Zayıf' }[q];
+  el.dataset.tip = `Gecikme: ${ms} ms (${label})\nSunucu: ${S.serverName || '—'}`;
+  if (tipTarget === el) tipEl.textContent = el.dataset.tip;
+}
 
 // =====================================================================
 //  Arayüz
@@ -1577,6 +1588,7 @@ function userRow(u, depth) {
     badges
   );
   row.style.paddingLeft = 30 + depth * 16 + 'px';
+  row.style.setProperty('--tree-x', 18 + depth * 16 + 'px'); // ağaç çizgisi kanal simgesinin altından başlar
   if (pcState && !['connected', 'new'].includes(pcState)) row.style.opacity = '.55';
   return row;
 }
@@ -2341,7 +2353,7 @@ function placeTip(target) {
   const t = tipEl.getBoundingClientRect();
   let top = r.bottom + 8;
   let below = true;
-  if (top + t.height > innerHeight - 8) {
+  if (target.dataset.tipPos === 'above' || top + t.height > innerHeight - 8) {
     top = r.top - t.height - 8;
     below = false;
   }
