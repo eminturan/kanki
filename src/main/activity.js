@@ -218,7 +218,7 @@ async function cachedNames(maxAge) {
   if (Date.now() - namesCache.at > maxAge) namesCache = { at: Date.now(), names: await processNames() };
   return namesCache.names;
 }
-async function scan({ games = true, music = true, custom = [], list = false } = {}) {
+async function scan({ games = true, music = true, custom = [], list = false, cacheMs = 9000 } = {}) {
   if (list) {
     // "Oyun ekle" penceresi için: şu an çalışan programlar (sistem programları hariç)
     const names = await cachedNames(0);
@@ -226,7 +226,7 @@ async function scan({ games = true, music = true, custom = [], list = false } = 
     return { names: [...new Set(names.map((n) => n.replace(/\.exe$/i, '')))].filter((n) => !skip.test(n)).sort((a, b) => a.localeCompare(b)) };
   }
   if (!games && !music) return { game: '', music: '' };
-  const names = await cachedNames(25000);
+  const names = await cachedNames(Math.max(3000, Math.min(60000, Number(cacheMs) || 9000)));
   return { game: games ? gameFrom(names, custom) : '', music: music ? await spotify(names) : '' };
 }
 

@@ -14,6 +14,7 @@
     r.classList.toggle('no-blur', lite || s.glass === false);
     r.classList.toggle('no-aurora', lite || s.aurora === false);
     r.classList.toggle('no-glow', lite || s.speakGlow === false);
+    r.classList.toggle('perf', !!s.perfMode);
     r.classList.toggle('flush', s.panels === 'flush');
     r.classList.toggle('compact', s.density === 'compact');
     if (s.chatScale) r.style.setProperty('--chat-scale', s.chatScale / 100);

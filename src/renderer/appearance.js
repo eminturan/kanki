@@ -15,7 +15,7 @@ const KANKI_THEMES = [
 ];
 const AP_DEFAULTS = {
   theme: 'kanki', themeAuto: false, accent: '', glass: true, aurora: true, speakGlow: true,
-  motion: 'system', panels: 'float', density: 'cozy', chatScale: 100,
+  motion: 'system', panels: 'float', density: 'cozy', chatScale: 100, perfMode: false,
 };
 for (const [k, v] of Object.entries(AP_DEFAULTS)) if (settings[k] === undefined) settings[k] = v;
 
@@ -77,6 +77,7 @@ function applyAppearance() {
   r.classList.toggle('no-blur', lite || !settings.glass);
   r.classList.toggle('no-aurora', lite || !settings.aurora);
   r.classList.toggle('no-glow', lite || !settings.speakGlow);
+  r.classList.toggle('perf', !!settings.perfMode);
   r.classList.toggle('reduce-motion', settings.motion === 'reduce' || (settings.motion === 'system' && apMqReduce.matches));
   r.classList.toggle('flush', settings.panels === 'flush');
   r.classList.toggle('compact', settings.density === 'compact');
@@ -128,6 +129,7 @@ function apSyncPane() {
   pane.querySelector('#ap-glass').checked = !!settings.glass;
   pane.querySelector('#ap-aurora').checked = !!settings.aurora;
   pane.querySelector('#ap-glow').checked = !!settings.speakGlow;
+  pane.querySelector('#ap-perf').checked = !!settings.perfMode;
   const lite = apIsLite();
   for (const id of ['#ap-glass', '#ap-aurora', '#ap-glow']) {
     const inp = pane.querySelector(id);
@@ -171,7 +173,7 @@ function apBuildPane() {
     if (sb) return set(sb.parentElement.dataset.key, sb.dataset.v);
     if (e.target.closest('#ap-reset')) { Object.assign(settings, AP_DEFAULTS); saveSettings(); applyAppearance(); }
   });
-  const checks = { 'ap-auto': 'themeAuto', 'ap-glass': 'glass', 'ap-aurora': 'aurora', 'ap-glow': 'speakGlow' };
+  const checks = { 'ap-auto': 'themeAuto', 'ap-glass': 'glass', 'ap-aurora': 'aurora', 'ap-glow': 'speakGlow', 'ap-perf': 'perfMode' };
   pane.addEventListener('change', (e) => {
     if (checks[e.target.id]) set(checks[e.target.id], e.target.checked);
     else if (e.target.id === 'ap-accent-custom') set('accent', e.target.value);
@@ -189,18 +191,21 @@ self.KANKI_COLORS_LIGHT = ['#316fca', '#7d53dd', '#c23b7d', '#b35310', '#0e7d71'
 const apLvlBuf = new Float32Array(1024);
 function apSetLevel(id, db) {
   if (!id) return;
-  const q = String(Math.round(Math.max(0, Math.min(1, (db + 58) / 30)) * 4) / 4); // 5 kademe: az değişsin, az çizilsin
+  const steps = settings.perfMode ? 4 : 10; // performans modunda 5 kademe: az değişsin, az çizilsin
+  const q = String(Math.round(Math.max(0, Math.min(1, (db + 58) / 30)) * steps) / steps);
   for (const el of document.querySelectorAll(`[data-av="${id}"].speaking`)) {
     if (el.style.getPropertyValue('--lvl') !== q) el.style.setProperty('--lvl', q);
   }
 }
+let apLvlTick = 0;
 setInterval(() => {
+  if (settings.perfMode && apLvlTick++ % 2) return; // performans modunda 160 ms'de bir
   if (!settings.speakGlow || apIsLite() || typeof audio === 'undefined' || typeof S === 'undefined' || !S.myId) return;
   try {
     if (S.transmitting) apSetLevel(S.myId, audio.level);
     for (const [id, r] of audio.remote) if (r.speaking && r.analyser) apSetLevel(id, rmsDb(r.analyser, apLvlBuf));
   } catch {}
-}, 160);
+}, 80);
 
 // Canlı gelen mesaj aşağıdan kayarak girsin; sohbet baştan çizilirken (renderChat) hiçbir şey oynamasın
 const apChatLog = document.getElementById('chat-log');

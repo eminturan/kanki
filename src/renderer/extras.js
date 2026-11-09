@@ -816,7 +816,7 @@ async function scanActivity() {
   let a = { game: '', music: '' };
   if (settings.showGame || settings.showMusic) {
     try {
-      a = (await kanki.scanActivity({ games: !!settings.showGame, music: !!settings.showMusic, custom: settings.customGames || [] })) || a;
+      a = (await kanki.scanActivity({ games: !!settings.showGame, music: !!settings.showMusic, custom: settings.customGames || [], cacheMs: settings.perfMode ? 25000 : 9000 })) || a;
     } catch {}
   }
   const key = JSON.stringify(a);
@@ -825,18 +825,21 @@ async function scanActivity() {
     send({ t: 'activity', game: a.game || '', music: a.music || '' });
   }
 }
-// Şarkı değişimi ~10 sn'de görünür (program listesi ana süreçte 25 sn saklanır, Spotify başlığı her taramada bakılır).
-// Daha sık bakmak Windows'ta her seferinde tasklist çalıştırıp düşük bilgisayarlarda oyunu kastırıyordu.
+// Şarkı değişimi birkaç saniyede görünsün (program listesi ana süreçte 9 sn saklanır, Spotify başlığı her taramada bakılır).
+// Performans modunda 10 sn'de bir bakılır ve liste 25 sn saklanır: Windows'ta her tarama tasklist çalıştırıp düşük
+// bilgisayarlarda oyunu kastırabiliyor.
 let actBusy = false;
+let actLast = 0;
 setInterval(async () => {
-  if (actBusy) return;
+  if (actBusy || (settings.perfMode && Date.now() - actLast < 9500)) return;
+  actLast = Date.now();
   actBusy = true;
   try {
     await scanActivity();
   } finally {
     actBusy = false;
   }
-}, 10000);
+}, 4000);
 
 // Listede olmayan oyunu kendin ekle (Ayarlar › Profilim)
 function renderCustomGames() {

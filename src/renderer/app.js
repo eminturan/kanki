@@ -307,7 +307,8 @@ function audioTick() {
     const lvl = rmsDb(r.analyser, levelBuf);
     const sp = lvl > -58 && !S.deafened;
     if (sp) r.lastLoud = now;
-    const on = now - (r.lastLoud || 0) < 450; // kelime aralarında yanıp sönmesin (her değişim ekranı yeniden çizer)
+    // Performans modunda kelime aralarında yanıp sönmesin (her değişim ekranı yeniden çizer)
+    const on = now - (r.lastLoud || 0) < (settings.perfMode ? 450 : 250);
     if (on !== r.speaking) {
       r.speaking = on;
       setSpeaking(id, on);

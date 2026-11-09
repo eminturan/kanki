@@ -6,6 +6,14 @@
  */
 const CHANGELOG = [
   {
+    version: '1.0.44',
+    date: '2026-11-10',
+    title: 'Performans modu',
+    changed: [
+      '1.0.43\'teki işlemci tasarrufu artık isteğe bağlı: Ayarlar › Görünüm › "⚡ Performans modu". Açınca Kanki işlemciyi yaklaşık yarı yarıya az kullanır (konuşma halkası geçişsiz, arka plan ışıkları adım adım, Kanki arkadayken animasyonlar durur, oyun/şarkı 10 sn\'de bir kontrol edilir). Kapalıyken her şey 1.0.42\'deki gibi yumuşak.',
+    ],
+  },
+  {
     version: '1.0.43',
     date: '2026-11-10',
     title: 'Daha az işlemci kullanımı',
