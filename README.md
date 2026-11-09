@@ -109,10 +109,10 @@ GitHub Actions paketleri derler, Release'e `latest.yml` ile birlikte ekler; kuru
 - **Yazı kanalları:** Kenar çubuğunun üstündeki `#` kanallar sese katılmadan herkesin okuyup yazabildiği kanallardır. Mesajlar ve resimler diske kaydedilmez; sunucu kapanınca silinir. Açık olmayan kanaldaki yeni mesajlar kanal adının yanında sayı olarak görünür (senden bahsedilirse kırmızı). Ses kanallarının kendi sohbeti de duruyor: bulunduğun ses kanalının adına tıklayınca açılır. Yönetici `+` ile yazı kanalı açar, sağ tıkla yeniden adlandırır ya da siler.
 - **Durum:** Sol alttaki adına tıklayıp Çevrimiçi / Boşta / Rahatsız Etmeyin seçilir; 10 dakika hareketsiz kalınca otomatik Boşta olur. Rahatsız Etmeyin'de mesaj sesleri, bildirimler ve dürtme titreşimi kapalıdır.
 - **Profil kartı:** Bir kişiye tıklayınca durumu, kişiye özel ses seviyesi ve Dürt / Sustur / Yayını izle düğmeleri açılır. Sağ tık menüsü de duruyor.
-- **Sunucu menüsü:** Sol üstte sunucu adına tıklayınca davet adresini kopyala, sunucu yönetimi (yönetici), kanal oluştur, ayarlar ve bağlantıyı kes.
-- **Üye listesi:** Sohbet panelinin sağ üstündeki kişiler simgesi tüm sunucudakileri kanal kanal gösterir.
+- **Sunucu menüsü:** Sol üstte sunucu adına tıklayınca davet adresini kopyala, Sunucu ayarları (yetkisi olana), kanal oluştur, ayarlar ve bağlantıyı kes.
+- **Üye listesi:** Sohbet panelinin sağ üstündeki kişiler simgesi tüm sunucudakileri gösterir: en üstte sunucu sahibi, sonra "ayrı göster" rolleri, sonra kanal kanal herkes.
 - **Mesajlar:** `**kalın**`, `*italik*`, `~~üstü çizili~~`, `` `kod` `` ve ```` ```kod bloğu``` ```` desteklenir. `@isim` ile bahsedilen kişide mesaj sarı vurgulanır ve ses çalar (`@herkes` kanaldaki herkese). "X yazıyor…" göstergesi, emoji seçici, gün ayraçları ve yukarı kaydırınca "Yeni mesajlar ↓" düğmesi vardır.
-- **Tepki, yanıt, düzenleme, silme:** Mesajın üzerine gelince sağ üstte araç çubuğu çıkar (sağ tık menüsü de var). Tepkiler mesajın altında sayılarıyla görünür. Yanıtta asıl mesaj alıntılanır, tıklayınca ona gider. Kendi mesajını düzenleyip silebilirsin (boş kutuda `↑` son mesajını düzenler); yönetici herkesin mesajını silebilir.
+- **Tepki, yanıt, düzenleme, silme:** Mesajın üzerine gelince sağ üstte araç çubuğu çıkar (sağ tık menüsü de var). Tepkiler mesajın altında sayılarıyla görünür. Yanıtta asıl mesaj alıntılanır, tıklayınca ona gider. Kendi mesajını düzenleyip silebilirsin (boş kutuda `↑` son mesajını düzenler); "Mesajları yönet" yetkisi olan herkesin mesajını silebilir.
 - **Resim gönderme:** Resmi mesaj kutusuna yapıştır, sohbet paneline sürükle-bırak ya da `+` düğmesiyle seç. Gönderilmeden önce küçültülür (en uzun kenar 1920 px). Sunucu her kanalda son 30 resmi saklar. Resme tıklayınca büyür, oradan kaydedilebilir.
 - **Profil:** Ayarlar › Profilim'den profil fotoğrafı ve durum yazısı (ör. "🎮 Oyun oynuyor") eklenir. Fotoğraf her yerde baş harfin yerine görünür.
 - **Sohbeti gizle:** Sahnenin sağ üstündeki sohbet düğmesi sağ paneli kapatır, yayınlara daha çok yer kalır; gizliyken gelen mesaj sayısı düğmede görünür.
@@ -145,7 +145,8 @@ GitHub Actions paketleri derler, Release'e `latest.yml` ile birlikte ekler; kuru
 
 ## Birlikte izle ve yayına işaret
 - Sahnenin altındaki film düğmesi: YouTube bağlantısı ya da bilgisayarındaki video dosyası. Video senin bilgisayarında oynar ve kanala yayın olarak gider; izleyenler yayının altındaki çubuktan herkes için durdurup sarabilir.
-- YouTube için yt-dlp kullanılır (ilk kullanımda indirilir). 720p'ye kadar.
+- YouTube için yt-dlp kullanılır (ilk kullanımda indirilir). Kalite: Otomatik (1080p'ye kadar, önerilen), 720p ya da 480p (yavaş internet); seçim hatırlanır.
+- Videoyu başlatan kişi de videoyu sahnede büyük kutuda görür (alttaki çubuktan "Sahneden gizle / Sahnede göster").
 - İzlediğin yayının üst çubuğundaki kalemle (ya da Alt + tık) yayına nokta koy ya da çiz; işaret herkeste ve tüm ekran paylaşılıyorsa yayıncının ekranında 3 saniye görünür.
 
 ## Tarayıcıdan ve telefondan katılma
@@ -157,7 +158,7 @@ Sunucu Ayarları › Bağlantı'dan "Tarayıcıdan ve telefondan katılma" açı
 - Sunucu sadece `src/renderer` içindeki arayüz dosyalarını verir (klasör dışına çıkılamaz); tarayıcı katmanı `web-shim.js` ve `web.css`.
 
 ## Görünüm ve temalar
-Ayarlar › Görünüm: 9 tema (Sade — efektsiz ve en hafif, Kanki, Zifiri, Gece Mavisi, Neon, Gün Batımı, Okyanus, Şampiyon, Gündüz), vurgu rengi, bilgisayarın açık/koyu temasına uyma, cam efekti, arka plan ışıkları, konuşurken parlama, hareketleri azaltma, yüzen/bitişik paneller, yoğunluk ve sohbet yazı boyutu. Bu ayarlar sadece o bilgisayarda geçerli. Tema dosyaları: `src/renderer/themes.css` (renkler ve görünüm), `theme-boot.js` (ilk boyamadan önce temayı uygular), `appearance.js` (Görünüm sayfası).
+Ayarlar › Görünüm: 9 tema (Sade — efektsiz ve en hafif, Kanki, Zifiri, Gece Mavisi, Neon, Gün Batımı, Okyanus, Şampiyon, Gündüz), vurgu rengi, bilgisayarın açık/koyu temasına uyma, cam efekti, arka plan ışıkları, konuşurken parlama, hareketleri azaltma, yüzen/bitişik paneller, yoğunluk ve sohbet yazı boyutu. Bu ayarlar sadece o bilgisayarda geçerli. Uygulamanın ne kadar bellek kullandığı Ayarlar › Hakkında'da görünür; en az bellek için Sade tema. Tema dosyaları: `src/renderer/themes.css` (renkler ve görünüm), `theme-boot.js` (ilk boyamadan önce temayı uygular), `appearance.js` (Görünüm sayfası).
 
 ## Yönetim (Sunucu Ayarları)
 Kalkan düğmesi ya da sunucu menüsü › Sunucu ayarları. Sekmeler: Genel Bakış, Roller, Üyeler, Kanallar, Yasaklılar, Denetim Kaydı, Bağlantı. Her sekme sadece ilgili yetkisi olana görünür.
@@ -176,9 +177,10 @@ Kalkan düğmesi ya da sunucu menüsü › Sunucu ayarları. Sekmeler: Genel Bak
 - Bu ayarlar (roller, üyelerin rolleri, yasaklar, AFK, GIF anahtarı, duyuru) Kanki Admin'in veri klasöründe `server-config.json` içinde saklanır; mesajlar saklanmaz.
 
 ## Durum, kısayollar, katman, davet
-- **Oyun / Spotify:** bilinen bir oyunu açınca adının altında "🎮 … oynuyor", Spotify'da şarkı çalınca "🎵 Sanatçı - Şarkı" görünür. Ayarlar › Profilim'den kapatılır. Mac'te Spotify için ilk seferde izin istenir.
+- **Oyun / Spotify:** bilinen bir oyunu açınca adının altında "🎮 … oynuyor", Spotify'da şarkı çalınca "🎵 Sanatçı - Şarkı" görünür; ikisi aynı anda da gösterilir. 4 saniyede bir bakılır (şarkı birkaç saniyede, oyun en geç ~15 saniyede görünür). Ayarlar › Profilim'den kapatılır. Mac'te Spotify için ilk seferde izin istenir.
+- **Listede olmayan oyun:** Ayarlar › Profilim › "Listede olmayan oyunu ekle". Oyun açıkken çalışan programlardan seçilir ve görünecek ad yazılır (ör. Seafight artık listede).
 - **Kendi kısayolların:** Ayarlar › Kısayollar › Kısayol ekle. Ses efekti, dürtme, AFK'ya geç / geri dön, mikrofon, ses, birlikte izle durdur/oynat. Oyundayken de çalışır.
-- **Oyun içi katman:** Ayarlar › Oyun içi katman. Ekranın köşesinde konuşanlar; tam ekran (özel) moddaki oyunlarda görünmeyebilir.
+- **Oyun içi katman:** Ayarlar › Oyun içi katman. Ekranın köşesinde konuşanlar; tam ekran (özel) moddaki oyunlarda görünmeyebilir. Konum, "sadece konuşanlar" ve görünürlük (saydamlık) ayarlanır; katman kapalıyken bu seçenekler pasiftir.
 - **Davet bağlantısı:** sunucu menüsü › Davet bağlantısını kopyala. Bağlantı `kanki-app.github.io/join` sayfasını açar, o da Kanki'yi açıp sunucuya bağlar (kurulu değilse indirme düğmeleri çıkar).
 - **Yapay zekâ gürültü engelleme (RNNoise):** Ayarlar › Ses ve görüntü › Ses işleme.
 
@@ -186,6 +188,7 @@ Kalkan düğmesi ya da sunucu menüsü › Sunucu ayarları. Sekmeler: Genel Bak
 - Ayarlar › Yazı stili: adın için yazı tipi (12 seçenek), efekt (düz, gradyan, neon, parıltı, gökkuşağı, nabız, ateş) ve iki renk. Önizleme anında güncellenir.
 - "Mesajlarımda da kullan" açılırsa mesaj metnin de aynı yazı tipi ve renkle görünür (efektsiz, okunaklı kalsın diye).
 - Yazı tipleri uygulamanın içinde gelir (SIL Open Font License), internet gerekmez.
+- "Mesajlarımda da bu yazı tipini ve rengi kullan" seçeneğini sadece **Süslü mesaj yazısı** yetkisi olan roldekiler açabilir (yönetici Roller'den verir).
 
 ## Uzaktan kontrol
 - İzlediğin **tüm ekran** yayınının üst çubuğundaki fare simgesiyle kontrol iste. Yayıncıya onay penceresi çıkar; 30 saniye içinde yanıt vermezse istek reddedilir.
