@@ -562,6 +562,9 @@ function modMenuItems(t) {
     return cleanItems(items);
   }
   const reach = outranks(t);
+  // Oylama susturması üyelerden gelir: Sunucuda sustur yetkisi olan, rütbeye bakılmadan kaldırabilir
+  if (!self && t.online && feat('liftVoteMute') && can('muteMembers') && S.users.get(t.userId)?.voteMuted)
+    items.push({ label: 'Oylama susturmasını kaldır', run: () => send({ t: 'liftVoteMute', to: t.userId }) });
   if (can('manageRoles') && (self || reach)) items.push({ label: 'Roller', submenu: roleToggleItems(t) });
   if (self) return cleanItems(items);
   const any = MEMBER_PERMS.some(can);
@@ -1529,6 +1532,7 @@ const AUDIT = {
   serverDeafen: ['🔕', 'sunucuda sağırlaştırdı', 'amber'],
   serverUndeafen: ['🔔', 'sağırlaştırmayı kaldırdı', 'green'],
   forceMute: ['🔇', 'mikrofonunu kapattı', 'amber'],
+  liftVoteMute: ['🎙️', 'oylama susturmasını kaldırdı', 'green'],
   move: ['➡️', 'taşıdı', ''],
   disconnect: ['⏏', 'sesten çıkardı', 'amber'],
   moveAll: ['⏩', 'herkesi taşıdı', ''],

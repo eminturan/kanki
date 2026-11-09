@@ -6,6 +6,12 @@
  */
 const CHANGELOG = [
   {
+    version: '1.0.38',
+    date: '2026-11-09',
+    title: 'Oylama susturmasını kaldırma',
+    added: ['Oylamayla 1 dakika susturulan kişinin susturmasını "Sunucuda sustur" yetkisi olan biri (ve sunucu sahibi) kaldırabilir: kişiye sağ tık › Oylama susturmasını kaldır. Kişiye haber gider, mikrofonunu kendisi açar; denetim kaydına düşer.'],
+  },
+  {
     version: '1.0.37',
     date: '2026-11-09',
     title: 'Flash bekleme süresi',

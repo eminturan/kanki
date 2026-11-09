@@ -1971,6 +1971,11 @@ function onMessage(m) {
     case 'flashSent':
       onFlashSent(m);
       break;
+    case 'voteMuteLifted':
+      S.voteMutedUntil = 0;
+      toast('🎙️ Susturman kaldırıldı', `${m.name || m.by} oylama susturmanı kaldırdı. Mikrofonunu açabilirsin.`, '', 6000);
+      renderControls();
+      break;
     case 'poke':
       if (effectivePresence() === 'dnd') {
         // Rahatsız Etmeyin: titreşim ve ses yok, sadece sessiz bir not

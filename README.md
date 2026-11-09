@@ -174,7 +174,7 @@ Ayarlar › Görünüm: 9 tema (Sade — efektsiz ve en hafif, Kanki, Zifiri, Ge
 
 ## Yönetim (Sunucu Ayarları)
 Kalkan düğmesi ya da sunucu menüsü › Sunucu ayarları. Sekmeler: Genel Bakış, Roller, Üyeler, Kanallar, Yasaklılar, Denetim Kaydı, Bağlantı. Her sekme sadece ilgili yetkisi olana görünür.
-- **Roller:** Discord'daki gibi. Rolün adı, rengi, "üyeleri ayrı göster" ayarı ve 24 yetkisi var (Yönetici, sunucuyu/rolleri/kanalları yönet, denetim kaydı, at, yasakla, zaman aşımı, sustur, sağırlaştır, taşı, mesajları yönet, @herkes, mesaj, dosya, GIF, anket, oylama, süslü mesaj yazısı, ses efekti, ekran paylaşımı, kamera, birlikte izle). Rolleri sürükleyerek sırala; üstteki rol alttakileri yönetir, kimse kendi rolüne eşit ya da üstteki birine işlem yapamaz. Sunucu sahibi (yönetici anahtarıyla bağlanan) her şeyi yapar ve kimse ona işlem yapamaz.
+- **Roller:** Discord'daki gibi. Rolün adı, rengi, "üyeleri ayrı göster" ayarı ve 25 yetkisi var (Yönetici, sunucuyu/rolleri/kanalları yönet, denetim kaydı, at, yasakla, zaman aşımı, sustur, sağırlaştır, taşı, mesajları yönet, @herkes, mesaj, dosya, GIF, anket, oylama, süslü mesaj yazısı, ses efekti, ekran paylaşımı, kamera, birlikte izle, flash at). Rolleri sürükleyerek sırala; üstteki rol alttakileri yönetir, kimse kendi rolüne eşit ya da üstteki birine işlem yapamaz. Sunucu sahibi (yönetici anahtarıyla bağlanan) her şeyi yapar ve kimse ona işlem yapamaz.
 - **@herkes:** herkesin varsayılan yetkileri (ör. GIF'i ya da ses efektlerini herkese kapatmak için).
 - **Moderatör:** yeni sunucularda hazır gelen rol. Eski sürümdeki moderatörler otomatik bu rolü alır.
 - **Moderasyon** (kişiye sağ tık): rol ver, taşı, sesten çıkar, sunucuda sustur/sağırlaştır, zaman aşımı (60 sn – 1 hafta; bu sürede yazamaz, konuşamaz, paylaşamaz), at, yasakla.
@@ -184,7 +184,7 @@ Kalkan düğmesi ya da sunucu menüsü › Sunucu ayarları. Sekmeler: Genel Bak
 - **Genel Bakış:** sunucu adı, açıklama, şifre, hoş geldin mesajı, duyuru bandı, AFK kanalı ve süresi, GIF anahtarı, bağlantı önizlemeleri.
 - **Yasak:** cihaz ve (internetten bağlanıyorsa) IP adresi yasaklanır. Yasaklılar sekmesinden kaldırılır.
 - **AFK:** hem hareketsiz hem sessiz kalan kişi kendiliğinden AFK kanalına geçer (varsayılan 15 dk, 0 = kapalı); yayın izleyen ya da açan taşınmaz.
-- **Oylamayla susturma / AFK:** kişiye sağ tık. Kanaldakilerin %75'i (en az 2 kişi) evet derse 1 dakika susturulur ya da AFK'ya taşınır. Oylama cihaz başına sayılır.
+- **Oylamayla susturma / AFK:** kişiye sağ tık. Kanaldakilerin %75'i (en az 2 kişi) evet derse 1 dakika susturulur ya da AFK'ya taşınır. Oylama cihaz başına sayılır. "Sunucuda sustur" yetkisi olan biri (ve sunucu sahibi) oylama susturmasını süre dolmadan kaldırabilir: kişiye sağ tık › Oylama susturmasını kaldır (denetim kaydına düşer, kişi mikrofonunu kendisi açar).
 - **Denetim kaydı:** kim, kime, ne yaptı; kişiye ve işleme göre süzülür (son 500 kayıt).
 - Bu ayarlar (roller, üyelerin rolleri, yasaklar, AFK, GIF anahtarı, duyuru) Kanki Admin'in veri klasöründe `server-config.json` içinde saklanır; mesajlar saklanmaz.
 

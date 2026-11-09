@@ -1236,7 +1236,7 @@ function startServer(opts = {}) {
           admin: isAdmin,
           mod: isModUser(me),
           token: me.token,
-          features: ['sfx', 'activity', 'log', 'pins', 'polls', 'votes', 'files', 'preview', 'gif', 'roles', 'chpass', 'afk', 'bans', 'marks', 'watch', 'perms', 'audit', 'timeout', 'serverDeafen', 'moveAll', 'purge', 'slowmode', 'readOnly', 'announce', 'welcomeMessage', 'headers', 'afkMic', 'webClient', 'info', 'leaveVoice', 'icon', 'flash', 'flashCooldown'],
+          features: ['sfx', 'activity', 'log', 'pins', 'polls', 'votes', 'files', 'preview', 'gif', 'roles', 'chpass', 'afk', 'bans', 'marks', 'watch', 'perms', 'audit', 'timeout', 'serverDeafen', 'moveAll', 'purge', 'slowmode', 'readOnly', 'announce', 'welcomeMessage', 'headers', 'afkMic', 'webClient', 'info', 'leaveVoice', 'icon', 'flash', 'flashCooldown', 'liftVoteMute'],
           // Roller ve yetkiler
           perms: [...permsOf(me)],
           roles: userRoleIds(me),
@@ -1305,6 +1305,7 @@ function startServer(opts = {}) {
         memberRole: 'manageRoles',
         audit: 'viewAudit',
         flash: 'flash',
+        liftVoteMute: 'muteMembers',
       };
       const need = typeof m.t === 'string' && Object.hasOwn(NEED, m.t) ? NEED[m.t] : null;
       if (need && !can(me, need)) return deny(me, need);
@@ -1767,6 +1768,16 @@ function startServer(opts = {}) {
           if (now - (me.pokeAt || 0) < 1000) break;
           me.pokeAt = now;
           send(target.ws, { t: 'poke', from: me.id, name: me.name, text: cleanReason(m.text) });
+          break;
+        }
+        case 'liftVoteMute': {
+          // Oylamayla susturulan kişinin susturmasını yetkili kaldırır (mikrofonunu kendisi açabilir)
+          const target = users.get(m.to);
+          if (!target || target.bot || voteMutedUntil(target) <= Date.now()) break;
+          voteMutes.delete(target.clientKey);
+          for (const u of usersByKey(target.clientKey)) send(u.ws, { t: 'voteMuteLifted', by: me.name });
+          audit(me, 'liftVoteMute', target.name);
+          broadcastState();
           break;
         }
         case 'flash': {
