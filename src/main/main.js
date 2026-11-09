@@ -101,6 +101,7 @@ function createWindow() {
     minWidth: 980,
     minHeight: 620,
     backgroundColor: '#14161b',
+    show: false, // tema ilk boyamada uygulansın, açık temada koyu flaş olmasın
     title: APP_TITLE,
     icon: path.join(__dirname, '..', '..', 'build', IS_ADMIN_BUILD ? 'icon-admin.png' : 'icon.png'),
     titleBarStyle: isMac ? 'hiddenInset' : 'default',
@@ -113,6 +114,9 @@ function createWindow() {
       backgroundThrottling: false,
     },
   });
+  const showWin = () => win && !win.isDestroyed() && !win.isVisible() && win.show();
+  win.once('ready-to-show', showWin);
+  setTimeout(showWin, 4000); // sayfa takılırsa yine de görünsün
   win.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
   win.webContents.once('did-finish-load', () => {
     if (pendingInvite) setTimeout(() => deliverInvite(pendingInvite) || (pendingInvite = null), 1500);

@@ -6,6 +6,9 @@
   <title>Kanki</title>
   <link rel="stylesheet" href="fonts/fonts.css" />
   <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="themes.css" />
+  <link rel="stylesheet" href="admin.css" />
+  <script src="theme-boot.js"></script>
 </head>
 <body>
   <!-- ================= BAĞLANTI EKRANI ================= -->
@@ -370,6 +373,7 @@
         <div class="settings-nav-title">Kullanıcı ayarları</div>
         <button class="snav active" data-pane="profile">Profilim</button>
         <button class="snav" data-pane="style">Yazı stili</button>
+        <button class="snav" data-pane="appearance">Görünüm</button>
         <button class="snav" data-pane="voice">Ses ve görüntü</button>
         <button class="snav" data-pane="share">Ekran paylaşımı</button>
         <button class="snav" data-pane="notify">Bildirimler</button>
@@ -422,6 +426,41 @@
             </div>
             <label class="check ns-inmsg"><input type="checkbox" id="ns-inmsg" /><span>Mesajlarımda da bu yazı tipini ve rengi kullan</span></label>
             <div class="ns-actions"><button class="btn" id="ns-reset">Varsayılana dön</button></div>
+          </section>
+          <section class="settings-pane hidden" data-pane="appearance">
+            <h2>Görünüm</h2>
+            <p class="hint">Kanki'nin renklerini ve havasını seç. Bu ayarlar sadece bu bilgisayarda geçerli.</p>
+            <h3>Tema</h3>
+            <div class="theme-grid" id="theme-grid"></div>
+            <div class="checks one" style="margin-top: 12px">
+              <label class="check"><input type="checkbox" id="ap-auto" /><span>Sistemle eşleştir<small>Bilgisayarın açık temadaysa Gündüz'e, koyu temadaysa seçtiğin temaya geçer</small></span></label>
+            </div>
+            <h3>Vurgu rengi</h3>
+            <div class="accent-row" id="ap-accents"></div>
+            <h3>Efektler</h3>
+            <div class="checks one">
+              <label class="check"><input type="checkbox" id="ap-glass" /><span>Cam efekti<small>Menüler ve pencereler buzlu cam gibi görünsün (zayıf ekran kartında kapat)</small></span></label>
+              <label class="check"><input type="checkbox" id="ap-aurora" /><span>Arka plan ışıkları<small>Arkada yavaşça kayan yumuşak renkler (Kanki arka plandayken durur)</small></span></label>
+              <label class="check"><input type="checkbox" id="ap-glow" /><span>Konuşurken parlama<small>Konuşanın halkası sesinin yüksekliğine göre büyüsün</small></span></label>
+            </div>
+            <div class="ap-row">
+              <div><b>Hareket</b><small>Animasyonlar ve geçişler</small></div>
+              <div class="seg" data-key="motion"><button type="button" data-v="system">Sistem</button><button type="button" data-v="full">Tam</button><button type="button" data-v="reduce">Azalt</button></div>
+            </div>
+            <h3>Yerleşim</h3>
+            <div class="ap-row">
+              <div><b>Paneller</b><small>Yüzen kartlar ya da kenardan kenara</small></div>
+              <div class="seg" data-key="panels"><button type="button" data-v="float">Yüzen</button><button type="button" data-v="flush">Bitişik</button></div>
+            </div>
+            <div class="ap-row">
+              <div><b>Yoğunluk</b><small>Sıkı modda listeler ve mesajlar daha az yer kaplar</small></div>
+              <div class="seg" data-key="density"><button type="button" data-v="cozy">Rahat</button><button type="button" data-v="compact">Sıkı</button></div>
+            </div>
+            <div class="ap-row">
+              <div><b>Sohbet yazı boyutu</b><small>Sadece mesajlar ve yazma kutusu</small></div>
+              <div class="ap-range"><input type="range" id="ap-chatscale" min="90" max="125" step="5" /><span class="ap-val" id="ap-chatscale-val">%100</span></div>
+            </div>
+            <div style="margin-top: 20px"><button type="button" class="btn sm" id="ap-reset">Varsayılana dön</button></div>
           </section>
           <section class="settings-pane hidden" data-pane="voice">
             <h2>Ses ve görüntü</h2>
@@ -544,72 +583,136 @@
     </div>
   </div>
 
-  <!-- ================= YÖNETİM PANELİ ================= -->
-  <div class="modal hidden" id="admin-panel">
-    <div class="modal-card wide">
-      <div class="modal-head">
-        <h2>Sunucu Yönetimi</h2>
-        <button class="icon-btn" data-close><svg viewBox="0 0 24 24"><path d="M6.4 5 5 6.4 10.6 12 5 17.6 6.4 19l5.6-5.6 5.6 5.6 1.4-1.4-5.6-5.6L19 6.4 17.6 5 12 10.6z"/></svg></button>
-      </div>
-      <div class="admin-grid">
-        <div class="admin-stat"><span>Bağlı kullanıcı</span><b id="adm-count">0</b></div>
-        <div class="admin-stat"><span>Kanal</span><b id="adm-channels">0</b></div>
-        <div class="admin-stat"><span>Çalışma süresi</span><b id="adm-uptime">—</b></div>
-        <div class="admin-stat"><span>Şifre</span><b id="adm-haspass">—</b></div>
-      </div>
-
-      <div class="admin-section" id="adm-address-section">
-        <h3>Bağlantı adresleri</h3>
-        <div class="addr-list" id="adm-addresses"></div>
-      </div>
-
-      <div class="admin-section">
-        <h3>Sunucu ayarları</h3>
-        <div class="admin-form">
-          <label class="field compact"><span>Sunucu adı</span><input id="adm-name" maxlength="40" /></label>
-          <label class="field compact"><span>Yeni şifre <em>(boş bırakırsan değişmez)</em></span><input id="adm-password" type="password" autocomplete="off" /></label>
-          <button class="btn primary" id="adm-save">Kaydet</button>
+  <!-- ================= SUNUCU AYARLARI (Discord benzeri, tam ekran; admin.js) ================= -->
+  <div class="modal hidden settings-full srv-settings" id="admin-panel">
+    <div class="settings-shell">
+      <nav class="settings-nav ss-nav" id="ss-nav">
+        <div class="ss-nav-server"><div class="ss-nav-badge" id="ss-nav-badge">?</div><div class="ss-nav-sname" id="ss-nav-name">Sunucu</div></div>
+        <div class="settings-nav-title">Sunucu ayarları</div>
+        <button class="ss-tab active" data-ss="overview"><svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm1 15h-2v-6h2v6Zm0-8h-2V7h2v2Z"/></svg><span>Genel Bakış</span></button>
+        <button class="ss-tab" data-ss="roles"><svg viewBox="0 0 24 24"><path d="M12 2 4 5v6c0 5 3.4 9.7 8 11 4.6-1.3 8-6 8-11V5l-8-3Zm0 5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5Zm0 12.2c-1.9-.6-3.5-2-4.4-3.8.6-1.2 2.5-2 4.4-2s3.8.8 4.4 2c-.9 1.8-2.5 3.2-4.4 3.8Z"/></svg><span>Roller</span></button>
+        <button class="ss-tab" data-ss="members"><svg viewBox="0 0 24 24"><path d="M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm7 0a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM9 13c-3.3 0-7 1.6-7 4v2h14v-2c0-2.4-3.7-4-7-4Zm7 0c-.5 0-1 0-1.5.1 1.5.9 2.5 2.2 2.5 3.9v2h5v-2c0-2.4-3.2-4-6-4Z"/></svg><span>Üyeler</span></button>
+        <button class="ss-tab" data-ss="channels"><svg viewBox="0 0 24 24"><path d="M10.2 3 9.5 7h4l.7-4h2l-.7 4H19v2h-3.9l-.7 4H18v2h-3.9l-.7 4h-2l.7-4h-4l-.7 4h-2l.7-4H3v-2h3.9l.7-4H4V7h3.9l.7-4h1.6Zm-1 6-.7 4h4l.7-4h-4Z"/></svg><span>Kanallar</span></button>
+        <div class="settings-nav-title ss-nav-group" id="ss-nav-mod">Moderasyon</div>
+        <button class="ss-tab" data-ss="bans"><svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20ZM4 12a8 8 0 0 1 12.9-6.3L5.7 16.9A7.9 7.9 0 0 1 4 12Zm8 8a7.9 7.9 0 0 1-4.9-1.7L18.3 7.1A8 8 0 0 1 12 20Z"/></svg><span>Yasaklılar</span><b class="ss-tab-n" id="ss-n-bans"></b></button>
+        <button class="ss-tab" data-ss="audit"><svg viewBox="0 0 24 24"><path d="M9 2h6a1 1 0 0 1 1 1v1h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2V3a1 1 0 0 1 1-1Zm1 2v2h4V4h-4ZM7 10v2h10v-2H7Zm0 4v2h7v-2H7Z"/></svg><span>Denetim Kaydı</span></button>
+        <div class="settings-nav-sep"></div>
+        <button class="ss-tab" data-ss="connection"><svg viewBox="0 0 24 24"><path d="M10.6 13.4a1 1 0 0 1 0-1.4l3.5-3.5a3 3 0 0 1 4.2 4.2l-2.1 2.1-1.4-1.4 2.1-2.1a1 1 0 0 0-1.4-1.4L12 13.4a1 1 0 0 1-1.4 0Zm2.8-2.8a1 1 0 0 1 0 1.4l-3.5 3.5a3 3 0 0 1-4.2-4.2l2.1-2.1 1.4 1.4-2.1 2.1a1 1 0 0 0 1.4 1.4L12 10.6a1 1 0 0 1 1.4 0ZM12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20Zm0 2a8 8 0 1 0 0 16 8 8 0 0 0 0-16Z"/></svg><span>Bağlantı</span></button>
+        <div class="ss-nav-me" id="ss-nav-me"></div>
+      </nav>
+      <div class="settings-main ss-main" id="ss-main">
+        <div class="settings-body ss-body">
+          <!-- Genel Bakış -->
+          <section class="ss-pane" data-ss="overview">
+            <h2>Genel Bakış</h2>
+            <div class="ss-hero">
+              <div class="ss-hero-badge" id="ss-hero-badge">?</div>
+              <div class="ss-hero-text">
+                <div class="ss-hero-name" id="ss-hero-name"></div>
+                <div class="ss-hero-desc" id="ss-hero-desc"></div>
+              </div>
+              <span class="ss-pill" id="adm-haspass"></span>
+            </div>
+            <div class="ss-stats">
+              <div class="ss-stat"><b id="adm-count">0</b><span>Bağlı kişi</span></div>
+              <div class="ss-stat"><b id="adm-channels">0</b><span>Kanal</span></div>
+              <div class="ss-stat"><b id="adm-roles">0</b><span>Rol</span></div>
+              <div class="ss-stat"><b id="adm-uptime">—</b><span>Çalışma süresi</span></div>
+            </div>
+            <p class="ss-note hidden" id="ss-ov-readonly">Bu ayarları değiştirmek için <b>Sunucuyu yönet</b> yetkisi gerekir.</p>
+            <div class="ss-card" data-ov>
+              <h3>Sunucu kimliği</h3>
+              <label class="field"><span>Sunucu adı</span><input id="adm-name" maxlength="40" autocomplete="off" /></label>
+              <label class="field"><span>Açıklama <em>(isteğe bağlı, en fazla 300 karakter)</em></span><textarea id="adm-desc" class="ss-textarea" rows="2" maxlength="300" placeholder="Ör. Akşamları oyun, hafta sonu film gecesi"></textarea></label>
+            </div>
+            <div class="ss-card" data-ov>
+              <h3>Giriş şifresi</h3>
+              <label class="field"><span>Yeni şifre <em>(boş bırakırsan değişmez)</em></span><input id="adm-password" type="password" autocomplete="off" /></label>
+              <label class="check"><input type="checkbox" id="adm-nopass" /><span>Şifreyi kaldır (herkes şifresiz girebilsin)</span></label>
+            </div>
+            <div class="ss-card" data-ov>
+              <h3>Duyuru şeridi</h3>
+              <p class="hint">Herkesin ekranının en üstünde, sen kaldırana kadar görünür. Turnuva, bakım, etkinlik gibi şeyler için.</p>
+              <div class="ss-ann-current hidden" id="adm-ann-current"></div>
+              <textarea id="adm-ann" class="ss-textarea" rows="2" maxlength="300" placeholder="Ör. Cuma 21:00'de turnuva var, herkes Lobi'de!"></textarea>
+              <div class="ss-actions"><button class="btn primary" id="adm-ann-send">Duyuruyu yayınla</button><button class="btn" id="adm-ann-clear">Duyuruyu kaldır</button></div>
+            </div>
+            <div class="ss-card" data-ov>
+              <h3>Hoş geldin mesajı</h3>
+              <p class="hint">Sunucuya bağlanan herkese bir kez gösterilir. Boş bırakırsan gösterilmez.</p>
+              <textarea id="adm-welcome" class="ss-textarea" rows="3" maxlength="500" placeholder="Ör. Hoş geldin! Kurallar: küfür yok, spam yok. İyi eğlenceler 🎮"></textarea>
+            </div>
+            <div class="ss-card" data-ov>
+              <h3>AFK</h3>
+              <div class="ss-grid2">
+                <label class="field"><span>AFK kanalı</span><select id="adm-afk-ch"></select></label>
+                <label class="field"><span>Boşta kalınca taşı <em>(dakika, 0 = kapalı)</em></span><input id="adm-afk-min" type="number" min="0" max="240" /></label>
+              </div>
+            </div>
+            <div class="ss-card" data-ov>
+              <h3>Sohbet</h3>
+              <label class="ss-switch-row"><span class="ss-sw-text"><b>Bağlantı önizlemeleri</b><small>Sohbette paylaşılan bağlantıların altında başlık ve resim gösterilir.</small></span><span class="ss-switch"><input type="checkbox" id="adm-previews" /><i></i></span></label>
+              <div class="ss-grid2">
+                <label class="field"><span>GIF servisi</span><select id="adm-gif-prov"><option value="klipy">KLIPY</option><option value="giphy">GIPHY</option></select></label>
+                <label class="field"><span>GIF API anahtarı <em id="adm-gif-state"></em></span><input id="adm-gif-key" type="password" autocomplete="off" placeholder="boş bırakırsan değişmez" /></label>
+              </div>
+              <p class="hint">GIF araması için ücretsiz bir KLIPY anahtarı al (klipy.com › Developers) ya da GIPHY anahtarı gir. Anahtar sunucuda saklanır, arkadaşların anahtarsız arar.</p>
+            </div>
+          </section>
+          <!-- Roller -->
+          <section class="ss-pane hidden" data-ss="roles"><div id="ss-roles"></div></section>
+          <!-- Üyeler -->
+          <section class="ss-pane hidden" data-ss="members">
+            <h2>Üyeler</h2>
+            <div class="ss-toolbar">
+              <input class="ss-search" id="ss-member-q" placeholder="Üye ara…" autocomplete="off" />
+              <div class="ss-seg" id="ss-member-filter">
+                <button data-f="all" class="active">Tümü</button><button data-f="online">Çevrimiçi</button><button data-f="roles">Rolü olan</button><button data-f="punished">Cezalı</button>
+              </div>
+            </div>
+            <div id="ss-members"></div>
+          </section>
+          <!-- Kanallar -->
+          <section class="ss-pane hidden" data-ss="channels">
+            <div class="ss-head-row"><h2>Kanallar</h2><button class="btn primary" id="ss-ch-create">Kanal oluştur</button></div>
+            <div id="ss-channels"></div>
+          </section>
+          <!-- Yasaklılar -->
+          <section class="ss-pane hidden" data-ss="bans">
+            <h2>Yasaklılar</h2>
+            <p class="hint">Yasaklanan kişi bu bilgisayardan (ve internetten bağlanıyorsa aynı IP adresinden) tekrar giremez. Birini yasaklamak için adına sağ tıkla ya da Üyeler sekmesini kullan.</p>
+            <div id="ss-bans"></div>
+          </section>
+          <!-- Denetim kaydı -->
+          <section class="ss-pane hidden" data-ss="audit">
+            <h2>Denetim Kaydı</h2>
+            <div class="ss-toolbar">
+              <input class="ss-search" id="ss-audit-q" placeholder="Ara (kişi, hedef, ayrıntı)…" autocomplete="off" />
+              <select class="ss-select" id="ss-audit-act"></select>
+              <select class="ss-select" id="ss-audit-by"></select>
+            </div>
+            <div id="ss-audit"></div>
+          </section>
+          <!-- Bağlantı -->
+          <section class="ss-pane hidden" data-ss="connection">
+            <h2>Bağlantı</h2>
+            <div class="ss-card" id="adm-address-section">
+              <h3>Bağlantı adresleri</h3>
+              <p class="hint">Arkadaşların Kanki'de bu adreslerden birini yazarak bağlanır. Kopyalamak için tıkla.</p>
+              <div class="addr-list" id="adm-addresses"></div>
+            </div>
+            <div class="ss-card ss-danger" id="adm-host-section">
+              <h3>Bu bilgisayardaki sunucu</h3>
+              <p class="hint">Yönetici anahtarı bu bilgisayarda saklanıyor; sunucuyu bu uygulamadan her kurduğunda otomatik olarak sunucu sahibi olursun. <a href="#" id="adm-show-key">Anahtarı kopyala</a></p>
+              <div class="ss-actions"><button class="btn danger" id="adm-stop">Sunucuyu Kapat</button></div>
+            </div>
+          </section>
         </div>
-        <label class="check" style="margin-top:10px"><input type="checkbox" id="adm-nopass" /><span>Şifreyi kaldır (herkes şifresiz girebilsin)</span></label>
-      </div>
-
-      <div class="admin-section">
-        <h3>AFK ve GIF</h3>
-        <div class="admin-form wrap">
-          <label class="field compact"><span>AFK kanalı</span><select id="adm-afk-ch"></select></label>
-          <label class="field compact"><span>Boşta kalınca taşı <em>(dakika, 0 = kapalı)</em></span><input id="adm-afk-min" type="number" min="0" max="240" /></label>
-          <label class="field compact"><span>GIF servisi</span><select id="adm-gif-prov"><option value="klipy">KLIPY</option><option value="giphy">GIPHY</option></select></label>
-          <label class="field compact"><span>GIF API anahtarı <em id="adm-gif-state"></em></span><input id="adm-gif-key" type="password" autocomplete="off" placeholder="boş bırakırsan değişmez" /></label>
-          <button class="btn primary" id="adm-save-extra">Kaydet</button>
-        </div>
-        <p class="hint">GIF araması için ücretsiz bir KLIPY anahtarı al (klipy.com › Developers) ya da GIPHY anahtarı gir. Anahtar sunucuda saklanır, arkadaşların anahtarsız arar.</p>
-      </div>
-
-      <div class="admin-section">
-        <h3>Moderatörler</h3>
-        <div class="adm-list" id="adm-mods"></div>
-        <p class="hint">Moderatörler kişileri taşıyabilir, atabilir, mikrofonunu kapatabilir ve mesaj sabitleyebilir; sunucu ayarlarına, kanallara ve yasaklara dokunamaz. Moderatör yapmak için kişiye sağ tıkla.</p>
-      </div>
-
-      <div class="admin-section">
-        <h3>Yasaklılar</h3>
-        <div class="adm-list" id="adm-bans"></div>
-      </div>
-
-      <div class="admin-section">
-        <h3>Kullanıcılar</h3>
-        <table class="admin-table">
-          <thead><tr><th>Kullanıcı</th><th>Kanal</th><th>IP</th><th>Süre</th><th></th></tr></thead>
-          <tbody id="adm-users"></tbody>
-        </table>
-      </div>
-
-      <div class="admin-section danger-zone" id="adm-host-section">
-        <h3>Bu bilgisayardaki sunucu</h3>
-        <div class="admin-form">
-          <div class="muted" style="flex:1">Yönetici anahtarı bu bilgisayarda saklanıyor; sunucuyu bu uygulamadan her kurduğunda otomatik yönetici olursun.
-            <a href="#" id="adm-show-key">Anahtarı kopyala</a></div>
-          <button class="btn danger" id="adm-stop">Sunucuyu Kapat</button>
+        <button class="settings-close" data-close title="Kapat (Esc)"><svg viewBox="0 0 24 24"><path d="M6.4 5 5 6.4 10.6 12 5 17.6 6.4 19l5.6-5.6 5.6 5.6 1.4-1.4-5.6-5.6L19 6.4 17.6 5 12 10.6z"/></svg><span>ESC</span></button>
+        <div class="ss-savebar hidden" id="ss-savebar">
+          <span>Dikkat — kaydedilmemiş değişikliklerin var!</span>
+          <button class="btn sm ss-link-btn" id="ss-reset">Sıfırla</button>
+          <button class="btn sm primary" id="ss-save">Değişiklikleri kaydet</button>
         </div>
       </div>
     </div>
@@ -695,5 +798,7 @@
   <script src="sfx.js"></script>
   <script src="app.js"></script>
   <script src="extras.js"></script>
+  <script src="appearance.js"></script>
+  <script src="admin.js"></script>
 </body>
 </html>

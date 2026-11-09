@@ -137,9 +137,9 @@ GitHub Actions paketleri derler, Release'e `latest.yml` ile birlikte ekler; kuru
 ## Sohbet araçları
 - **Dosya gönderme:** mesaj kutusundaki + düğmesi ya da sürükle-bırak. Resim değilse dosya olarak gider (en fazla 50 MB). Dosyalar sunucunun belleğinde durur (en fazla 400 MB, 12 saat), sunucu kapanınca silinir; diske yazılmaz.
 - **Bağlantı önizlemesi:** mesajdaki ilk bağlantının başlığı, açıklaması ve resmi sunucu tarafından alınır. Yerel ağ adreslerine (192.168.x.x, 127.0.0.1…) istek atılmaz.
-- **GIF:** mesaj kutusundaki GIF düğmesi. Yönetici, Sunucu yönetimi › AFK ve GIF bölümüne bir [KLIPY](https://klipy.com) (ücretsiz) ya da GIPHY anahtarı girer; arkadaşlar anahtarsız arar. (Google'ın Tenor servisi 2026'da kapandı.)
+- **GIF:** mesaj kutusundaki GIF düğmesi. Yönetici, Sunucu Ayarları › Genel Bakış'a bir [KLIPY](https://klipy.com) (ücretsiz) ya da GIPHY anahtarı girer; arkadaşlar anahtarsız arar. (Google'ın Tenor servisi 2026'da kapandı.)
 - **Anket, çark, takım kur:** + düğmesinden. Çarkın sonucunu sunucu seçer; takım kur, ses kanalındakileri rastgele böler.
-- **Sabitlenmiş mesajlar:** mesaja sağ tık › Sabitle (yazan, yönetici ya da moderatör). Sohbet başlığındaki iğne düğmesi listeyi açar.
+- **Sabitlenmiş mesajlar:** mesaja sağ tık › Sabitle (yazan ya da Mesajları yönet yetkisi olan). Sohbet başlığındaki iğne düğmesi listeyi açar.
 - **Arama:** büyüteç ya da `Ctrl/Cmd+F`. `from:isim`, `has:resim`, `has:dosya`, `has:link`, `has:gif`, `has:anket`.
 - **Geçmiş sekmesi:** sağ paneldeki saat simgesi. Giriş-çıkış, dürtme, ses efekti, oylama ve birlikte izle olayları saatleriyle (sadece sende, bu oturumda).
 
@@ -148,13 +148,22 @@ GitHub Actions paketleri derler, Release'e `latest.yml` ile birlikte ekler; kuru
 - YouTube için yt-dlp kullanılır (ilk kullanımda indirilir). 720p'ye kadar.
 - İzlediğin yayının üst çubuğundaki kalemle (ya da Alt + tık) yayına nokta koy ya da çiz; işaret herkeste ve tüm ekran paylaşılıyorsa yayıncının ekranında 3 saniye görünür.
 
-## Yönetim
-- **Moderatör:** yönetici kişiye sağ tıklayıp moderatör yapar. Moderatörler taşıyabilir, atabilir, mikrofonunu kapatabilir, mesaj sabitleyebilir; ayarlara, kanallara, yasaklara dokunamaz. Moderatörlük cihaza bağlıdır.
-- **Kanal şifresi / kişi sınırı:** kanala sağ tık › Şifre ve kişi sınırı. Yönetici ve moderatörler şifresiz girer.
-- **Yasak:** kişiye sağ tık › Yasakla. Cihaz ve (internetten bağlanıyorsa) IP adresi yasaklanır. Sunucu yönetimi › Yasaklılar'dan kaldırılır.
-- **AFK:** Sunucu yönetiminde AFK kanalı ve süre (varsayılan 15 dk, 0 = kapalı). Hem hareketsiz hem sessiz kalan kişi kendiliğinden AFK kanalına geçer; yayın izleyen ya da açan taşınmaz.
-- **Oylamayla susturma / AFK:** kişiye sağ tık. Kanaldakilerin %75'i (en az 2 kişi) evet derse 10 dakika susturulur ya da AFK'ya taşınır. Yönetici ve moderatörler oylanamaz.
-- Bu ayarlar (moderatörler, yasaklar, AFK, GIF anahtarı) Kanki Admin'in veri klasöründe `server-config.json` içinde saklanır; mesajlar saklanmaz.
+## Görünüm ve temalar
+Ayarlar › Görünüm: 8 tema (Kanki, Zifiri, Gece Mavisi, Neon, Gün Batımı, Okyanus, Şampiyon, Gündüz), vurgu rengi, bilgisayarın açık/koyu temasına uyma, cam efekti, arka plan ışıkları, konuşurken parlama, hareketleri azaltma, yüzen/bitişik paneller, yoğunluk ve sohbet yazı boyutu. Bu ayarlar sadece o bilgisayarda geçerli. Tema dosyaları: `src/renderer/themes.css` (renkler ve görünüm), `theme-boot.js` (ilk boyamadan önce temayı uygular), `appearance.js` (Görünüm sayfası).
+
+## Yönetim (Sunucu Ayarları)
+Kalkan düğmesi ya da sunucu menüsü › Sunucu ayarları. Sekmeler: Genel Bakış, Roller, Üyeler, Kanallar, Yasaklılar, Denetim Kaydı, Bağlantı. Her sekme sadece ilgili yetkisi olana görünür.
+- **Roller:** Discord'daki gibi. Rolün adı, rengi, "üyeleri ayrı göster" ayarı ve 23 yetkisi var (Yönetici, sunucuyu/rolleri/kanalları yönet, denetim kaydı, at, yasakla, zaman aşımı, sustur, sağırlaştır, taşı, mesajları yönet, @herkes, mesaj, dosya, GIF, anket, oylama, ses efekti, ekran paylaşımı, kamera, birlikte izle). Rolleri sürükleyerek sırala; üstteki rol alttakileri yönetir, kimse kendi rolüne eşit ya da üstteki birine işlem yapamaz. Sunucu sahibi (yönetici anahtarıyla bağlanan) her şeyi yapar ve kimse ona işlem yapamaz.
+- **@herkes:** herkesin varsayılan yetkileri (ör. GIF'i ya da ses efektlerini herkese kapatmak için).
+- **Moderatör:** yeni sunucularda hazır gelen rol. Eski sürümdeki moderatörler otomatik bu rolü alır.
+- **Moderasyon** (kişiye sağ tık): rol ver, taşı, sesten çıkar, sunucuda sustur/sağırlaştır, zaman aşımı (60 sn – 1 hafta; bu sürede yazamaz, konuşamaz, paylaşamaz), at, yasakla.
+- **Kanallar:** şifre, kişi sınırı, yavaş mod, salt okunur, konu; herkesi başka kanala taşı, sohbeti temizle.
+- **Genel Bakış:** sunucu adı, açıklama, şifre, hoş geldin mesajı, duyuru bandı, AFK kanalı ve süresi, GIF anahtarı, bağlantı önizlemeleri.
+- **Yasak:** cihaz ve (internetten bağlanıyorsa) IP adresi yasaklanır. Yasaklılar sekmesinden kaldırılır.
+- **AFK:** hem hareketsiz hem sessiz kalan kişi kendiliğinden AFK kanalına geçer (varsayılan 15 dk, 0 = kapalı); yayın izleyen ya da açan taşınmaz.
+- **Oylamayla susturma / AFK:** kişiye sağ tık. Kanaldakilerin %75'i (en az 2 kişi) evet derse 10 dakika susturulur ya da AFK'ya taşınır. Oylama cihaz başına sayılır.
+- **Denetim kaydı:** kim, kime, ne yaptı; kişiye ve işleme göre süzülür (son 500 kayıt).
+- Bu ayarlar (roller, üyelerin rolleri, yasaklar, AFK, GIF anahtarı, duyuru) Kanki Admin'in veri klasöründe `server-config.json` içinde saklanır; mesajlar saklanmaz.
 
 ## Durum, kısayollar, katman, davet
 - **Oyun / Spotify:** bilinen bir oyunu açınca adının altında "🎮 … oynuyor", Spotify'da şarkı çalınca "🎵 Sanatçı - Şarkı" görünür. Ayarlar › Profilim'den kapatılır. Mac'te Spotify için ilk seferde izin istenir.

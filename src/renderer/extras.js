@@ -10,7 +10,7 @@ const fmtBytes = (n) => (n < 1024 ? `${n} B` : n < 1048576 ? `${Math.round(n / 1
 const hhmm = (ts, sec = false) => new Date(ts).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', ...(sec ? { second: '2-digit' } : {}) });
 const chName = (id) => S.channels.find((c) => c.id === id)?.name || '';
 const httpBase = () => S.url.replace(/^ws/i, 'http').replace(/\/+$/, '');
-const canModerate = () => S.isAdmin || S.isMod;
+const canModerate = () => can('manageMessages'); // başkasının mesajını sabitle / anketi bitir (admin.js)
 const fmtClock = (s) => {
   s = Math.max(0, Math.floor(s || 0));
   const hh = Math.floor(s / 3600);
@@ -157,6 +157,7 @@ function onExtraMessage(m) {
       break;
     case 'role':
       S.isMod = !!m.mod;
+      if (feat('perms')) break; // yeni sunucu: rol değişikliğini 'perms' mesajı bildirir (admin.js)
       toast(m.mod ? 'Moderatör oldun 🛡️' : 'Moderatörlüğün alındı', m.mod ? `${m.by} seni moderatör yaptı: kişileri taşıyabilir, atabilir, mikrofonlarını kapatabilir ve mesaj sabitleyebilirsin.` : `${m.by} tarafından.`);
       renderAll();
       break;
@@ -172,6 +173,8 @@ function onExtraMessage(m) {
     case 'watchState':
       onWatchState(m);
       break;
+    default:
+      onAdminMessage(m); // roller, moderasyon, duyuru, denetim kaydı (admin.js)
   }
 }
 
@@ -463,9 +466,12 @@ function wheelCard(m) {
     g.closePath();
     g.fillStyle = WHEEL_COLORS[i % WHEEL_COLORS.length];
     g.fill();
-    g.strokeStyle = '#0b0d0e';
+    // Dilim araları şeffaf: kartın rengi görünür, her temada (açık tema dahil) doğru durur
+    g.save();
+    g.globalCompositeOperation = 'destination-out';
     g.lineWidth = 2;
     g.stroke();
+    g.restore();
     g.save();
     g.translate(r, r);
     g.rotate((a0 + a1) / 2);
@@ -477,10 +483,12 @@ function wheelCard(m) {
     g.fillText(label, r - 10, 0);
     g.restore();
   }
+  // Göbek: ortası boş, tema renginde göbeği CSS çizer (.wheel-wrap::after)
   g.beginPath();
   g.arc(r, r, 14, 0, Math.PI * 2);
-  g.fillStyle = '#0b0d0e';
+  g.globalCompositeOperation = 'destination-out';
   g.fill();
+  g.globalCompositeOperation = 'source-over';
   // İbre üstte: sonuç dilimin ortası 270°'ye gelecek kadar döndür
   const final = 270 - (w.result + 0.5) * seg;
   const result = h('div', { class: 'wheel-result' }, `🎯 ${w.options[w.result]}`);
@@ -526,13 +534,15 @@ function teamsCard(m) {
 function attachMenu(e) {
   e.stopPropagation();
   const r = $('#btn-attach').getBoundingClientRect();
-  showCtx({ clientX: r.left, clientY: r.top - 190, preventDefault() {} }, [
-    { label: '📎 Dosya ya da resim gönder', run: () => $('#file-input').click() },
-    feat('polls') && '-',
-    feat('polls') && { label: '📊 Anket oluştur', run: pollForm },
-    feat('polls') && { label: '🎡 Çark çevir', run: wheelForm },
-    feat('polls') && S.channelId && { label: '👥 Takım kur', run: teamsForm },
+  const polls = feat('polls') && can('createPolls');
+  const items = cleanItems([
+    can('attachFiles') && { label: '📎 Dosya ya da resim gönder', run: () => $('#file-input').click() },
+    polls && '-',
+    polls && { label: '📊 Anket oluştur', run: pollForm },
+    polls && { label: '🎡 Çark çevir', run: wheelForm },
+    polls && S.channelId && { label: '👥 Takım kur', run: teamsForm },
   ]);
+  if (items.length) showCtx({ clientX: r.left, clientY: r.top - 40 - items.length * 34, preventDefault() {} }, items);
 }
 const linesOf = (t) =>
   String(t || '')
@@ -601,6 +611,9 @@ function renderUploads() {
 }
 async function uploadFile(file) {
   if (!file) return;
+  if (!can('attachFiles')) return toast('Dosya gönderemezsin', 'Bu sunucuda dosya ve resim gönderme yetkin yok.', 'err');
+  const blk = chatBlock();
+  if (blk) return toast('Dosya gönderilemiyor', blk.text, 'err');
   if (!feat('files') || !kanki.uploadFile) return toast('Dosya gönderilemiyor', 'Bu sunucu dosya göndermeyi desteklemiyor; sunucuyu kuran kişinin Kanki Admin’i güncellemesi gerekir.', 'err');
   if (file.size > 50 * 1024 * 1024) return toast('Dosya çok büyük', 'En fazla 50 MB gönderebilirsin.', 'err');
   if (!file.size) return toast('Dosya boş', '', 'err');
@@ -655,7 +668,7 @@ function gifQuery(q) {
 function onGifResults(m) {
   if ((m.q || '') !== $('#gif-q').value.trim()) return; // eski arama
   if (m.error === 'nokey')
-    return gifInfo(S.isAdmin ? 'GIF araması için Sunucu yönetimi › AFK ve GIF bölümüne bir KLIPY (ücretsiz) ya da GIPHY anahtarı gir.' : 'GIF araması için sunucuyu kuran kişinin Kanki Admin’de bir GIF anahtarı girmesi gerekiyor.');
+    return gifInfo(can('manageServer') ? 'GIF araması için Sunucu ayarları › Genel Bakış › Sohbet bölümüne bir KLIPY (ücretsiz) ya da GIPHY anahtarı gir.' : 'GIF araması için sunucuyu yöneten kişinin Sunucu ayarları’na bir GIF anahtarı girmesi gerekiyor.');
   if (m.error) return gifInfo('GIF araması şu an çalışmıyor. Biraz sonra tekrar dene.');
   const grid = $('#gif-grid');
   grid.classList.remove('loading');
@@ -663,6 +676,8 @@ function onGifResults(m) {
   grid.replaceChildren(...m.results.map((g) => h('img', { class: 'gif-item', src: g.preview || g.url, loading: 'lazy', alt: g.title || 'GIF', title: g.title || '', onclick: () => sendGif(g) })));
 }
 function sendGif(g) {
+  const blk = chatBlock();
+  if (blk) return toast('GIF gönderilemiyor', blk.text, 'err');
   send({ t: 'chat', text: '', gif: { url: g.url, w: g.w, h: g.h }, channelId: chatChannel(), replyTo: S.replyTo?.id });
   S.replyTo = null;
   renderComposerExtras();
@@ -690,7 +705,7 @@ $('#gif-q').addEventListener('keydown', (e) => {
 S.votes = new Map();
 S.myVotes = new Map();
 function voteItems(u) {
-  if (!feat('votes') || !S.channelId || u.id === S.myId || u.bot || u.channelId !== S.channelId || u.admin || u.mod) return [];
+  if (!feat('votes') || !S.channelId || u.id === S.myId || u.bot || u.channelId !== S.channelId || u.admin || u.mod || !can('startVotes') || myTimeout()) return [];
   const others = [...S.users.values()].filter((x) => x.channelId === S.channelId && !x.bot && x.id !== u.id).length;
   if (others < 2) return [];
   return [
@@ -748,44 +763,8 @@ function renderVotes() {
 setInterval(() => S.votes.size && renderVotes(), 1000);
 
 // =====================================================================
-//  Moderatör, yasak, kanal şifresi / kişi sınırı, sunucu ayarları (AFK, GIF)
+//  Şifreli kanal ve AFK'ya otomatik taşıma (roller, yasaklar, kanal ayarları admin.js'de)
 // =====================================================================
-function adminUserItems(u) {
-  if (!S.isAdmin || u.bot || u.admin) return [];
-  return [
-    feat('roles') && { label: u.mod ? '🛡️ Moderatörlüğü al' : '🛡️ Moderatör yap', run: () => send({ t: 'setRole', to: u.id, role: u.mod ? null : 'mod' }) },
-    feat('bans') && {
-      label: 'Yasakla…',
-      danger: true,
-      run: () =>
-        inlinePrompt(
-          `${u.name} yasaklansın mı?`,
-          '',
-          (reason) => send({ t: 'ban', to: u.id, reason }),
-          true,
-          'Yasaklanan kişi bu bilgisayardan (ve internetten bağlanıyorsa aynı IP adresinden) tekrar giremez. Yasağı Sunucu yönetimi › Yasaklılar bölümünden kaldırabilirsin. Sebep yazabilirsin (opsiyonel).'
-        ),
-    },
-  ];
-}
-function channelSettings(ch) {
-  formModal({
-    title: `${ch.name} — şifre ve kişi sınırı`,
-    desc: 'Şifreli kanala girmek isteyenden şifre istenir. Yönetici ve moderatörler şifresiz girer ve sınırı aşabilir.',
-    fields: [
-      { key: 'limit', label: 'Kişi sınırı (0 = sınırsız)', type: 'number', value: ch.limit || 0, min: 0, maxNum: 99 },
-      { key: 'password', label: ch.locked ? 'Yeni şifre (boş bırakırsan değişmez)' : 'Şifre (boş bırakırsan şifresiz)', type: 'password', max: 100 },
-      ch.locked && { key: 'clear', label: 'Şifreyi kaldır', type: 'check' },
-    ],
-    submit: 'Kaydet',
-    onSubmit: (v) => {
-      const msg = { t: 'channelSettings', channelId: ch.id, limit: Number(v.limit) || 0 };
-      if (v.clear) msg.password = '';
-      else if (v.password) msg.password = v.password;
-      send(msg);
-    },
-  });
-}
 function onNeedPassword(m) {
   formModal({
     title: `🔒 ${m.name}`,
@@ -795,58 +774,6 @@ function onNeedPassword(m) {
     onSubmit: (v) => send({ t: 'join', channelId: m.channelId, password: v.pw }),
   });
 }
-function renderAdminExtras(m) {
-  const on = 'bans' in m;
-  for (const id of ['#adm-mods', '#adm-bans', '#adm-afk-ch']) $(id).closest('.admin-section').classList.toggle('hidden', !on);
-  if (!on) return;
-  const afkSel = $('#adm-afk-ch');
-  if (document.activeElement !== afkSel) {
-    afkSel.replaceChildren(h('option', { value: '' }, '— yok —'), ...S.channels.filter((c) => c.type !== 'text').map((c) => h('option', { value: c.id }, c.name)));
-    afkSel.value = m.afkChannelId || '';
-  }
-  const minEl = $('#adm-afk-min');
-  if (document.activeElement !== minEl) minEl.value = m.afkMinutes ?? 15;
-  const prov = $('#adm-gif-prov');
-  if (document.activeElement !== prov) prov.value = m.gifProvider || 'klipy';
-  $('#adm-gif-state').textContent = m.hasGifKey ? '(kayıtlı)' : '(girilmedi)';
-  const mods = $('#adm-mods');
-  mods.replaceChildren(
-    ...(m.mods.length
-      ? m.mods.map((x) =>
-          h(
-            'div',
-            { class: 'adm-row' },
-            h('span', { class: `dot ${x.online ? 'on' : ''}`, title: x.online ? 'Bağlı' : 'Bağlı değil' }),
-            h('span', { class: 'adm-row-name' }, `🛡️ ${x.name}`),
-            h('button', { class: 'btn sm', onclick: () => (send({ t: 'setRole', key: x.key }), setTimeout(refreshAdmin, 300)) }, 'Kaldır')
-          )
-        )
-      : [h('div', { class: 'muted adm-empty' }, 'Moderatör yok.')])
-  );
-  const bans = $('#adm-bans');
-  bans.replaceChildren(
-    ...(m.bans.length
-      ? m.bans.map((b) =>
-          h(
-            'div',
-            { class: 'adm-row' },
-            h('span', { class: 'adm-row-name' }, `⛔ ${b.name}`),
-            h('span', { class: 'muted adm-row-sub' }, `${new Date(b.at).toLocaleDateString('tr-TR')} · ${b.by}${b.reason ? ' · ' + b.reason : ''}${b.ip ? ' · IP' : ''}`),
-            h('button', { class: 'btn sm', onclick: () => (send({ t: 'unban', id: b.id }), setTimeout(refreshAdmin, 300)) }, 'Yasağı kaldır')
-          )
-        )
-      : [h('div', { class: 'muted adm-empty' }, 'Yasaklı kimse yok.')])
-  );
-}
-$('#adm-save-extra').addEventListener('click', () => {
-  const msg = { t: 'setConfig', afkChannelId: $('#adm-afk-ch').value || null, afkMinutes: Number($('#adm-afk-min').value) || 0, gifProvider: $('#adm-gif-prov').value };
-  const key = $('#adm-gif-key').value.trim();
-  if (key) msg.gifKey = key;
-  send(msg);
-  $('#adm-gif-key').value = '';
-  setTimeout(refreshAdmin, 300);
-});
-
 // AFK: uzun süre hem bilgisayar başında hareket yok hem de konuşmuyorsan AFK kanalına geç
 setInterval(() => {
   if (S.transmitting) S.lastTalkAt = Date.now();
@@ -1335,6 +1262,7 @@ $('#cb-watch').addEventListener('click', () => {
 });
 function watchForm() {
   if (!S.channelId) return toast('Önce bir ses kanalına gir');
+  if (!can('startWatch')) return toast('Birlikte izle kapalı', 'Bu sunucuda birlikte izleme yetkin yok.', 'err');
   formModal({
     title: '🎬 Birlikte izle',
     desc: 'Videoyu sen oynatırsın, kanaldakiler yayın olarak izler; herkes durdurup ileri-geri sarabilir. YouTube bağlantısı yapıştır ya da bilgisayarından bir video dosyası seç.',

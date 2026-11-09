@@ -47,7 +47,7 @@ const COLORS = ['#3d8bfd', '#8b5cf6', '#ec4899', '#f97316', '#14b8a6', '#22c55e'
 const colorFor = (name) => {
   let x = 0;
   for (const c of name) x = (x * 31 + c.charCodeAt(0)) >>> 0;
-  return COLORS[x % COLORS.length];
+  return (document.documentElement.dataset.scheme === 'light' && self.KANKI_COLORS_LIGHT || COLORS)[x % COLORS.length]; // açık temada koyu palet (appearance.js)
 };
 // Profil fotoğrafı: kişinin adına göre bulunur (sohbet geçmişindeki eski mesajlarda da görünsün diye)
 const avatarImg = (name) => {
@@ -360,7 +360,7 @@ function applyRemoteVolume(userId) {
   const r = audio.remote.get(userId);
   if (r) {
     r.el.volume = Math.min(1, (settings.userVolumes[volKey(userId)] ?? 100) / 100);
-    r.el.muted = S.deafened || !!settings.localMutes[userName(userId)];
+    r.el.muted = S.deafened || !!settings.localMutes[userName(userId)] || silencedByServer(userId);
   }
   applyScreenVolumes();
 }
@@ -818,6 +818,7 @@ async function openPicker(arg) {
   if (!S.channelId) return;
   const editId = typeof arg === 'string' && S.myShares.has(arg) ? arg : null;
   pickerEdit = editId;
+  if (!editId && !can('stream')) return toast('Ekran paylaşamazsın', 'Bu sunucuda ekran paylaşma yetkin yok.', 'err');
   if (!editId && myScreenShares().length >= MAX_SHARES) {
     toast(`En fazla ${MAX_SHARES} yayın açabilirsin`, 'Yeni bir tane eklemek için önce birini durdur.');
     return;
@@ -1767,6 +1768,7 @@ function onMessage(m) {
       S.features = new Set(m.features || []);
       S.token = m.token || '';
       S.isMod = !!m.mod;
+      onPermsWelcome(m); // roller, yetkiler, susturma / zaman aşımı, duyuru (admin.js)
       applyAdminUi();
       setTimeout(() => KankiSfx.BUILTIN.forEach((x) => KankiSfx.builtin(x.sid)), 1500); // ilk basışta gecikme olmasın
       break;
@@ -1828,6 +1830,7 @@ function onMessage(m) {
         }
       }
       S.knownShares = liveKeys;
+      onPermsState(m); // roller, duyuru (admin.js)
       for (const id of audio.remote.keys()) applyRemoteVolume(id);
       renderAll();
       onStateExtras(prevUsers, prevChannel);
@@ -1949,9 +1952,16 @@ function onMessage(m) {
       break;
     }
     case 'moved':
-      toast('Kanalın değiştirildi', `${m.by} seni başka bir kanala taşıdı.`);
+      if (m.channelId === null) toast('Sesten çıkarıldın', `${m.by} seni ses kanalından çıkardı. Bir kanala tıklayarak geri dönebilirsin.`, 'err');
+      else toast('Kanalın değiştirildi', `${m.by} seni ${chName(m.channelId) ? chName(m.channelId) + ' kanalına' : 'başka bir kanala'} taşıdı.`);
       break;
     case 'forceMute':
+      if (m.server) {
+        // Sunucu susturması / zaman aşımı: kilit admin.js'de, bildirimi modState gösterir
+        if (!S.muted) toggleMute(true);
+        renderControls();
+        break;
+      }
       if (m.until) S.voteMutedUntil = m.until;
       if (!S.muted) toggleMute(true);
       toast('Mikrofonun kapatıldı', `${m.by} mikrofonunu kapattı. İstediğinde tekrar açabilirsin.`);
@@ -1968,6 +1978,7 @@ function onMessage(m) {
         setConnectError(m.message);
         break;
       }
+      if (onPermError(m)) break; // yetki, zaman aşımı, salt okunur, yavaş mod (admin.js)
       toast(m.code === 'info' || m.code === 'channel_full' ? m.message : 'Hata', m.code === 'info' || m.code === 'channel_full' ? '' : m.message, 'err');
       break;
     case 'pong':
@@ -2031,7 +2042,7 @@ function renderTree() {
             row.classList.remove('drop');
             const dragged = e.dataTransfer.getData('text/kanki-user');
             if (dragged === S.myId) joinChannel(ch.id);
-            else if (dragged && (S.isAdmin || S.isMod)) send({ t: 'move', to: dragged, channelId: ch.id });
+            else if (dragged && can('moveMembers')) send({ t: 'move', to: dragged, channelId: ch.id });
           },
         },
         h('span', { class: 'ch-ico' }),
@@ -2076,11 +2087,12 @@ function userRow(u, depth) {
   const sfb = sfxNow(u.id);
   if (sfb) badges.prepend(h('span', { class: 'sfx-badge', title: `${sfb.it.name} çaldı`, style: `animation-delay:-${sfb.age}ms` }, sfb.it.emoji));
   if (u.bot) badges.append(h('span', { class: 'bot-tag', title: 'Müzik botu — !yardım' }, 'BOT'));
-  if (u.admin) badges.append(h('span', { class: 'crown', title: 'Yönetici' }, ICON_CROWN()));
-  else if (u.mod) badges.append(h('span', { class: 'mod-badge', title: 'Moderatör' }, '🛡️'));
+  const sb = staffBadge(u); // sahip tacı ya da en üst rolün renginde kalkan (admin.js)
+  if (sb) badges.append(sb);
   activityBadge(u, badges);
-  if (u.muted) badges.insertAdjacentHTML('beforeend', ICON.micOff);
-  if (u.deafened) badges.insertAdjacentHTML('beforeend', ICON.headOff);
+  modBadges(u, badges); // sunucu susturması, sağırlaştırma, zaman aşımı (admin.js)
+  if (u.muted && !u.serverMuted) badges.insertAdjacentHTML('beforeend', ICON.micOff);
+  if (u.deafened && !u.serverDeafened) badges.insertAdjacentHTML('beforeend', ICON.headOff);
   if (settings.localMutes[u.name] && u.id !== S.myId) badges.insertAdjacentHTML('beforeend', ICON.speaker);
   const p = S.peers.get(u.id);
   const pcState = p?.pc.connectionState;
@@ -2091,14 +2103,14 @@ function userRow(u, depth) {
     {
       class: `user ${u.id === S.myId ? 'me' : ''}`,
       title,
-      draggable: u.id === S.myId || S.isAdmin ? 'true' : null,
+      draggable: u.id === S.myId || can('moveMembers') ? 'true' : null,
       ondragstart: (e) => e.dataTransfer.setData('text/kanki-user', u.id),
       oncontextmenu: (e) => userMenu(e, u),
       onclick: (e) => !e.target.closest('.live-badge') && openProfile(u.id, row),
       ondblclick: () => screenSharesOf(u).length && u.id !== S.myId && u.channelId === S.channelId && watchUser(u.id, true),
     },
     av,
-    applyNameStyle(h('span', { class: 'uname' }, u.name), styleOfUser(u), u.name),
+    roleTint(applyNameStyle(h('span', { class: 'uname' }, u.name), styleOfUser(u), u.name), u),
     badges
   );
   row.style.paddingLeft = 30 + depth * 16 + 'px';
@@ -2389,7 +2401,7 @@ function appendChat(m, scroll = true) {
     const nm = el.querySelector('.msg-name');
     const nst = nameStyleFor(m.name, m.ns);
     if (nst) applyNameStyle(nm, nst, m.name);
-    else nm.style.color = colorFor(m.name);
+    else nm.style.color = roleColorByName(m.name) || colorFor(m.name); // rol rengi
     nm.addEventListener('click', () => openProfileByName(m, nm));
     if (m.replyTo) {
       el.classList.add('has-reply');
@@ -2420,18 +2432,8 @@ function joinChannel(id) {
 
 function channelMenu(e, ch) {
   e.preventDefault();
-  if (!S.isAdmin) {
-    if (ch.id !== S.channelId) showCtx(e, [{ label: 'Kanala katıl', run: () => joinChannel(ch.id) }]);
-    return;
-  }
-  showCtx(e, [
-    ch.id !== S.channelId && { label: 'Kanala katıl', run: () => joinChannel(ch.id) },
-    { label: 'Alt kanal oluştur', run: () => promptChannel(ch.id) },
-    { label: 'Yeniden adlandır', run: () => renameChannel(ch) },
-    feat('chpass') && ch.type !== 'text' && { label: 'Şifre ve kişi sınırı…', run: () => channelSettings(ch) },
-    '-',
-    { label: 'Kanalı sil', danger: true, run: () => send({ t: 'deleteChannel', channelId: ch.id }) },
-  ]);
+  const items = channelMenuItems(ch); // yetkiye göre (admin.js)
+  if (items.length) showCtx(e, items);
 }
 
 function promptChannel(parent = null) {
@@ -2443,10 +2445,13 @@ function renameChannel(ch) {
 
 function userMenu(e, u) {
   e.preventDefault();
+  // Moderasyon: yetkiye ve rol hiyerarşisine göre (admin.js)
+  const mod = modMenuItems(subjectOf(u));
   if (u.id === S.myId) {
     return showCtx(e, [
       { label: S.muted ? 'Mikrofonu aç' : 'Mikrofonu kapat', run: toggleMute },
       { label: S.deafened ? 'Sesi aç' : 'Sesi kapat', run: toggleDeafen },
+      ...(mod.length ? ['-', ...mod] : []),
     ]);
   }
   const key = volKey(u.id);
@@ -2481,23 +2486,7 @@ function userMenu(e, u) {
     },
     !sameChannel && { label: 'Kanalına git', run: () => joinChannel(u.channelId) },
     ...voteItems(u),
-    ...(S.isAdmin || S.isMod
-      ? [
-          '-',
-          { html: `<div class="ctx-label">${S.isAdmin ? 'Yönetici' : 'Moderatör'}</div>` },
-          {
-            label: 'Kanala taşı',
-            submenu: S.channels.filter((c) => c.id !== u.channelId).map((c) => ({ label: c.name, run: () => send({ t: 'move', to: u.id, channelId: c.id }) })),
-          },
-          !u.muted && { label: 'Mikrofonunu kapat', run: () => send({ t: 'serverMute', to: u.id }) },
-          {
-            label: 'Sunucudan at',
-            danger: true,
-            run: () => inlinePrompt(`${u.name} sunucudan atılsın mı?`, '', (reason) => send({ t: 'kick', to: u.id, reason }), true, 'Sebep yazabilirsin (opsiyonel). Atılan kişi tekrar bağlanabilir.'),
-          },
-          ...adminUserItems(u),
-        ]
-      : []),
+    ...(mod.length ? ['-', { html: '<div class="ctx-label">Moderasyon</div>' }, ...mod] : []),
   ]);
 }
 
@@ -2625,9 +2614,11 @@ function showModal(id) {
 function hideModal(id) {
   $('#' + id).classList.add('hidden');
 }
+// Sunucu ayarlarında kaydedilmemiş değişiklik varsa kapatma; kaydet çubuğunu salla
+const blockClose = (m) => m.id === 'admin-panel' && !m.classList.contains('hidden') && typeof SS !== 'undefined' && SS.ovDirty && (ssNagSave(), true);
 $$('.modal').forEach((m) => {
-  m.addEventListener('mousedown', (e) => e.target === m && m.classList.add('hidden'));
-  $$('[data-close]', m).forEach((b) => b.addEventListener('click', () => m.classList.add('hidden')));
+  m.addEventListener('mousedown', (e) => e.target === m && !blockClose(m) && m.classList.add('hidden'));
+  $$('[data-close]', m).forEach((b) => b.addEventListener('click', () => !blockClose(m) && m.classList.add('hidden')));
 });
 
 // ---------- Mikrofon / hoparlör ----------
@@ -2637,6 +2628,9 @@ function toggleMute(force) {
     const min = Math.ceil((S.voteMutedUntil - Date.now()) / 60000);
     return toast('Mikrofonun kilitli', `Kanal oylamasıyla susturuldun. ${min} dakika sonra açabilirsin.`, 'err');
   }
+  // Sunucu susturması / zaman aşımı / sağırlaştırma: bir yetkili kaldırana kadar açılamaz (admin.js)
+  if (force !== true && S.muted && micLockReason()) return toast('Mikrofonun kilitli', micLockReason(), 'err');
+  if (force !== true && S.deafened && deafLockReason()) return toast('Sesin kilitli', deafLockReason(), 'err');
   if (S.deafened) {
     // Hoparlör kapalıyken mikrofona basmak: ikisini de aç (Discord gibi)
     S.deafened = false;
@@ -2648,11 +2642,12 @@ function toggleMute(force) {
   renderControls();
 }
 function toggleDeafen() {
+  if (S.deafened && deafLockReason()) return toast('Sesin kilitli', deafLockReason(), 'err');
   S.deafened = !S.deafened;
   if (S.deafened) {
     S.mutedBeforeDeafen = S.muted; // hoparlör açılınca mikrofon eski haline dönsün
     S.muted = true;
-  } else S.muted = S.mutedBeforeDeafen;
+  } else S.muted = S.mutedBeforeDeafen || !!micLockReason();
   beep(S.deafened ? 'mute' : 'unmute');
   if (S.deafened) stopAllSfx();
   send({ t: 'status', muted: S.muted, deafened: S.deafened });
@@ -2751,6 +2746,7 @@ $$('.snav').forEach((b) =>
   b.addEventListener('click', () => {
     $$('.snav').forEach((x) => x.classList.toggle('active', x === b));
     $$('.settings-pane').forEach((p) => p.classList.toggle('hidden', p.dataset.pane !== b.dataset.pane));
+    $('#settings .settings-main').scrollTop = 0; // yeni sayfa en üstten açılsın (önceki sayfanın kaydırması kalmasın)
   })
 );
 $('#btn-check-update').addEventListener('click', async () => {
@@ -2841,7 +2837,11 @@ window.addEventListener('keydown', (e) => {
   if (e.key === 'f' && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName || '') && tileEls.size) toggleFullscreen();
   if (e.key === 'Escape') {
     hideCtx();
-    $$('.modal').forEach((m) => m.classList.add('hidden'));
+    // Üstte başka pencere açıksa önce o kapansın; sunucu ayarları kaydedilmemişse açık kalsın
+    const open = $$('.modal:not(.hidden)');
+    const others = open.filter((m) => m.id !== 'admin-panel');
+    if (others.length && open.some((m) => m.id === 'admin-panel') && typeof SS !== 'undefined' && SS.ovDirty) others.forEach((m) => m.classList.add('hidden'));
+    else open.forEach((m) => !blockClose(m) && m.classList.add('hidden'));
   }
 });
 window.addEventListener('keyup', (e) => {
@@ -3112,8 +3112,11 @@ const TIPS = {
   'in-ngrok': 'Sunucuyu ngrok üzerinden internete açar; arkadaşların farklı evlerden, port açmana gerek kalmadan bağlanır.',
   'in-ngrok-token': 'ngrok hesabının giriş anahtarı. dashboard.ngrok.com › Your Authtoken sayfasından kopyala. Sadece bu bilgisayarda saklanır.',
   'in-ngrok-domain': 'ngrok’tan aldığın ücretsiz sabit adres. Doldurursan sunucunun adresi her açılışta aynı kalır.',
-  // Yönetim paneli
-  'adm-name': 'Sunucunun herkese görünen adı. Kaydet’e basınca bağlı herkeste hemen değişir.',
+  // Sunucu ayarları (admin.js)
+  'adm-name': 'Sunucunun herkese görünen adı. "Değişiklikleri kaydet"e basınca bağlı herkeste hemen değişir.',
+  'adm-welcome': 'Sunucuya bağlanan herkese girişte bir kez gösterilen mesaj. Kurallar ya da selam için.',
+  'adm-ann': 'Herkesin ekranının en üstünde görünen şerit. Kişi kapatabilir ama yeni duyuru yine çıkar.',
+  'adm-previews': 'Kapalıyken sohbette paylaşılan bağlantıların altında önizleme kartı çıkmaz.',
   'adm-password': 'Yeni giriş şifresi. Boş bırakırsan mevcut şifre değişmez. Zaten bağlı olanlar atılmaz.',
   'adm-nopass': 'Şifreyi tamamen kaldırır; adresi bilen herkes şifresiz girebilir.',
 };
@@ -3186,9 +3189,11 @@ const ICON_CROWN = () => {
 };
 
 function applyAdminUi() {
-  $('#btn-admin').classList.toggle('hidden', !S.isAdmin);
-  $('#btn-add-channel').classList.toggle('hidden', !S.isAdmin);
-  $('#btn-add-text').classList.toggle('hidden', !S.isAdmin);
+  // Sunucu ayarları ve kanal oluşturma: yetkisi olana (admin.js: isStaff, can)
+  $('#btn-admin').classList.toggle('hidden', !isStaff());
+  $('#btn-admin').title = 'Sunucu ayarları';
+  $('#btn-add-channel').classList.toggle('hidden', !can('manageChannels'));
+  $('#btn-add-text').classList.toggle('hidden', !can('manageChannels'));
 }
 
 const fmtDuration = (ms) => {
@@ -3199,139 +3204,7 @@ const fmtDuration = (ms) => {
   return hrs < 24 ? `${hrs} sa ${m % 60} dk` : `${Math.floor(hrs / 24)} gün ${hrs % 24} sa`;
 };
 
-let adminTimer = null;
-function openAdminPanel() {
-  if (!S.isAdmin) return;
-  $('#adm-name').value = S.serverName;
-  $('#adm-password').value = '';
-  $('#adm-nopass').checked = false;
-  $('#adm-stop').textContent = 'Sunucuyu Kapat';
-  delete $('#adm-stop').dataset.confirm;
-  showModal('admin-panel');
-  refreshAdmin();
-  clearInterval(adminTimer);
-  adminTimer = setInterval(() => {
-    if ($('#admin-panel').classList.contains('hidden')) return clearInterval(adminTimer);
-    refreshAdmin();
-  }, 3000);
-}
-
-async function refreshAdmin() {
-  send({ t: 'adminInfo' });
-  const st = await kanki.serverStatus();
-  const hostingHere = !!(st.hosting && S.hosting);
-  $('#adm-host-section').classList.toggle('hidden', !hostingHere);
-  const box = $('#adm-addresses');
-  box.innerHTML = '';
-  const addAddr = (text, note, cls = '') =>
-    box.append(
-      h(
-        'div',
-        {
-          class: `addr ${cls}`,
-          title: 'Kopyalamak için tıkla',
-          onclick: () => {
-            navigator.clipboard.writeText(text);
-            toast('Adres kopyalandı', text);
-          },
-        },
-        h('span', {}, text),
-        h('small', {}, note)
-      )
-    );
-  if (hostingHere) {
-    if (st.tunnelUrl) addAddr(st.tunnelUrl.replace(/^https:\/\//, ''), 'internet (ngrok)', 'public');
-    for (const a of st.addresses) addAddr(`${a.address}:${st.port}`, 'yerel ağ');
-    if (!st.tunnelUrl) box.append(h('div', { class: 'muted', style: 'font-size:12px;width:100%' }, 'İnternetten bağlanılabilmesi için sunucuyu "İnternete aç (ngrok)" seçeneğiyle başlat.'));
-  } else {
-    addAddr(S.url.replace(/^wss?:\/\//, ''), 'bağlı olduğun sunucu');
-  }
-}
-
-function renderAdminInfo(m) {
-  $('#adm-count').textContent = m.users.length;
-  $('#adm-channels').textContent = S.channels.length;
-  $('#adm-uptime').textContent = fmtDuration(m.now - m.startedAt);
-  $('#adm-haspass').textContent = m.hasPassword ? 'Var' : 'Yok';
-  const tbody = $('#adm-users');
-  if (tbody.contains(document.activeElement)) return; // açık bir seçim kutusunu bozma
-  tbody.innerHTML = '';
-  const chName = (id) => S.channels.find((c) => c.id === id)?.name || '—';
-  for (const u of m.users.sort((a, b) => a.name.localeCompare(b.name, 'tr'))) {
-    const isMe = u.id === S.myId;
-    const select = h('select', { title: 'Kanala taşı' });
-    for (const c of S.channels) {
-      const opt = h('option', { value: c.id }, c.name);
-      if (c.id === u.channelId) opt.selected = true;
-      select.append(opt);
-    }
-    select.addEventListener('change', () => {
-      send({ t: 'move', to: u.id, channelId: select.value });
-      select.blur();
-    });
-    const nameCell = h('div', { class: 'uname-cell' }, avatar(u.name), h('span', {}, u.name + (isMe ? ' (sen)' : '')));
-    if (u.admin) nameCell.append(h('span', { class: 'crown', title: 'Yönetici' }, ICON_CROWN()));
-    tbody.append(
-      h(
-        'tr',
-        {},
-        h('td', {}, nameCell),
-        h('td', {}, select),
-        h('td', { class: 'muted' }, u.ip || '—'),
-        h('td', { class: 'muted' }, fmtDuration(m.now - u.connectedAt)),
-        h(
-          'td',
-          { class: 'actions' },
-          isMe
-            ? null
-            : h(
-                'button',
-                {
-                  class: 'btn danger sm',
-                  onclick: () => {
-                    send({ t: 'kick', to: u.id, reason: '' });
-                    setTimeout(refreshAdmin, 400);
-                  },
-                },
-                'At'
-              )
-        )
-      )
-    );
-  }
-  void chName;
-  renderAdminExtras(m);
-}
-
-$('#btn-admin').addEventListener('click', openAdminPanel);
-$('#adm-save').addEventListener('click', () => {
-  const msg = { t: 'setServer', name: $('#adm-name').value.trim() };
-  if ($('#adm-nopass').checked) msg.password = '';
-  else if ($('#adm-password').value) msg.password = $('#adm-password').value;
-  send(msg);
-  $('#adm-password').value = '';
-  $('#adm-nopass').checked = false;
-  setTimeout(refreshAdmin, 300);
-});
-$('#adm-show-key').addEventListener('click', (e) => {
-  e.preventDefault();
-  if (!S.adminKey) return;
-  navigator.clipboard.writeText(S.adminKey);
-  toast('Yönetici anahtarı kopyalandı', 'Bu anahtarı kimseyle paylaşma; sahibi sunucuyu yönetebilir.');
-});
-$('#adm-stop').addEventListener('click', async () => {
-  const btn = $('#adm-stop');
-  if (!btn.dataset.confirm) {
-    btn.dataset.confirm = '1';
-    btn.textContent = 'Emin misin? Herkesin bağlantısı kesilir';
-    return;
-  }
-  await kanki.stopServer();
-  S.hosting = null;
-  $('#host-chip').classList.add('hidden');
-  disconnect();
-  setConnectError('Sunucu kapatıldı.');
-});
+// Sunucu ayarları ekranı (openAdminPanel, refreshAdmin, renderAdminInfo, Bağlantı sekmesi) admin.js'de.
 
 // =====================================================================
 //  Otomatik güncelleme bildirimi (sadece kurulumlu Windows sürümünde gelir)
@@ -3480,8 +3353,8 @@ $('#server-menu-btn').addEventListener('click', (e) => {
     },
     { label: 'Davet bağlantısını kopyala', run: () => copyInviteLink(false) },
     S.password && { label: 'Şifre dahil davet bağlantısı', run: () => copyInviteLink(true) },
-    S.isAdmin && { label: 'Sunucu yönetimi', run: openAdminPanel },
-    S.isAdmin && { label: 'Kanal oluştur', run: () => promptChannel(null) },
+    isStaff() && { label: 'Sunucu ayarları', run: () => openAdminPanel() },
+    can('manageChannels') && { label: 'Kanal oluştur', run: () => createChannelForm() },
     '-',
     { label: 'Ayarlar', run: openSettings },
     { label: 'Bağlantıyı kes', danger: true, run: disconnect },
@@ -3524,7 +3397,7 @@ function openProfile(uid, anchor) {
   const banner = h('div', { class: 'pf-banner' });
   banner.style.background = colorFor(u.name);
   const tags = h('div', { class: 'pf-tags' });
-  if (u.admin) tags.append(h('span', { class: 'pf-tag admin' }, 'Yönetici'));
+  if (u.admin) tags.append(h('span', { class: 'pf-tag admin' }, 'Sunucu sahibi'));
   const nScr = screenSharesOf(u).length;
   if (nScr) tags.append(h('span', { class: 'pf-tag live' }, nScr > 1 ? `${nScr} yayın` : 'Ekran paylaşıyor'));
   if (camShareOf(u)) tags.append(h('span', { class: 'pf-tag cam' }, 'Kamerası açık'));
@@ -3538,7 +3411,8 @@ function openProfile(uid, anchor) {
     statusText ? h('div', { class: 'pf-custom' }, statusText) : null,
     activityText(u) ? h('div', { class: 'pf-activity' }, activityText(u)) : null,
     h('div', { class: 'pf-status' }, h('span', { class: `status-dot inline ${pres}` }), PRESENCE[pres].label, ch ? h('span', { class: 'muted' }, ` · ${ch.name}`) : null),
-    tags
+    tags,
+    profileRoles(u) // roller ve moderasyon durumu (admin.js)
   );
   if (isMe) {
     const row = h('div', { class: 'pf-section' }, h('div', { class: 'pf-label' }, 'Durumun'));
@@ -3632,13 +3506,9 @@ function renderMembers() {
   if (rightTab !== 'members') return;
   const box = $('#members');
   box.innerHTML = '';
-  const groups = [];
-  for (const ch of S.channels) {
-    const list = [...S.users.values()].filter((u) => u.channelId === ch.id);
-    if (list.length) groups.push([ch, list]);
-  }
-  for (const [ch, list] of groups) {
-    box.append(h('div', { class: 'member-group' }, `${ch.name} — ${list.length}`));
+  // Önce "ayrı göster" (hoist) rolleri, sonra kanallar — Discord gibi (admin.js)
+  for (const [label, list] of memberGroups()) {
+    box.append(h('div', { class: 'member-group' }, `${label} — ${list.length}`));
     for (const u of list.sort((a, b) => a.name.localeCompare(b.name, 'tr'))) {
       const pres = presenceOf(u);
       const av = u.bot ? botAvatar() : withDot(avatar(u.name), u);
@@ -3649,9 +3519,9 @@ function renderMembers() {
         'div',
         { class: `member ${pres}`, onclick: () => openProfile(u.id, row), oncontextmenu: (e) => userMenu(e, u) },
         av,
-        h('div', { class: 'member-text' }, h('div', { class: 'member-name' }, nameEl(u.name, styleOfUser(u)), u.admin ? h('span', { class: 'crown' }, ICON_CROWN()) : u.mod ? h('span', { class: 'mod-badge', title: 'Moderatör' }, '🛡️') : null), sub ? h('div', { class: 'member-sub' }, sub) : null)
+        h('div', { class: 'member-text' }, h('div', { class: 'member-name' }, nameEl(u.name, styleOfUser(u)), staffBadge(u)), sub ? h('div', { class: 'member-sub' }, sub) : null)
       );
-      if (!styleOfUser(u)) row.querySelector('.member-name').style.color = colorFor(u.name);
+      if (!styleOfUser(u)) row.querySelector('.member-name').style.color = roleInk(u.color) || colorFor(u.name); // rol rengi (açık temada koyu)
       box.append(row);
     }
   }
@@ -3723,7 +3593,7 @@ function mentionCandidates() {
   const q = mentionQuery();
   if (q === null) return [];
   const all = [...S.users.values()].filter((u) => u.id !== S.myId).map((u) => u.name);
-  all.push('herkes');
+  if (can('mentionEveryone')) all.push('herkes');
   return all.filter((n) => trLower(n).startsWith(trLower(q))).slice(0, 6);
 }
 function updateMentionPop() {
@@ -3878,7 +3748,7 @@ function msgTools(m) {
   tools.append(h('span', { class: 'mt-sep' }));
   btn('Yanıtla', ICON.reply, () => startReply(m));
   if (isMineMsg(m)) btn('Düzenle', ICON.edit, () => startEdit(m));
-  else if (S.isAdmin) btn('Sil (yönetici)', ICON.trash, (e) => deleteMsg(m, e.shiftKey), 'danger');
+  else if (can('manageMessages')) btn('Sil (yetkili)', ICON.trash, (e) => deleteMsg(m, e.shiftKey), 'danger');
   btn('Diğer (sağ tık)', ICON_MORE, (e, b) => {
     const r = b.getBoundingClientRect();
     msgMenu({ clientX: r.left, clientY: r.bottom + 4, preventDefault() {} }, m);
@@ -3894,7 +3764,7 @@ function msgMenu(e, m) {
     { html: `<div class="ctx-react">${QUICK_REACTS.concat(['🔥', '🎉']).map((x) => `<button type="button" data-em="${x}">${x}</button>`).join('')}</div>` },
     { label: 'Yanıtla', run: () => startReply(m) },
     mine && m.text !== undefined && !m.poll && !m.wheel && !m.teams && { label: 'Düzenle', run: () => startEdit(m) },
-    (mine || S.isAdmin || S.isMod) && { label: m.pinned ? 'Sabitlemeyi kaldır' : 'Sabitle', run: () => send({ t: 'pin', id: m.id, on: !m.pinned, channelId: chatChannel() }) },
+    (mine || can('manageMessages')) && { label: m.pinned ? 'Sabitlemeyi kaldır' : 'Sabitle', run: () => send({ t: 'pin', id: m.id, on: !m.pinned, channelId: chatChannel() }) },
     m.text && {
       label: 'Metni kopyala',
       run: () => {
@@ -3903,8 +3773,8 @@ function msgMenu(e, m) {
       },
     },
     m.image && { label: 'Resmi aç', run: () => openLightbox(m.image, m.name) },
-    (mine || S.isAdmin) && '-',
-    (mine || S.isAdmin) && { label: mine ? 'Mesajı sil' : 'Mesajı sil (yönetici)', danger: true, run: () => deleteMsg(m) },
+    (mine || can('manageMessages')) && '-',
+    (mine || can('manageMessages')) && { label: mine ? 'Mesajı sil' : 'Mesajı sil (yetkili)', danger: true, run: () => deleteMsg(m) },
   ]);
   for (const b of document.querySelectorAll('#ctx .ctx-react button'))
     b.addEventListener('click', () => {
@@ -4113,6 +3983,7 @@ function renderComposerExtras() {
   box.classList.toggle('hidden', !box.childElementCount);
   const ch = S.channels.find((c) => c.id === chatChannel());
   $('#chat-input').placeholder = S.pendingImage ? 'Not ekle (isteğe bağlı)' : S.replyTo ? 'Yanıtını yaz' : ch?.type === 'text' ? `#${ch.name} kanalına yaz` : `${ch?.name || 'Kanal'} sohbetine yaz`;
+  renderComposerLock(); // zaman aşımı, salt okunur, yetki yok, yavaş mod (admin.js)
   if (atBottom) chatLog.scrollTop = chatLog.scrollHeight;
 }
 
@@ -4121,10 +3992,14 @@ function sendChat() {
   const v = inp.value.trim();
   if (!v && !S.pendingImage) return;
   if (!S.ws || S.ws.readyState !== 1) return toast('Mesaj gönderilemedi', 'Sunucuya bağlı değilsin.', 'err');
+  const blk = chatBlock(); // zaman aşımı, salt okunur, yavaş mod (admin.js)
+  if (blk) return toast(blk.kind === 'slow' ? 'Yavaş mod' : 'Mesaj gönderilemiyor', blk.text, 'err', 3000);
+  if (S.pendingImage && !can('attachFiles')) return toast('Resim gönderemezsin', 'Bu sunucuda dosya ve resim gönderme yetkin yok.', 'err');
   const msg = { t: 'chat', text: v, channelId: chatChannel() };
   if (S.pendingImage) Object.assign(msg, { image: S.pendingImage.data, imageW: S.pendingImage.w, imageH: S.pendingImage.h });
   if (S.replyTo) msg.replyTo = S.replyTo.id;
   send(msg);
+  noteChatSent(msg.channelId);
   inp.value = '';
   autoGrow(inp);
   S.pendingImage = null;
@@ -4333,6 +4208,7 @@ async function toggleCamera() {
   const cur = myCamera();
   if (cur) return removeShare(cur.id);
   if (!S.channelId) return;
+  if (!can('camera')) return toast('Kamera açamazsın', 'Bu sunucuda kamera yetkin yok.', 'err');
   try {
     await kanki.ensureCamera?.();
   } catch {}
@@ -4407,6 +4283,7 @@ function renderCallBar() {
   set('#cb-deafen', S.deafened ? ICON.headOff : ICON.head, S.deafened ? 'Sesi aç (Ctrl+Shift+D)' : 'Sesi kapat (Ctrl+Shift+D)', S.deafened ? 'off' : '');
   set('#cb-leave', ICON.power, 'Bağlantıyı kes', 'leave');
   $('#cb-share').disabled = screens >= MAX_SHARES;
+  gateCallBar(); // yetkisi olmayan özellikler gizlenir, kilitler görünür (admin.js)
 }
 $('#cb-camera').addEventListener('click', toggleCamera);
 $('#cb-share').addEventListener('click', openPicker);
@@ -4536,6 +4413,8 @@ function markSfx(userId, sid) {
 
 function sendSfx(sid) {
   if (!S.channelId || !SFX_BY_ID.has(sid)) return;
+  if (!can('useSoundboard')) return toast('Ses efektleri kapalı', 'Bu sunucuda ses efekti yetkin yok.', 'err');
+  if (micLockReason()) return toast('Ses efekti çalamazsın', micLockReason(), 'err');
   const now = Date.now();
   if (now < sfx.coolUntil) return; // spam koruması (sunucu da kontrol eder)
   sfx.coolUntil = now + SFX_COOLDOWN;
@@ -4941,7 +4820,7 @@ function renderTextChannels() {
   if (!box) return;
   box.innerHTML = '';
   const list = S.channels.filter((c) => c.type === 'text').sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-  $('#text-head').classList.toggle('hidden', !list.length && !S.isAdmin);
+  $('#text-head').classList.toggle('hidden', !list.length && !can('manageChannels'));
   for (const ch of list) {
     const un = S.textUnread.get(ch.id);
     const row = h(
@@ -4999,20 +4878,7 @@ function renderChatHead() {
 }
 function textChannelMenu(e, ch) {
   e.preventDefault();
-  const un = S.textUnread.get(ch.id);
-  showCtx(e, [
-    { label: 'Sohbeti aç', run: () => openChat(ch.id) },
-    un && {
-      label: 'Okundu olarak işaretle',
-      run: () => {
-        S.textUnread.delete(ch.id);
-        renderTextChannels();
-      },
-    },
-    S.isAdmin && '-',
-    S.isAdmin && { label: 'Yeniden adlandır', run: () => renameChannel(ch) },
-    S.isAdmin && { label: 'Kanalı sil', danger: true, run: () => confirmBox(`#${ch.name} silinsin mi?`, 'Kanal ve tüm mesaj geçmişi herkes için silinir.', 'Sil', () => send({ t: 'deleteChannel', channelId: ch.id })) },
-  ]);
+  showCtx(e, textChannelMenuItems(ch)); // yetkiye göre (admin.js)
 }
 $('#btn-add-text').addEventListener('click', () =>
   inlinePrompt('Yazı kanalı adı', '', (name) => send({ t: 'createChannel', name, type: 'text' }), false, 'Sese katılmadan herkesin yazabildiği kanal, ör. "oyun-planı" ya da "linkler".')
