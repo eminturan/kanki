@@ -1235,44 +1235,48 @@ body.has-update .layout.chat-hidden .stage-head { padding-right: 56px; }
 .msg-text.ns-msg { font-size: 1.04em; }
 .msg-text.ns-f-pixel { font-size: .72em; line-height: 1.8; }
 .user .uname.ns { display: block; }
-/* Yıldırım: isim beyaz parlar, iki yanından sırayla --n3 renginde yıldırımlar çakar */
-.ns-x-storm {
-  position: relative; color: #fff !important;
-  text-shadow: 0 0 2px var(--n1), 0 0 7px var(--n1);
-  filter: drop-shadow(0 0 3px var(--n3)) drop-shadow(0 0 6px var(--n2));
-  animation: ns-storm-text 3.2s linear infinite;
-}
-.ns-x-storm::before, .ns-x-storm::after {
-  content: ''; position: absolute; top: -.3em; width: .8em; height: 1.6em; pointer-events: none; opacity: 0;
-  background: color-mix(in srgb, var(--n3) 70%, #fff);
-  --bolt: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 30'%3E%3Cpath d='M10 0 L7.5 6 L10.5 8 L5 16 L8.5 17.5 L3 30 L12 15 L8.5 13.5 L13 5 L11 4 Z' fill='%23000'/%3E%3Cpath d='M7.5 6 L3 9 M5 16 L1.5 19.5' stroke='%23000' stroke-width='1.2' fill='none'/%3E%3C/svg%3E");
+/* Yıldırım eki: seçilen efektin (neon, ateş, gradyan…) üstüne, ismin farklı yerlerinde --n3 renginde çift çakan yıldırımlar */
+.ns-bolts { position: relative; filter: drop-shadow(0 0 2px var(--n3)) drop-shadow(0 0 5px var(--n3)); }
+.ns-bolts.ns-x-fire { filter: drop-shadow(0 0 3px rgba(255, 110, 30, .55)) drop-shadow(0 0 4px var(--n3)); }
+.ns-bolts::before, .ns-bolts::after {
+  content: ''; position: absolute; top: -.55em; width: 1em; height: 2.1em; pointer-events: none; opacity: 0;
+  background: color-mix(in srgb, var(--n3) 45%, #fff);
+  --bolt: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 40'%3E%3Cpath d='M12 0 L8 9 L12.5 10.5 L6 21 L10.5 22.5 L3 40 L15.5 19 L11 17.5 L16.5 7 L13.5 6 L15 0 Z'/%3E%3Cpath d='M8 9 L2.5 13 L4 13.5 L1 18 M6 21 L1.5 26' stroke='%23000' stroke-width='1.4' fill='none'/%3E%3Cpath d='M12.5 10.5 L18 14 L17 15 L19.5 19' stroke='%23000' stroke-width='1.1' fill='none'/%3E%3C/svg%3E");
   -webkit-mask: var(--bolt) center / contain no-repeat; mask: var(--bolt) center / contain no-repeat;
 }
-.ns-x-storm::before { left: -.35em; animation: ns-storm-a 3.2s steps(1) infinite; }
-.ns-x-storm::after { right: -.35em; animation: ns-storm-b 3.2s steps(1) infinite; }
-@keyframes ns-storm-a {
-  0% { opacity: 1; transform: rotate(8deg); }
-  3% { opacity: 0; } 5% { opacity: .9; } 8% { opacity: 0; }
-  60% { opacity: 1; transform: translateX(1.4em) rotate(-6deg) scaleX(-1); }
-  63% { opacity: 0; }
+.ns-bolts::before { animation: ns-bolt-a 4s steps(1) infinite; }
+.ns-bolts::after { animation: ns-bolt-b 4s steps(1) infinite; }
+/* Kendi animasyonu olmayan efektlerde (düz, gradyan, neon) çakınca isim de bir an aydınlanır */
+.ns-bolts.ns-bolts-flash { animation: ns-bolt-glow 4s steps(1) infinite; }
+@keyframes ns-bolt-a {
+  0% { opacity: 1; left: -6%; transform: rotate(10deg); }
+  2% { opacity: 0; } 3.5% { opacity: 1; } 6% { opacity: 0; }
+  38% { opacity: 1; left: 42%; transform: rotate(-4deg) scaleX(-1); }
+  40% { opacity: 0; } 41.5% { opacity: .9; } 44% { opacity: 0; }
+  72% { opacity: 1; left: 18%; transform: rotate(14deg); }
+  74% { opacity: 0; } 75.5% { opacity: 1; } 78% { opacity: 0; }
 }
-@keyframes ns-storm-b {
+@keyframes ns-bolt-b {
   0% { opacity: 0; }
-  30% { opacity: 1; transform: rotate(-10deg) scaleX(-1); }
-  33% { opacity: 0; } 35% { opacity: .85; } 37% { opacity: 0; }
-  82% { opacity: 1; transform: translateX(-1.2em) rotate(12deg); }
-  85% { opacity: 0; }
+  19% { opacity: 1; left: 78%; transform: rotate(-12deg) scaleX(-1); }
+  21% { opacity: 0; } 22.5% { opacity: 1; } 25% { opacity: 0; }
+  55% { opacity: 1; left: 96%; transform: rotate(8deg); }
+  57% { opacity: 0; } 58.5% { opacity: .9; } 61% { opacity: 0; }
+  88% { opacity: 1; left: 60%; transform: rotate(-8deg) scaleX(-1); }
+  90% { opacity: 0; } 91.5% { opacity: 1; } 94% { opacity: 0; }
 }
-@keyframes ns-storm-text {
-  0%, 30%, 60%, 82% { text-shadow: 0 0 3px #fff, 0 0 8px var(--n3), 0 0 16px var(--n2); }
-  4%, 34%, 64%, 86%, 100% { text-shadow: 0 0 2px var(--n1), 0 0 7px var(--n1); }
+@keyframes ns-bolt-glow {
+  0%, 3.5%, 19%, 22.5%, 38%, 55%, 72%, 75.5%, 88%, 91.5% { filter: brightness(1.45) drop-shadow(0 0 3px var(--n3)) drop-shadow(0 0 10px var(--n3)); }
+  2%, 6%, 21%, 25%, 40%, 44%, 57%, 61%, 74%, 78%, 90%, 94% { filter: drop-shadow(0 0 2px var(--n3)) drop-shadow(0 0 5px var(--n3)); }
 }
-/* Dar satırlar (kanal/üye listesi, alt köşe) taşanı kırpar: parlama ve yıldırımlar sığsın diye kırpma alanını
-   dolgu + eksi kenar boşluğuyla genişlet (yerleşim değişmez), efekt sohbettekiyle aynı görünsün */
-.user .uname.ns-x-storm, .member-name:has(> .ns-x-storm), #me-name:has(> .ns-x-storm) { padding: 12px 16px; margin: -12px -16px; }
+/* Dar satırlar (kanal/üye listesi, alt köşe) taşanı kırpar: isim kutusu ismin boyunda kalsın (yıldırım satırın ucuna
+   kaçmasın) ve parlama/yıldırım sığsın diye kırpma kenarına pay verilsin (uzun isimde … yine çalışır) */
+.user .uname.ns-bolts { width: fit-content; max-width: 100%; }
+.user .uname.ns-bolts, .member-name:has(> .ns-bolts), #me-name:has(> .ns-bolts) { overflow: clip; overflow-clip-margin: 24px; }
+.ns-bolts-toggle small { color: var(--text-3, var(--muted)); font-weight: 400; }
 .ns-fx.locked { opacity: .55; cursor: not-allowed; }
 .ns-fx .ns-lock { margin-left: 6px; font-size: 12px; }
-@media (prefers-reduced-motion: reduce) { .ns-x-shimmer, .ns-x-rainbow, .ns-x-pulse, .ns-x-fire, .ns-x-storm, .ns-x-storm::before, .ns-x-storm::after { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .ns-x-shimmer, .ns-x-rainbow, .ns-x-pulse, .ns-x-fire, .ns-bolts, .ns-bolts::before, .ns-bolts::after { animation: none; } }
 
 /* ---------- Ayarlar › Yazı stili ---------- */
 .ns-preview { padding: 6px 0 10px; border-radius: 8px; background: var(--bg-1); border: 1px solid var(--line); margin-bottom: 4px; }

@@ -63,7 +63,7 @@ const PERMS = [
   ['createPolls', 'Anket, çark, takım', 'Anket açar, çark çevirir, takım kurar.', 'sohbet'],
   ['startVotes', 'Oylama başlat', 'Oylamayla susturma ya da AFK’ya gönderme başlatır.', 'sohbet'],
   ['styledMessages', 'Süslü mesaj yazısı', 'Yazı stilindeki yazı tipini ve rengi mesajlarında da kullanır.', 'sohbet'],
-  ['stormName', 'Yıldırım isim efekti', 'Yazı stilinde “Yıldırım” efektini kullanır: adının etrafında seçtiği renkte yıldırımlar çakar.', 'sohbet'],
+  ['stormName', 'Yıldırım isim efekti', 'Yazı stilinde “Yıldırım ekle”yi kullanır: seçtiği efektin üstüne, adının etrafında seçtiği renkte yıldırımlar çakar.', 'sohbet'],
   ['useSoundboard', 'Ses efektleri', 'Ses efekti panelini kullanır.', 'ses'],
   ['stream', 'Ekran paylaş', 'Ekranını ya da bir pencereyi yayınlar.', 'ses'],
   ['camera', 'Kamera', 'Kamerasını açar.', 'ses'],
@@ -273,15 +273,17 @@ function startServer(opts = {}) {
     let st = u?.nameStyle;
     if (!st) return null;
     if (st.inMessages && !u.bot && !can(u, 'styledMessages')) st = { ...st, inMessages: false };
-    if (st.effect === 'storm' && !can(u, 'stormName')) st = { ...st, effect: 'none' };
-    return st.font === 'default' && st.effect === 'none' && !st.c1 && !st.inMessages ? null : st;
+    if (st.bolts && !can(u, 'stormName')) st = { ...st, bolts: false };
+    return st.font === 'default' && st.effect === 'none' && !st.c1 && !st.bolts && !st.inMessages ? null : st;
   };
   const cleanNameStyle = (st) => {
     if (!st || typeof st !== 'object') return null;
     const font = NS_FONTS.includes(st.font) ? st.font : 'default';
-    const effect = NS_FX.includes(st.effect) ? st.effect : 'none';
-    const out = { font, effect, c1: hex(st.c1), c2: hex(st.c2), c3: hex(st.c3), inMessages: !!st.inMessages };
-    return font === 'default' && effect === 'none' && !out.c1 ? null : out;
+    // 1.0.40–1.0.41'deki "storm" efekti artık her efektin üstüne eklenen yıldırım: Düz + yıldırım olur
+    const storm = st.effect === 'storm';
+    const effect = !storm && NS_FX.includes(st.effect) ? st.effect : 'none';
+    const out = { font, effect, c1: hex(st.c1), c2: hex(st.c2), c3: hex(st.c3), bolts: storm || !!st.bolts, inMessages: !!st.inMessages };
+    return font === 'default' && effect === 'none' && !out.c1 && !out.bolts ? null : out;
   };
 
   // ---------- Roller ve yetkiler ----------
@@ -1240,7 +1242,7 @@ function startServer(opts = {}) {
           admin: isAdmin,
           mod: isModUser(me),
           token: me.token,
-          features: ['sfx', 'activity', 'log', 'pins', 'polls', 'votes', 'files', 'preview', 'gif', 'roles', 'chpass', 'afk', 'bans', 'marks', 'watch', 'perms', 'audit', 'timeout', 'serverDeafen', 'moveAll', 'purge', 'slowmode', 'readOnly', 'announce', 'welcomeMessage', 'headers', 'afkMic', 'webClient', 'info', 'leaveVoice', 'icon', 'flash', 'flashCooldown', 'liftVoteMute', 'storm'],
+          features: ['sfx', 'activity', 'log', 'pins', 'polls', 'votes', 'files', 'preview', 'gif', 'roles', 'chpass', 'afk', 'bans', 'marks', 'watch', 'perms', 'audit', 'timeout', 'serverDeafen', 'moveAll', 'purge', 'slowmode', 'readOnly', 'announce', 'welcomeMessage', 'headers', 'afkMic', 'webClient', 'info', 'leaveVoice', 'icon', 'flash', 'flashCooldown', 'liftVoteMute', 'storm', 'bolts'],
           // Roller ve yetkiler
           perms: [...permsOf(me)],
           roles: userRoleIds(me),

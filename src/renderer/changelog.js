@@ -6,6 +6,16 @@
  */
 const CHANGELOG = [
   {
+    version: '1.0.42',
+    date: '2026-11-09',
+    title: 'Yıldırım artık her efektle birlikte',
+    changed: [
+      'Yıldırım ayrı bir efekt değil, her efektin üstüne eklenen bir seçenek oldu: Ayarlar › Yazı stili › "⚡ Yıldırım ekle". Neon + yıldırım, Ateş + yıldırım, Gradyan + yıldırım gibi birleştirebilirsin. Daha önce Yıldırım seçtiysen kendiliğinden Düz + yıldırım olur.',
+      'Yıldırımlar daha büyük ve dallı; her çakış ismin farklı bir yerinde, çift çakıyor. Düz, Gradyan ve Neon\'da çakınca isim de bir an aydınlanıyor.',
+    ],
+    fixed: ['Kanal listesinde yıldırım isimden kopup satırın sağ ucunda çıkıyordu.'],
+  },
+  {
     version: '1.0.41',
     date: '2026-11-09',
     title: 'Yıldırım efekti her yerde aynı',
