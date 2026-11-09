@@ -98,7 +98,9 @@ GitHub Actions paketleri derler, Release'e `latest.yml` ile birlikte ekler; kuru
 - **Sol çubuk** (Discord gibi): en üstte ana sayfa, altında eklenen sunucular. Simgedeki sayı içeride kaç kişi olduğunu, gri nokta sunucuya ulaşılamadığını gösterir. Tıklayınca o sunucunun içi açılır ama sese girilmez; ses kanalına tıklayınca girilir (aynı anda tek sunucudasın). Bağlantı koparsa yeniden bağlanırken önceki kanala dönülür. Sağ tık: adresi kopyala, şifreyi değiştir, listeden kaldır.
 - **Ana sayfa:** sunucu kartları (çevrimiçi sayısı, kimler içeride, canlı yayın) ve "Sunucu ekle" (adres ya da davet bağlantısı yapıştırılır). Kart bilgisi sunucunun `/info` adresinden gelir (şifreli sunucuda isimler gösterilmez); 30 saniyede bir yenilenir.
 - **Kanki Admin:** kendi sunucun listede "Senin sunucun" olarak durur, "Başlat ve gir" ile açılır. Port, şifre, ngrok ayarları çubuktaki sunucu düğmesinde.
-- **Sol alttaki kart** (Discord gibi): seste iken üstte ses bağlantısı (kanal adı, sesten çık, kamera, ekran, ses efektleri, birlikte izle), altta profil. Telefon düğmesi sadece sesten çıkarır; sunucudan çıkmak için sunucu menüsü ya da çubuktaki simgeye sağ tık › Sunucudan çık.
+- **Sol alttaki kart** (Discord gibi): seste iken üstte ses bağlantısı (kanal adı, bağlantıyı kes, kamera, ekran, ses efektleri, birlikte izle), altta profil. Telefon düğmesi sunucudan çıkarır ve ana sayfaya döner.
+- **Sunucu resmi:** Sunucu Ayarları › Genel Bakış › Sunucu resmi (Sunucuyu yönet yetkisi). Resim kare kırpılıp 256 px'e küçültülür; sol çubukta, ana sayfa kartında ve kanal listesinin üstündeki logoda görünür. Sunucu mesajlarla sadece sürüm numarasını yollar, resim `/icon` adresinden bir kez indirilip saklanır (ngrok kotası harcamaz).
+- **Gecikme simgesi:** üzerine gelince kişilerle aradaki ses gecikmesi (WebRTC, doğrudan bağlantı) ve sunucu gecikmesi ayrı ayrı görünür. Ses ve görüntü ngrok'tan geçmez; sunucu gecikmesi yüksekse bu sadece mesaj ve kanal işlemlerini yavaşlatır.
 - Tarayıcıdan girenlerde çubuk yoktur: ad girilir ve doğrudan o sunucuya bağlanılır.
 
 ## Ekran paylaşımı

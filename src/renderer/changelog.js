@@ -6,6 +6,16 @@
  */
 const CHANGELOG = [
   {
+    version: '1.0.33',
+    date: '2026-11-09',
+    title: 'Sunucu resmi',
+    added: [
+      'Sunucuya resim konabilir (Sunucu Ayarları › Genel Bakış › Sunucu resmi). Sol çubukta, ana sayfadaki kartta ve kanal listesinin üstündeki logoda görünür. Resim bir kez indirilip saklanır, değişmedikçe tekrar indirilmez.',
+      'Gecikme simgesinin üzerine gelince artık kişilerle aranızdaki gerçek ses gecikmesi de görünür; simgenin rengi sese göre değişir. Ses ve görüntü sunucudan (ngrok\'tan) geçmez, sunucu gecikmesi sadece mesaj ve kanal işlemlerini etkiler.',
+    ],
+    changed: ['Telefon düğmesi yine bağlantıyı keser ve ana sayfaya döner (sadece sesten çıkıp sunucuda kalmak yanıltıcıydı).'],
+  },
+  {
     version: '1.0.32',
     date: '2026-11-09',
     title: 'Sol altta Discord gibi ses ve profil kartı',

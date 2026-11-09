@@ -481,7 +481,12 @@ function startServer(opts = {}) {
       roles: conf.roleDefs.map(publicRole),
       description: conf.description || '',
       announcement: conf.announcement || null,
+      iconV: iconV(),
     });
+  }
+  // Sunucu resmi: sadece sürüm numarası mesajlarla gider, resmin kendisi /icon adresinden bir kez indirilir (ngrok kotası)
+  function iconV() {
+    return conf.icon && conf.iconV ? conf.iconV : 0;
   }
   // Rol/yetki değişince etkilenen herkese yeni yetkilerini gönder
   const permsMsg = (u) => ({ t: 'perms', perms: [...permsOf(u)], roles: userRoleIds(u), rank: rankOf(u), admin: !!u.admin, mod: isModUser(u), color: userColor(u) });
@@ -1026,6 +1031,19 @@ function startServer(opts = {}) {
       });
       return res.end(f.buf);
     }
+    // Sunucu resmi (sol çubuk, ana sayfa kartı, kanal listesinin üstü). ?v= sürümüyle istenir, uzun süre önbellekte kalır.
+    if (u.pathname === '/icon') {
+      const hdr = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'ngrok-skip-browser-warning' };
+      if (req.method === 'OPTIONS') {
+        res.writeHead(204, hdr);
+        return res.end();
+      }
+      const im = /^data:(image\/(?:png|jpeg|webp|gif));base64,([A-Za-z0-9+/=]+)$/.exec(conf.icon || '');
+      if (req.method !== 'GET' || !im) return json(404, { error: 'Sunucu resmi yok' });
+      const buf = Buffer.from(im[2], 'base64');
+      res.writeHead(200, { ...hdr, 'Content-Type': im[1], 'Content-Length': buf.length, 'Cache-Control': 'public, max-age=31536000, immutable', 'X-Content-Type-Options': 'nosniff' });
+      return res.end(buf);
+    }
     // Sunucu kartı (Kanki ana sayfası ve sol çubuk): ad, kaç kişi çevrimiçi, canlı yayın var mı.
     // Şifreli sunucuda kimlerin içeride olduğu gösterilmez, sadece sayı.
     if (u.pathname === '/info') {
@@ -1045,6 +1063,7 @@ function startServer(opts = {}) {
           names: password ? [] : people.slice(0, 6).map((x) => x.name),
           locked: !!password,
           version: webVersion,
+          iconV: iconV(),
         });
         res.writeHead(200, { ...hdr, 'Content-Type': 'application/json; charset=utf-8' });
         return res.end(body);
@@ -1209,7 +1228,7 @@ function startServer(opts = {}) {
           admin: isAdmin,
           mod: isModUser(me),
           token: me.token,
-          features: ['sfx', 'activity', 'log', 'pins', 'polls', 'votes', 'files', 'preview', 'gif', 'roles', 'chpass', 'afk', 'bans', 'marks', 'watch', 'perms', 'audit', 'timeout', 'serverDeafen', 'moveAll', 'purge', 'slowmode', 'readOnly', 'announce', 'welcomeMessage', 'headers', 'afkMic', 'webClient', 'info', 'leaveVoice'],
+          features: ['sfx', 'activity', 'log', 'pins', 'polls', 'votes', 'files', 'preview', 'gif', 'roles', 'chpass', 'afk', 'bans', 'marks', 'watch', 'perms', 'audit', 'timeout', 'serverDeafen', 'moveAll', 'purge', 'slowmode', 'readOnly', 'announce', 'welcomeMessage', 'headers', 'afkMic', 'webClient', 'info', 'leaveVoice', 'icon'],
           // Roller ve yetkiler
           perms: [...permsOf(me)],
           roles: userRoleIds(me),
@@ -1222,6 +1241,7 @@ function startServer(opts = {}) {
           description: conf.description || '',
           welcomeMessage: conf.welcomeMessage || '',
           announcement: conf.announcement || null,
+          iconV: iconV(),
         });
         if (forcedMute) send(ws, { t: 'forceMute', by: timeouts.get(me.clientKey)?.by || 'Sunucu', server: true, until: timeoutUntil(me) || undefined });
         else if (voteMuteEnd > Date.now()) send(ws, { t: 'forceMute', by: 'Kanal oylaması', until: voteMuteEnd });
@@ -2225,6 +2245,19 @@ function startServer(opts = {}) {
           if (typeof m.turnUrl === 'string') set('turnUrl', m.turnUrl.trim().slice(0, 400), 'TURN adresi');
           if (typeof m.turnUser === 'string') set('turnUser', m.turnUser.trim().slice(0, 200), 'TURN kullanıcı adı');
           if (typeof m.turnPass === 'string') set('turnPass', m.turnPass.slice(0, 200), 'TURN şifresi');
+          if (typeof m.icon === 'string') {
+            // Sunucu resmi: küçültülmüş PNG/JPEG/WebP/GIF (en fazla ~256 KB), boş metin kaldırır
+            const ok = m.icon === '' || (m.icon.length <= 350000 && /^data:image\/(?:png|jpeg|webp|gif);base64,[A-Za-z0-9+/=]+$/.test(m.icon));
+            if (!ok) {
+              send(ws, { t: 'error', code: 'info', message: 'Sunucu resmi kaydedilemedi: PNG, JPEG, WebP ya da GIF olmalı ve çok büyük olmamalı.' });
+              break;
+            }
+            if (m.icon !== (conf.icon || '')) {
+              conf.icon = m.icon;
+              conf.iconV = m.icon ? Date.now() : 0;
+              changes.push(m.icon ? 'sunucu resmi değişti' : 'sunucu resmi kaldırıldı');
+            }
+          }
           saveConf();
           broadcastState();
           send(ws, { t: 'adminNotice', message: 'Sunucu ayarları kaydedildi.' });

@@ -848,7 +848,7 @@ function renderAdminInfo(m) {
 }
 
 function ssRenderNav() {
-  $('#ss-nav-badge').textContent = (S.serverName || '?').charAt(0).toUpperCase();
+  renderServerBadge();
   $('#ss-nav-name').textContent = S.serverName || 'Sunucu';
   for (const b of $$('#ss-nav .ss-tab')) b.classList.toggle('hidden', !ssVisible(b.dataset.ss));
   $('#ss-nav-mod').classList.toggle('hidden', !ssVisible('bans') && !ssVisible('audit'));
@@ -905,10 +905,55 @@ $$('#ss-nav .ss-tab').forEach((b) =>
   })
 );
 
+// ---------- Sunucu resmi ----------
+function ssRenderIconField() {
+  const box = $('#adm-icon-prev');
+  if (!box) return;
+  const id = svCurrentId();
+  const img = id ? svIconOf(id) : '';
+  box.textContent = img ? '' : (S.serverName || '?').charAt(0).toUpperCase();
+  box.style.background = img ? `center / cover no-repeat url("${img}")` : svGrad(S.serverName || '?');
+  const editable = can('manageServer') && feat('icon');
+  $('#adm-icon-pick').disabled = !editable;
+  $('#adm-icon-clear').disabled = !editable || !S.iconV;
+  $('#adm-icon-card').classList.toggle('hidden', !feat('icon'));
+}
+// Seçilen resim kare kırpılıp 256 px'e küçültülür (hareketli GIF ilk karesiyle kalır)
+async function ssIconFromFile(file) {
+  if (!file || !/^image\//.test(file.type)) return toast('Bir resim seç', 'PNG, JPEG, WebP ya da GIF olabilir.', 'err');
+  if (file.size > 15 * 1024 * 1024) return toast('Resim çok büyük', 'En fazla 15 MB.', 'err');
+  let bmp;
+  try {
+    bmp = await createImageBitmap(file);
+  } catch {
+    return toast('Resim açılamadı', '', 'err');
+  }
+  const side = Math.min(bmp.width, bmp.height);
+  const size = Math.min(256, side);
+  const c = document.createElement('canvas');
+  c.width = c.height = size;
+  const g = c.getContext('2d');
+  g.imageSmoothingQuality = 'high';
+  g.drawImage(bmp, (bmp.width - side) / 2, (bmp.height - side) / 2, side, side, 0, 0, size, size);
+  let data = c.toDataURL('image/webp', 0.9);
+  if (!data.startsWith('data:image/webp')) data = c.toDataURL('image/png');
+  if (data.length > 340000) data = c.toDataURL('image/jpeg', 0.85);
+  send({ t: 'setConfig', icon: data });
+  toast('Sunucu resmi kaydedildi', 'Sol çubukta ve kanal listesinin üstünde görünecek.');
+}
+$('#adm-icon-pick')?.addEventListener('click', () => $('#adm-icon-file').click());
+$('#adm-icon-file')?.addEventListener('change', (e) => {
+  const f = e.target.files[0];
+  e.target.value = '';
+  ssIconFromFile(f);
+});
+$('#adm-icon-clear')?.addEventListener('click', () => send({ t: 'setConfig', icon: '' }));
+
 // ---------- Genel Bakış ----------
 function ssRenderStats() {
   const m = SS.info;
-  $('#ss-hero-badge').textContent = (S.serverName || '?').charAt(0).toUpperCase();
+  renderServerBadge();
+  ssRenderIconField();
   $('#ss-hero-name').textContent = S.serverName || '';
   $('#ss-hero-desc').textContent = S.serverDesc || 'Açıklama yok';
   $('#ss-hero-desc').classList.toggle('muted', !S.serverDesc);

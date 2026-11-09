@@ -20,6 +20,62 @@ function svGrad(name) {
   const [a, b] = SV_GRADS[x % SV_GRADS.length];
   return `linear-gradient(135deg, ${a}, ${b})`;
 }
+// Sunucu resmi: sunucudan sadece sürüm (iconV) gelir; resim değişince bir kez /icon'dan indirilip burada saklanır
+const SV_ICON_KEY = 'kanki-server-icons';
+let svIcons = {};
+try {
+  svIcons = JSON.parse(localStorage.getItem(SV_ICON_KEY) || '{}') || {};
+} catch {}
+const svIconOf = (id) => (id && svIcons[id]?.data) || '';
+const svIconLoading = new Set();
+async function svSyncIcon(e, v) {
+  if (!e?.id) return;
+  v = Number(v) || 0;
+  const have = svIcons[e.id];
+  if ((have?.v || 0) === v) return;
+  if (!v) {
+    delete svIcons[e.id];
+    return svIconsChanged();
+  }
+  const base = svHttp(e);
+  if (!base || svIconLoading.has(e.id)) return;
+  svIconLoading.add(e.id);
+  try {
+    const r = await fetch(`${base}/icon?v=${v}`, { headers: { 'ngrok-skip-browser-warning': '1' } });
+    const blob = r.ok ? await r.blob() : null;
+    if (!blob || !/^image\//.test(blob.type) || blob.size > 400000) return;
+    const data = await new Promise((res, rej) => {
+      const fr = new FileReader();
+      fr.onload = () => res(fr.result);
+      fr.onerror = rej;
+      fr.readAsDataURL(blob);
+    });
+    svIcons[e.id] = { v, data };
+    svIconsChanged();
+  } catch {
+  } finally {
+    svIconLoading.delete(e.id);
+  }
+}
+function svIconsChanged() {
+  try {
+    localStorage.setItem(SV_ICON_KEY, JSON.stringify(svIcons));
+  } catch {}
+  renderRail();
+  if (!$('#home-screen').classList.contains('hidden')) renderHome();
+  if (S.myId) renderServerBadge();
+}
+// Bir öğeye sunucu resmini (yoksa baş harfler + renk geçişini) koyar
+function svPaint(el, id, name) {
+  const img = svIconOf(id);
+  el.classList.toggle('has-icon', !!img);
+  el.style.background = img ? `center / cover no-repeat url("${img}")` : svGrad(name);
+}
+// Bağlı olduğun sunucunun sol çubuktaki kimliği (Admin'in kendi sunucusu dahil)
+function svCurrentEntry() {
+  const id = svCurrentId();
+  return id ? svEntries().find((x) => x.id === id) : null;
+}
 const svUrl = (e) => (e.id === HOST_ID ? (S.hosting ? `ws://127.0.0.1:${S.hosting.port}` : '') : normalizeAddress(e.address || '') || '');
 const svHttp = (e) => svUrl(e).replace(/^ws/i, 'http');
 
@@ -116,8 +172,8 @@ function railIcon(e) {
   const cur = svCurrentId() === e.id;
   const inf = SV.info.get(e.id);
   const name = e.name || inf?.name || e.address;
-  const b = h('button', { class: `ri ri-srv ${cur && $('#home-screen').classList.contains('hidden') ? 'on' : ''} ${cur ? 'cur' : ''}`, 'data-id': e.id }, svInitials(name));
-  b.style.background = svGrad(name);
+  const b = h('button', { class: `ri ri-srv ${cur && $('#home-screen').classList.contains('hidden') ? 'on' : ''} ${cur ? 'cur' : ''}`, 'data-id': e.id }, svIconOf(e.id) ? '' : svInitials(name));
+  svPaint(b, e.id, name);
   const online = cur ? [...S.users.values()].filter((u) => !u.bot).length : inf?.online;
   if (inf && inf.ok === false && !cur) b.append(h('span', { class: 'ri-off' }));
   else if (online) b.append(h('span', { class: 'ri-cnt' }, String(online)));
@@ -203,8 +259,9 @@ function svCard(e) {
   const card = h('div', { class: `srv-card ${live ? 'is-live' : ''} ${cur ? 'is-cur' : ''}` });
   const banner = h('div', { class: 'srv-banner' });
   banner.style.background = grad;
-  const ic = h('div', { class: 'srv-ic' }, svInitials(name));
-  ic.style.background = grad;
+  const ic = h('div', { class: 'srv-ic' }, svIconOf(e.id) ? '' : svInitials(name));
+  svPaint(ic, e.id, name);
+  if (svIconOf(e.id)) banner.style.background = `linear-gradient(rgba(0,0,0,.25), rgba(0,0,0,.25)), center / cover no-repeat url("${svIconOf(e.id)}")`;
   const badge = cur
     ? h('span', { class: 'srv-badge here' }, '● Buradasın')
     : live
@@ -336,6 +393,7 @@ async function svFetchInfo(e) {
     } else {
       const d = await r.json();
       SV.info.set(e.id, { ok: true, ...d });
+      if ('iconV' in d) svSyncIcon(e, d.iconV);
       // Kayıtlı adı güncel tut
       if (d.name && e.id !== HOST_ID) {
         const s = (settings.servers || []).find((x) => x.address === e.address);

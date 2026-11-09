@@ -1734,15 +1734,7 @@ function onDisconnected() {
   }, 2000);
 }
 
-// Telefon düğmesi: sesten çık ama sunucuda kal (eski sunucularda tamamen ayrılır)
-function leaveVoice() {
-  if (!S.myId) return;
-  if (!feat('leaveVoice')) return disconnect();
-  if (!S.channelId) return;
-  S.lastChannelId = null;
-  stopAllShares();
-  send({ t: 'leaveVoice' });
-}
+// Telefon düğmesi: sunucudan tamamen çıkar, ana sayfaya döner
 function disconnect() {
   S.intentionalClose = true;
   clearTimeout(S.reconnectTimer);
@@ -1792,6 +1784,7 @@ function onMessage(m) {
       $('#me-avatar').replaceWith(Object.assign(av, { id: 'me-avatar' }));
       S.isAdmin = !!m.admin;
       S.features = new Set(m.features || []);
+      setTimeout(() => syncServerIcon(m.iconV)); // svCurrentId için S.url/S.myId hazır olsun
       S.token = m.token || '';
       S.isMod = !!m.mod;
       onPermsWelcome(m); // roller, yetkiler, susturma / zaman aşımı, duyuru (admin.js)
@@ -1807,6 +1800,7 @@ function onMessage(m) {
       const prevUsers = S.users;
       S.afk = m.afk || null;
       S.serverName = m.serverName;
+      if (m.iconV !== S.iconV) syncServerIcon(m.iconV);
       S.channels = m.channels;
       S.users = new Map(m.users.map((u) => [u.id, u]));
       const me = S.users.get(S.myId);
@@ -2019,22 +2013,73 @@ function onMessage(m) {
 setInterval(() => send({ t: 'ping', ts: performance.now() }), 3000);
 
 // Gecikme: ses panelindeki sinyal simgesinin rengi ve üzerine gelince çıkan bilgi
-function updatePing(ms) {
+// Ses ve görüntü sunucudan (ngrok'tan) geçmez, kişiler arasında doğrudan gider. Bu yüzden asıl ses gecikmesi
+// WebRTC bağlantısının ölçtüğü gidiş-dönüş süresidir; sunucu gecikmesi sadece mesaj ve kanal işlemlerini etkiler.
+async function voiceRtts() {
+  const out = [];
+  for (const [id, p] of S.peers) {
+    if (p.pc?.connectionState !== 'connected') continue;
+    try {
+      const st = await p.pc.getStats();
+      let pair = null;
+      st.forEach((x) => {
+        if (x.type === 'transport' && x.selectedCandidatePairId) pair = st.get(x.selectedCandidatePairId) || pair;
+      });
+      if (!pair) st.forEach((x) => x.type === 'candidate-pair' && x.nominated && x.state === 'succeeded' && (pair = x));
+      if (pair && typeof pair.currentRoundTripTime === 'number') out.push({ name: userName(id), ms: Math.round(pair.currentRoundTripTime * 1000) });
+    } catch {}
+  }
+  return out;
+}
+async function updatePing(ms) {
   const el = $('#voice-ping');
   if (!el) return;
-  const q = ms < 80 ? 'good' : ms < 200 ? 'fair' : 'bad';
+  const voice = S.channelId ? await voiceRtts() : [];
+  const qOf = (x) => (x < 80 ? 'good' : x < 200 ? 'fair' : 'bad');
+  const label = { good: 'İyi', fair: 'Orta', bad: 'Zayıf' };
+  // Renk: odadaysan ses gecikmesine (en kötü kişi), değilsen sunucu gecikmesine göre
+  const worst = voice.length ? Math.max(...voice.map((v) => v.ms)) : ms;
+  const q = qOf(worst);
   el.className = `voice-ping ${q}`;
-  const label = { good: 'İyi', fair: 'Orta', bad: 'Zayıf' }[q];
-  el.dataset.tip = `Gecikme: ${ms} ms (${label})\nSunucu: ${S.serverName || '—'}`;
+  const lines = [];
+  if (voice.length) {
+    lines.push(`Ses gecikmesi: ${worst} ms (${label[q]})`);
+    for (const v of voice.slice(0, 6)) lines.push(`  ${v.name}: ${v.ms} ms`);
+  }
+  lines.push(`Sunucu gecikmesi: ${ms} ms (${label[qOf(ms)]})${voice.length ? ' · sadece mesaj/kanal işlemleri' : ''}`);
+  lines.push(`Sunucu: ${S.serverName || '—'}`);
+  el.dataset.tip = lines.join('\n');
   if (tipTarget === el) tipEl.textContent = el.dataset.tip;
 }
 
 // =====================================================================
 //  Arayüz
 // =====================================================================
+// Kanal listesinin üstündeki sunucu logosu: sunucu resmi varsa o, yoksa baş harf
+function renderServerBadge() {
+  const b = $('#server-badge');
+  const id = typeof svCurrentId === 'function' ? svCurrentId() : null;
+  const img = id ? svIconOf(id) : '';
+  b.textContent = img ? '' : (S.serverName || '?').charAt(0).toUpperCase();
+  b.classList.toggle('has-icon', !!img);
+  b.style.backgroundImage = img ? `url("${img}")` : '';
+  for (const el of [$('#ss-hero-badge'), $('#ss-nav-badge')]) {
+    if (!el) continue;
+    el.textContent = img ? '' : (S.serverName || '?').charAt(0).toUpperCase();
+    el.classList.toggle('has-icon', !!img);
+    el.style.backgroundImage = img ? `url("${img}")` : '';
+  }
+}
+// Sunucu resmi sürümü değişince (welcome/state) yeni resmi indir
+function syncServerIcon(v) {
+  if (v === undefined || typeof svCurrentEntry !== 'function') return;
+  S.iconV = Number(v) || 0;
+  const e = svCurrentEntry();
+  if (e) svSyncIcon(e, S.iconV);
+}
 function renderAll() {
   $('#server-name').textContent = S.serverName;
-  $('#server-badge').textContent = (S.serverName || '?').charAt(0).toUpperCase();
+  renderServerBadge();
   renderTree();
   renderStage();
   renderControls();
@@ -3138,7 +3183,7 @@ for (const id of ['#in-address', '#in-password', '#in-nick']) $(id).addEventList
 $('#btn-mic').addEventListener('click', toggleMute);
 $('#btn-deafen').addEventListener('click', toggleDeafen);
 $('#btn-settings').addEventListener('click', openSettings);
-$('#btn-disconnect').addEventListener('click', leaveVoice);
+$('#btn-disconnect').addEventListener('click', disconnect);
 $('#btn-share').addEventListener('click', openPicker);
 $('#btn-go-live').addEventListener('click', goLive);
 $('#btn-add-channel').addEventListener('click', () => promptChannel(null));
@@ -4423,7 +4468,7 @@ function renderCallBar() {
   set('#cb-watch', ICON_WATCH, 'Birlikte izle: YouTube ya da video dosyası', myWatchShare() ? 'on' : '');
   set('#cb-mic', S.muted ? ICON.micOff : ICON.mic, S.muted ? 'Mikrofonu aç (Ctrl+Shift+M)' : 'Mikrofonu kapat (Ctrl+Shift+M)', S.muted ? 'off' : '');
   set('#cb-deafen', S.deafened ? ICON.headOff : ICON.head, S.deafened ? 'Sesi aç (Ctrl+Shift+D)' : 'Sesi kapat (Ctrl+Shift+D)', S.deafened ? 'off' : '');
-  set('#cb-leave', ICON.power, 'Sesten çık', 'leave');
+  set('#cb-leave', ICON.power, 'Bağlantıyı kes', 'leave');
   $('#cb-share').disabled = screens >= MAX_SHARES;
   gateCallBar(); // yetkisi olmayan özellikler gizlenir, kilitler görünür (admin.js)
 }
@@ -4431,7 +4476,7 @@ $('#cb-camera').addEventListener('click', toggleCamera);
 $('#cb-share').addEventListener('click', openPicker);
 $('#cb-mic').addEventListener('click', toggleMute);
 $('#cb-deafen').addEventListener('click', toggleDeafen);
-$('#cb-leave').addEventListener('click', leaveVoice);
+$('#cb-leave').addEventListener('click', disconnect);
 $('#cb-sfx').addEventListener('click', (e) => {
   e.stopPropagation();
   toggleSfxPop();

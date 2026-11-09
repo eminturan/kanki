@@ -172,3 +172,14 @@ body.has-rail #connect-tabs, body.has-rail #connect-screen .field:has(#in-nick),
 #me-bar .voice-actions .btn.share svg { width: 18px; height: 18px; fill: currentColor; }
 body.has-rail .sidebar { padding-bottom: calc(var(--dock-h, 58px) + 12px); }
 body.has-rail .rail { padding-bottom: calc(var(--dock-h, 58px) + 18px); }
+
+/* ---------- Sunucu resmi ---------- */
+.ri-srv.has-icon, .srv-ic.has-icon { color: transparent; }
+.server-badge.has-icon, .ss-hero-badge.has-icon, .ss-nav-badge.has-icon { background-size: cover !important; background-position: center !important; background-repeat: no-repeat !important; color: transparent; }
+.ss-icon-row { display: flex; gap: 16px; align-items: center; }
+.ss-icon-prev {
+  flex: none; width: 88px; height: 88px; border-radius: 24px; display: grid; place-items: center;
+  font: 800 30px var(--font); color: #fff; box-shadow: 0 0 0 1px var(--line);
+}
+.ss-icon-side { flex: 1; min-width: 0; }
+.ss-icon-side .hint { margin: 0 0 10px; }
