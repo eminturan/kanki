@@ -120,7 +120,8 @@ GitHub Actions paketleri derler, Release'e `latest.yml` ile birlikte ekler; kuru
 
 ## Müzik botu
 - Sunucuyu kuran kişinin **Kanki Admin** uygulamasında kendiliğinden çalışır ve kanal listesinde "Müzik Botu" olarak görünür.
-- Sohbete yaz: `!çal <YouTube linki ya da şarkı adı>` (oynatma listesi linki en fazla 50 şarkı ekler), `!geç`, `!duraklat`, `!devam`, `!sar <1:30 | +10 | -10>`, `!dur` (kuyruğu da temizler), `!kuyruk`, `!çıkar <sıra>`, `!temizle`, `!karıştır`, `!tekrar`, `!ses <0-100>`, `!şimdi`, `!gel`, `!ayrıl`, `!yardım`.
+- Sohbete yaz: `!çal <YouTube linki ya da şarkı adı>` (oynatma listesi linki en fazla 50 şarkı ekler), `!geç`, `!duraklat`, `!devam`, `!sar <1:30 | +10 | -10>`, `!radyo <isim>`, `!dur` (kuyruğu da temizler), `!kuyruk`, `!çıkar <sıra>`, `!temizle`, `!karıştır`, `!tekrar`, `!ses <0-100>`, `!şimdi`, `!gel`, `!ayrıl`, `!yardım`.
+- **Radyolar:** müzik panelindeki "📻 Radyolar" sekmesinde Türkiye ve dünyanın en çok dinlenen radyoları ve arama var (liste [radio-browser.info](https://www.radio-browser.info)'dan gelir); tıklayınca bot çalar. Sohbetten `!radyo <isim>`. Radyo çalarken eklenen şarkı radyonun yerine hemen başlar; radyoda ileri/geri sarılmaz.
 - Aynı işler sahnenin sağ üstündeki nota düğmesinden ve çalan şarkı çubuğundan da yapılır; çubuğa tıklayıp sürükleyerek şarkı ileri/geri sarılır. Kişiye özel bot sesi: botun profil kartındaki ses sürgüsü.
 - Kanalda 1 dakika kimse kalmazsa bot durur ve kanaldan ayrılır.
 - Bir YouTube şarkısının başlaması 10–15 saniye sürebilir: bağlantı çözülür ve YouTube bazı videolarda akışı reklam süresi kadar (birkaç saniye) bekletir. Kuyruktaki sıradaki şarkı önceden hazırlandığı için geçişler genelde beklemesizdir. Canlı yayınlar çalınamaz.

@@ -217,6 +217,7 @@ const CMDS = {
   karıştır: 'shuffle', karistir: 'shuffle', shuffle: 'shuffle',
   tekrar: 'loop', loop: 'loop', döngü: 'loop',
   sar: 'seek', seek: 'seek', atla: 'seek',
+  radyo: 'radio', radio: 'radio',
   yardım: 'help', yardim: 'help', help: 'help', komutlar: 'help',
 };
 const fmt = (s) => {
@@ -255,7 +256,7 @@ async function handleCmd(m) {
   switch (c) {
     case 'help':
       return say(
-        '🎵 **Müzik botu komutları:** `!çal <YouTube linki ya da şarkı adı>` · `!geç` · `!duraklat` · `!devam` · `!sar <1:30 | +10 | -10>` · `!dur` · `!kuyruk` · `!çıkar <sıra>` · `!temizle` · `!karıştır` · `!tekrar` · `!ses <0-100>` · `!şimdi` · `!gel` · `!ayrıl`'
+        '🎵 **Müzik botu komutları:** `!çal <YouTube linki ya da şarkı adı>` · `!geç` · `!duraklat` · `!devam` · `!sar <1:30 | +10 | -10>` · `!radyo <isim>` · `!dur` · `!kuyruk` · `!çıkar <sıra>` · `!temizle` · `!karıştır` · `!tekrar` · `!ses <0-100>` · `!şimdi` · `!gel` · `!ayrıl`'
       );
     case 'join':
       if (here) return say('Zaten buradayım 🎧');
@@ -281,7 +282,7 @@ async function handleCmd(m) {
       if (!r.ok) return say(`⚠️ Bulunamadı: ${r.error}`);
       if (!r.items.length) return say('⚠️ Sonuç bulunamadı.');
       const items = r.items.map((x) => ({ ...x, by: m.name }));
-      const wasIdle = !B.current;
+      const wasIdle = !B.current || !!B.current.live; // radyo çalarken eklenen şarkı radyonun yerine hemen çalar
       B.queue.push(...items);
       if (wasIdle) {
         if (items.length > 1) say(`📃 ${items.length} şarkı kuyruğa eklendi.`);
@@ -345,9 +346,18 @@ async function handleCmd(m) {
       }
       pushState();
       return say('🔀 Kuyruk karıştırıldı.');
+    case 'radio': {
+      // Hazır radyo: panelden istasyon kimliğiyle, sohbetten adıyla (!radyo virgin). Canlı yayın hemen çalar.
+      const r = await kankiBot.radio(m.arg);
+      if (!r.ok) return say(`⚠️ ${r.error}`);
+      const item = { title: r.station.name, url: r.station.url, duration: 0, thumbnail: r.station.favicon || '', by: m.name, direct: true, live: true };
+      B.queue.unshift(item);
+      return playNext(true);
+    }
     case 'seek': {
       // !sar 1:30 · !sar 90 · !sar +10 · !sar -15 (müzik panelindeki çubuk da bunu gönderir)
       if (!B.current || B.loading) return;
+      if (B.current.live) return say('📻 Radyo canlı yayın; ileri/geri sarılamaz.');
       const a = String(m.arg || '').trim().replace(',', '.');
       const rel = /^[+-]/.test(a);
       const parts = a.replace(/^[+-]/, '').split(':').map(Number);
@@ -414,7 +424,7 @@ async function playNext(skipped = false) {
   el.load();
   pushState();
   try {
-    const st = await kankiBot.stream(item.url);
+    const st = item.live ? { ok: true, url: item.url } : await kankiBot.stream(item.url);
     if (token !== B.playToken) return;
     if (!st.ok) throw new Error(st.error);
     if (st.title && !item.direct) Object.assign(B.current, { title: st.title, duration: st.duration || item.duration, thumbnail: st.thumbnail || item.thumbnail });
@@ -428,7 +438,8 @@ async function playNext(skipped = false) {
     if (token !== B.playToken) return;
     B.loading = false;
     prefetchNext();
-    if (!(B.loop && !skipped && item === B.current)) say(`🎵 Çalıyor: **${B.current.title}**${B.current.duration ? ` (${fmt(B.current.duration)})` : ''} · isteyen: ${item.by}`);
+    if (item.live) say(`📻 Radyo: **${B.current.title}** · açan: ${item.by}`);
+    else if (!(B.loop && !skipped && item === B.current)) say(`🎵 Çalıyor: **${B.current.title}**${B.current.duration ? ` (${fmt(B.current.duration)})` : ''} · isteyen: ${item.by}`);
   } catch (e) {
     if (token !== B.playToken) return;
     say(`⚠️ Çalınamadı: ${item.title} — ${String(e.message || e).slice(0, 140)}`);
@@ -469,7 +480,7 @@ function pushState() {
     state: {
       id: B.myId,
       channelId: B.channelId,
-      current: B.current ? { title: B.current.title, url: B.current.direct ? '' : B.current.url, thumbnail: B.current.thumbnail || '', duration: B.current.duration || 0, by: B.current.by } : null,
+      current: B.current ? { title: B.current.title, url: B.current.direct ? '' : B.current.url, thumbnail: B.current.thumbnail || '', duration: B.current.live ? 0 : B.current.duration || 0, by: B.current.by, live: !!B.current.live } : null,
       position: el.currentTime || 0,
       at: Date.now(),
       paused: B.paused || (!!B.current && el.paused && !el.ended),

@@ -1620,3 +1620,106 @@ setInterval(() => {
   if (S.watchStates.size) updateWatchBars();
   if (myWatchShare()) renderWatchHost();
 }, 500);
+
+// =====================================================================
+//  Müzik botu: hazır radyolar (radio-browser.info; bot istasyonu kimliğiyle çalar)
+// =====================================================================
+const RADIO_HOSTS = ['de1.api.radio-browser.info', 'de2.api.radio-browser.info', 'fi1.api.radio-browser.info'];
+const radioCache = new Map(); // istek -> { at, list }
+let radioMode = 'tr';
+let radioQ = '';
+let radioTimer = null;
+const radioPlayable = (s) => /^https?:\/\//i.test(s.url_resolved || s.url || '') && !/\.(m3u8|pls|m3u)(\?|$)/i.test(s.url_resolved || s.url || '') && s.lastcheckok !== 0;
+async function radioFetch(path) {
+  const hit = radioCache.get(path);
+  if (hit && Date.now() - hit.at < 10 * 60 * 1000) return hit.list;
+  let lastErr;
+  for (const host of RADIO_HOSTS) {
+    try {
+      const r = await fetch(`https://${host}${path}`);
+      if (!r.ok) throw new Error(String(r.status));
+      const list = (await r.json()).filter(radioPlayable);
+      radioCache.set(path, { at: Date.now(), list });
+      return list;
+    } catch (e) {
+      lastErr = e;
+    }
+  }
+  throw lastErr;
+}
+async function renderRadio() {
+  const box = $('#mp-radio-list');
+  if (!box) return;
+  const q = radioQ.trim();
+  const path = q
+    ? `/json/stations/search?name=${encodeURIComponent(q)}&order=votes&reverse=true&limit=40&hidebroken=true`
+    : radioMode === 'tr'
+      ? '/json/stations/search?countrycode=TR&order=votes&reverse=true&limit=60&hidebroken=true'
+      : '/json/stations/search?order=votes&reverse=true&limit=60&hidebroken=true';
+  box.replaceChildren(h('div', { class: 'muted mp-radio-empty' }, 'Yükleniyor…'));
+  let list;
+  try {
+    list = await radioFetch(path);
+  } catch {
+    return box.replaceChildren(h('div', { class: 'muted mp-radio-empty' }, 'Radyo listesine ulaşılamadı. İnternetini kontrol edip tekrar dene.'));
+  }
+  // Aynı adlı tekrarları ayıkla
+  const seen = new Set();
+  list = list.filter((s) => {
+    const k = s.name.trim().toLocaleLowerCase('tr');
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  }).slice(0, 40);
+  if (!list.length) return box.replaceChildren(h('div', { class: 'muted mp-radio-empty' }, 'Sonuç yok.'));
+  const nowTitle = S.botState?.current?.live ? S.botState.current.title : '';
+  box.replaceChildren(
+    ...list.map((s) => {
+      const ico = h('span', { class: 'rs-ico' }, '📻');
+      if (/^https:\/\//.test(s.favicon || '')) {
+        const img = h('img', { src: s.favicon, alt: '', loading: 'lazy', referrerpolicy: 'no-referrer' });
+        img.addEventListener('error', () => img.remove(), { once: true });
+        ico.replaceChildren(img);
+      }
+      const meta = [s.country && s.countrycode !== 'TR' ? s.country : '', (s.tags || '').split(',').slice(0, 2).join(', '), s.bitrate ? `${s.bitrate} kbps` : ''].filter(Boolean).join(' · ');
+      return h(
+        'button',
+        {
+          class: `rs-item ${nowTitle && nowTitle === s.name.trim().slice(0, 80) ? 'on' : ''}`,
+          title: `${s.name} — kanalda çal`,
+          onclick: () => {
+            if (!botHere()) return toast('Bot bu kanalda değil', 'Önce "Botu bu kanala çağır"a bas.', 'err');
+            botCmd('radyo', s.stationuuid);
+            toast(`📻 ${s.name.trim()}`, 'Radyo açılıyor…', '', 2500);
+          },
+        },
+        ico,
+        h('span', { class: 'rs-text' }, h('b', {}, s.name.trim()), meta ? h('small', {}, meta) : null)
+      );
+    })
+  );
+}
+function setMusicView(v) {
+  for (const b of $$('#mp-tabs button')) b.classList.toggle('active', b.dataset.v === v);
+  $('#music-pop .mp-queue')?.classList.toggle('hidden', v !== 'queue');
+  $('#mp-radio')?.classList.toggle('hidden', v !== 'radio');
+  if (v === 'radio') renderRadio();
+}
+$('#mp-tabs')?.addEventListener('click', (e) => {
+  const b = e.target.closest('button[data-v]');
+  if (b) setMusicView(b.dataset.v);
+});
+$('#mp-radio-seg')?.addEventListener('click', (e) => {
+  const b = e.target.closest('button[data-r]');
+  if (!b) return;
+  radioMode = b.dataset.r;
+  for (const x of $$('#mp-radio-seg button')) x.classList.toggle('active', x === b);
+  radioQ = '';
+  $('#mp-radio-q').value = '';
+  renderRadio();
+});
+$('#mp-radio-q')?.addEventListener('input', (e) => {
+  radioQ = e.target.value;
+  clearTimeout(radioTimer);
+  radioTimer = setTimeout(renderRadio, 350);
+});

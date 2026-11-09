@@ -409,6 +409,48 @@ function stopMusicBot() {
 }
 const fromBot = (e) => botWin && e.sender === botWin.webContents;
 const botStatus = (text) => botWin && !botWin.isDestroyed() && botWin.webContents.send('bot:status', text);
+// Hazır radyolar: radio-browser.info (ücretsiz, topluluk veritabanı). Bot sadece istasyon kimliği ya da adıyla çalar.
+const RADIO_HOSTS = ['de1.api.radio-browser.info', 'de2.api.radio-browser.info', 'fi1.api.radio-browser.info'];
+const radioPlayable = (s) => s && /^https?:\/\//i.test(s.url_resolved || s.url || '') && !/\.(m3u8|pls|m3u)(\?|$)/i.test(s.url_resolved || s.url || '') && s.lastcheckok !== 0;
+function radioGet(pathname) {
+  const tryHost = (i) =>
+    new Promise((resolve, reject) => {
+      const req = https.get({ host: RADIO_HOSTS[i], path: pathname, headers: { 'User-Agent': 'Kanki/1.0' }, timeout: 8000 }, (res) => {
+        let d = '';
+        res.on('data', (c) => (d += c));
+        res.on('end', () => {
+          try {
+            resolve(JSON.parse(d));
+          } catch (err) {
+            reject(err);
+          }
+        });
+      });
+      req.on('timeout', () => req.destroy(new Error('Zaman aşımı')));
+      req.on('error', reject);
+    }).catch((err) => (i + 1 < RADIO_HOSTS.length ? tryHost(i + 1) : Promise.reject(err)));
+  return tryHost(0);
+}
+ipcMain.handle('bot:radio', async (e, arg) => {
+  if (!fromBot(e)) return { ok: false, error: 'izin yok' };
+  const q = String(arg || '').trim().slice(0, 100);
+  if (!q) return { ok: false, error: 'Radyo adı yaz: !radyo virgin' };
+  try {
+    let st = null;
+    if (/^[0-9a-f-]{36}$/i.test(q)) {
+      const [s] = await radioGet(`/json/stations/byuuid/${q}`);
+      if (radioPlayable(s)) st = s;
+      radioGet(`/json/url/${q}`).catch(() => {}); // radio-browser'ın istediği tıklama sayacı
+    } else {
+      const list = await radioGet(`/json/stations/search?name=${encodeURIComponent(q)}&order=votes&reverse=true&limit=15&hidebroken=true`);
+      st = list.find(radioPlayable) || null;
+    }
+    if (!st) return { ok: false, error: 'Bu adla çalınabilir bir radyo bulunamadı.' };
+    return { ok: true, station: { name: String(st.name || 'Radyo').trim().slice(0, 80), url: st.url_resolved || st.url, favicon: /^https:\/\//.test(st.favicon || '') ? st.favicon : '' } };
+  } catch (err) {
+    return { ok: false, error: 'Radyo listesine ulaşılamadı: ' + err.message };
+  }
+});
 ipcMain.handle('bot:resolve', async (e, query) => {
   if (!fromBot(e)) return { ok: false, error: 'izin yok' };
   try {

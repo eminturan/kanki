@@ -4786,7 +4786,7 @@ function tickMusic() {
   const bar = $('#music-bar');
   const pos = botPosition();
   const dur = st.current.duration || 0;
-  bar.querySelector('.mb-time').textContent = st.loading ? 'yükleniyor…' : dur ? `${fmtTime(pos)} / ${fmtTime(dur)}` : fmtTime(pos);
+  bar.querySelector('.mb-time').textContent = st.loading ? 'yükleniyor…' : st.current.live ? `📻 canlı · ${fmtTime(pos)}` : dur ? `${fmtTime(pos)} / ${fmtTime(dur)}` : fmtTime(pos);
   const prog = bar.querySelector('.mb-progress');
   const shown = prog.dataset.drag ? Number(prog.dataset.drag) * dur : pos;
   if (prog.dataset.drag) bar.querySelector('.mb-time').textContent = `${fmtTime(shown)} / ${fmtTime(dur)}`;

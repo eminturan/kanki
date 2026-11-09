@@ -208,7 +208,16 @@
           <div class="mp-head"><span>🎵 Müzik Botu</span><span class="mp-where"></span></div>
           <div class="mp-nobot hidden">Bu sunucuda müzik botu çalışmıyor. Bot, sunucuyu kuran kişinin Kanki Admin uygulamasında (1.0.14 ve üstü) çalışır.</div>
           <form id="mp-form"><input id="mp-input" placeholder="YouTube linki ya da şarkı adı" autocomplete="off" maxlength="500" /><button class="btn primary" type="submit">Ekle</button></form>
+          <div class="mp-tabs" id="mp-tabs"><button class="active" data-v="queue">🎵 Kuyruk</button><button data-v="radio">📻 Radyolar</button></div>
           <div class="mp-queue"></div>
+          <div class="mp-radio hidden" id="mp-radio">
+            <div class="mp-radio-bar">
+              <div class="seg" id="mp-radio-seg"><button class="active" data-r="tr">Türkiye</button><button data-r="world">Dünya</button></div>
+              <input id="mp-radio-q" placeholder="Radyo ara (ör. virgin, lofi, jazz)" autocomplete="off" maxlength="60" />
+            </div>
+            <div class="mp-radio-list" id="mp-radio-list"></div>
+            <div class="mp-radio-note">Liste radio-browser.info'dan gelir. Tıklayınca bot kanalda çalar; şarkı eklenirse radyonun yerine geçer.</div>
+          </div>
           <div class="mp-vol"><span>Bot sesi (herkes için)</span><input type="range" id="mp-vol" min="0" max="100" /></div>
           <div class="mp-actions">
             <button class="btn sm" data-cmd="join">Botu bu kanala çağır</button>
@@ -217,7 +226,7 @@
             <button class="btn sm" data-cmd="clear">Kuyruğu temizle</button>
             <button class="btn sm danger" data-cmd="leave">Botu çıkar</button>
           </div>
-          <div class="mp-help">Sohbete de yazabilirsin: <code>!çal</code> <code>!geç</code> <code>!duraklat</code> <code>!devam</code> <code>!dur</code> <code>!kuyruk</code> <code>!ses 50</code> <code>!gel</code> <code>!ayrıl</code> <code>!yardım</code></div>
+          <div class="mp-help">Sohbete de yazabilirsin: <code>!çal</code> <code>!geç</code> <code>!duraklat</code> <code>!devam</code> <code>!radyo virgin</code> <code>!dur</code> <code>!kuyruk</code> <code>!ses 50</code> <code>!gel</code> <code>!ayrıl</code> <code>!yardım</code></div>
         </div>
         <div class="sfx-pop hidden" id="sfx-pop">
           <div class="mp-head"><span>Ses efektleri</span><span class="mp-where">kanaldaki herkes duyar</span></div>

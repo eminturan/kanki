@@ -247,7 +247,7 @@ function startServer(opts = {}) {
   const findBot = () => [...users.values()].find((u) => u.bot);
   // Sadece botun anladığı komutlar iletilir ("!!!" gibi mesajlar bota gitmesin)
   const BOT_WORDS = new Set(
-    'çal cal play p oynat geç gec skip s sonraki next duraklat pause bekle devam resume dur stop durdur kuyruk queue q liste sıra temizle clear çıkar cikar remove sil ses volume vol şimdi simdi np çalan calan gel katıl katil join ayrıl ayril leave git çık karıştır karistir shuffle tekrar loop döngü yardım yardim help komutlar'.split(' ')
+    'çal cal play p oynat geç gec skip s sonraki next duraklat pause bekle devam resume dur stop durdur kuyruk queue q liste sıra temizle clear çıkar cikar remove sil ses volume vol şimdi simdi np çalan calan gel katıl katil join ayrıl ayril leave git çık karıştır karistir shuffle tekrar loop döngü yardım yardim help komutlar sar seek atla radyo radio'.split(' ')
   );
   // "!çal ..." gibi sohbet komutlarını ya da müzik panelinden gelen komutları bota ilet
   function forwardToBot(me, cmd, arg) {

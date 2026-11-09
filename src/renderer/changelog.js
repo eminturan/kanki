@@ -6,6 +6,16 @@
  */
 const CHANGELOG = [
   {
+    version: '1.0.29',
+    date: '2026-11-09',
+    title: 'Müzik botunda hazır radyolar',
+    added: [
+      'Müzik paneline “Radyolar” sekmesi: Türkiye’nin ve dünyanın en çok dinlenen radyoları, arama kutusuyla (ör. virgin, lofi, jazz). Tıklayınca bot kanalda çalar. Liste radio-browser.info’dan gelir.',
+      'Sohbetten de açılır: !radyo virgin. Radyo çalarken şarkı eklenirse şarkı radyonun yerine hemen başlar.',
+    ],
+    fixed: ['Sohbete yazılan !sar komutu bota ulaşmıyordu (sadece çubuktan sarılabiliyordu).'],
+  },
+  {
     version: '1.0.28',
     date: '2026-11-09',
     title: 'Süslü mesaj yazısı başta kapalı',
