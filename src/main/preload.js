@@ -15,6 +15,7 @@ contextBridge.exposeInMainWorld('kanki', {
   stopTunnel: () => ipcRenderer.invoke('tunnel:stop'),
   notify: (title, body) => ipcRenderer.invoke('app:notify', title, body),
   flash: () => ipcRenderer.invoke('app:flash'),
+  flashbang: () => ipcRenderer.invoke('fx:flashbang'),
   shake: () => ipcRenderer.invoke('app:shake'),
   setPtt: (keycode) => ipcRenderer.invoke('ptt:set', keycode),
   capturePttKey: () => ipcRenderer.invoke('ptt:capture'),

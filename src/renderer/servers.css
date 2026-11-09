@@ -183,3 +183,7 @@ body.has-rail .rail { padding-bottom: calc(var(--dock-h, 58px) + 18px); }
 }
 .ss-icon-side { flex: 1; min-width: 0; }
 .ss-icon-side .hint { margin: 0 0 10px; }
+
+/* Flash: tarayıcıdan girenlerde sayfanın üstünde (masaüstünde bütün monitörlerde ayrı pencere) */
+.flash-page { position: fixed; inset: 0; z-index: 2147483647; background: #fff; pointer-events: none; animation: flash-fade 3s cubic-bezier(.55,0,.85,.4) forwards; }
+@keyframes flash-fade { 0%, 18% { opacity: 1; } 100% { opacity: 0; } }

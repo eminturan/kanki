@@ -677,6 +677,54 @@ ipcMain.handle('app:notify', (_e, title, body) => {
   if (Notification.isSupported() && win && !win.isFocused()) new Notification({ title, body, silent: true }).show();
 });
 
+// Flash (CS gibi): her monitöre en üstte, tıklanamaz, bembeyaz bir pencere; birkaç saniyede kaybolur.
+// Kanki küçültülmüş olsa da masaüstünün, tarayıcının, pencereli/kenarlıksız tam ekran oyunun üstünde görünür.
+// ("Exclusive fullscreen" oyunlarda Windows izin vermez; orada sadece ses duyulur.)
+const FLASH_MS = 3200;
+const FLASH_HTML = `<!doctype html><html><head><meta charset="utf-8"><style>
+html,body{margin:0;height:100%;overflow:hidden;background:transparent}
+#f{position:fixed;inset:0;background:#fff;opacity:1;animation:fade ${FLASH_MS - 200}ms cubic-bezier(.55,0,.85,.4) forwards}
+@keyframes fade{0%,18%{opacity:1}100%{opacity:0}}
+</style></head><body><div id="f"></div></body></html>`;
+let flashWins = [];
+function flashbang() {
+  for (const w of flashWins) if (!w.isDestroyed()) w.destroy();
+  flashWins = screen.getAllDisplays().map((d) => {
+    const w = new BrowserWindow({
+      ...d.bounds,
+      frame: false,
+      transparent: true,
+      resizable: false,
+      movable: false,
+      skipTaskbar: true,
+      focusable: false,
+      alwaysOnTop: true,
+      hasShadow: false,
+      enableLargerThanScreen: true,
+      show: false,
+      webPreferences: { sandbox: true, contextIsolation: true },
+    });
+    w.setAlwaysOnTop(true, 'screen-saver');
+    w.setVisibleOnAllWorkspaces?.(true, { visibleOnFullScreen: true });
+    w.setIgnoreMouseEvents(true);
+    w.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+    w.webContents.on('will-navigate', (e) => e.preventDefault());
+    w.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(FLASH_HTML));
+    w.webContents.once('did-finish-load', () => {
+      if (w.isDestroyed()) return;
+      w.setBounds(d.bounds);
+      w.showInactive();
+      if (process.env.KANKI_FLASH_SHOT && d.id === screen.getPrimaryDisplay().id) {
+        setTimeout(async () => !w.isDestroyed() && fs.writeFileSync(process.env.KANKI_FLASH_SHOT, (await w.webContents.capturePage()).toPNG()), 150);
+      }
+    });
+    setTimeout(() => !w.isDestroyed() && w.destroy(), FLASH_MS);
+    return w;
+  });
+  return flashWins.length;
+}
+ipcMain.handle('fx:flashbang', () => flashbang());
+
 ipcMain.handle('app:flash', () => {
   if (win && !win.isFocused()) {
     if (isMac) app.dock?.bounce('informational');

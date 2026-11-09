@@ -67,6 +67,7 @@ const PERMS = [
   ['stream', 'Ekran paylaş', 'Ekranını ya da bir pencereyi yayınlar.', 'ses'],
   ['camera', 'Kamera', 'Kamerasını açar.', 'ses'],
   ['startWatch', 'Birlikte izle', 'Birlikte izlemeyi başlatır ve oynatmayı yönetir.', 'ses'],
+  ['flash', 'Flash at', 'Kişiye sağ tıklayıp flash atar: karşı tarafın bütün monitörleri birkaç saniye bembeyaz olur (CS gibi).', 'ses'],
 ];
 const PERM_KEYS = PERMS.map((p) => p[0]);
 const PERM_LABEL = Object.fromEntries(PERMS.map((p) => [p[0], p[1]]));
@@ -1228,7 +1229,7 @@ function startServer(opts = {}) {
           admin: isAdmin,
           mod: isModUser(me),
           token: me.token,
-          features: ['sfx', 'activity', 'log', 'pins', 'polls', 'votes', 'files', 'preview', 'gif', 'roles', 'chpass', 'afk', 'bans', 'marks', 'watch', 'perms', 'audit', 'timeout', 'serverDeafen', 'moveAll', 'purge', 'slowmode', 'readOnly', 'announce', 'welcomeMessage', 'headers', 'afkMic', 'webClient', 'info', 'leaveVoice', 'icon'],
+          features: ['sfx', 'activity', 'log', 'pins', 'polls', 'votes', 'files', 'preview', 'gif', 'roles', 'chpass', 'afk', 'bans', 'marks', 'watch', 'perms', 'audit', 'timeout', 'serverDeafen', 'moveAll', 'purge', 'slowmode', 'readOnly', 'announce', 'welcomeMessage', 'headers', 'afkMic', 'webClient', 'info', 'leaveVoice', 'icon', 'flash'],
           // Roller ve yetkiler
           perms: [...permsOf(me)],
           roles: userRoleIds(me),
@@ -1296,6 +1297,7 @@ function startServer(opts = {}) {
         memberRoles: 'manageRoles',
         memberRole: 'manageRoles',
         audit: 'viewAudit',
+        flash: 'flash',
       };
       const need = typeof m.t === 'string' && Object.hasOwn(NEED, m.t) ? NEED[m.t] : null;
       if (need && !can(me, need)) return deny(me, need);
@@ -1758,6 +1760,13 @@ function startServer(opts = {}) {
           if (now - (me.pokeAt || 0) < 1000) break;
           me.pokeAt = now;
           send(target.ws, { t: 'poke', from: me.id, name: me.name, text: cleanReason(m.text) });
+          break;
+        }
+        case 'flash': {
+          // Flash (CS gibi): sadece hedefe gider, karşı tarafın bütün ekranları kısa süre beyaz olur
+          const target = users.get(m.to);
+          if (!target || target.bot || target === me) break;
+          send(target.ws, { t: 'flash', from: me.id, name: me.name });
           break;
         }
         case 'sfx': {

@@ -1964,6 +1964,9 @@ function onMessage(m) {
     case 'sfx':
       onSfx(m);
       break;
+    case 'flash':
+      onFlashed(m);
+      break;
     case 'poke':
       if (effectivePresence() === 'dnd') {
         // Rahatsız Etmeyin: titreşim ve ses yok, sadece sessiz bir not
@@ -2647,6 +2650,7 @@ function userMenu(e, u) {
       run: () =>
         pokeUser(u),
     },
+    canFlash(u) && { label: '💥 Flash at', run: () => flashUser(u) },
     !sameChannel && { label: 'Kanalına git', run: () => joinChannel(u.channelId) },
     ...voteItems(u),
     ...(mod.length ? ['-', { html: '<div class="ctx-label">Moderasyon</div>' }, ...mod] : []),
@@ -4522,6 +4526,65 @@ $('#btn-toggle-chat').addEventListener('click', () => {
 const ICON_SFX =
   '<svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3Zm13.5 3A4.5 4.5 0 0 0 14 7.97v8.05A4.5 4.5 0 0 0 16.5 12Z"/><path d="m19 2 1.1 2.4 2.4 1.1-2.4 1.1L19 9l-1.1-2.4-2.4-1.1 2.4-1.1L19 2Zm.5 11 .6 1.4 1.4.6-1.4.6-.6 1.4-.6-1.4-1.4-.6 1.4-.6.6-1.4Z"/></svg>';
 const sfxSupported = () => !!S.features?.has('sfx');
+
+// =====================================================================
+//  Flash (CS gibi): yetkisi olan kişiye sağ tıklayıp atar, karşı tarafın bütün ekranları beyaz olur
+// =====================================================================
+const canFlash = (u) => !!u && !u.bot && u.id !== S.myId && feat('flash') && can('flash');
+function flashUser(u) {
+  send({ t: 'flash', to: u.id });
+  toast(`💥 ${u.name} kişisine flash attın`, '', '', 2500);
+}
+function onFlashed(m) {
+  logEvent('💥', `${m.name} sana flash attı`, { hot: true });
+  if (kanki.flashbang) kanki.flashbang();
+  else flashInPage(); // tarayıcıdan girenlerde sadece sayfa beyazlar
+  flashSound();
+  setTimeout(() => toast(`💥 ${m.name} sana flash attı!`, '', 'poke', 5000), 1200);
+}
+function flashInPage() {
+  const el = h('div', { class: 'flash-page' });
+  document.body.append(el);
+  setTimeout(() => el.remove(), 3200);
+}
+// Patlama + kulak çınlaması (ses dosyası yok, WebAudio ile üretilir)
+function flashSound() {
+  if (S.deafened) return;
+  try {
+    const ctx = sfxCtx();
+    const t = ctx.currentTime + 0.02;
+    const vol = Math.max(0.15, (settings.sfxVolume ?? 50) / 100);
+    const out = ctx.createGain();
+    out.gain.value = vol;
+    out.connect(ctx.destination);
+    // Patlama: kısa, kalın gürültü
+    const len = Math.floor(ctx.sampleRate * 0.35);
+    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3);
+    const noise = ctx.createBufferSource();
+    noise.buffer = buf;
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 1800;
+    const ng = ctx.createGain();
+    ng.gain.value = 0.9;
+    noise.connect(lp).connect(ng).connect(out);
+    noise.start(t);
+    // Çınlama: yüksek, yavaşça sönen ton
+    const tone = ctx.createOscillator();
+    tone.type = 'sine';
+    tone.frequency.value = 3400;
+    const tg = ctx.createGain();
+    tg.gain.setValueAtTime(0.0001, t);
+    tg.gain.exponentialRampToValueAtTime(0.18, t + 0.08);
+    tg.gain.setValueAtTime(0.18, t + 0.9);
+    tg.gain.exponentialRampToValueAtTime(0.0001, t + 3.4);
+    tone.connect(tg).connect(out);
+    tone.start(t);
+    tone.stop(t + 3.5);
+  } catch {}
+}
 
 function sfxCtx() {
   if (!sfx.ctx) {

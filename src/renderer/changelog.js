@@ -6,6 +6,15 @@
  */
 const CHANGELOG = [
   {
+    version: '1.0.36',
+    date: '2026-11-09',
+    title: 'Flash (CS gibi)',
+    added: [
+      'Yeni "Flash at" yetkisi: yetkisi olan kişi birine sağ tıklayıp 💥 Flash at der; karşı tarafın bütün monitörleri birkaç saniye bembeyaz olur ve kulakta çınlama sesi duyulur. Kanki küçültülmüş olsa da masaüstünde, tarayıcıda ya da pencereli tam ekran oyunda çıkar.',
+      'Yetki varsayılan olarak kimsede yok (sadece sunucu sahibi); Sunucu Ayarları › Roller › Ses ve görüntü bölümünden verilir.',
+    ],
+  },
+  {
     version: '1.0.35',
     date: '2026-11-09',
     title: 'Ana sayfa kartı çıkınca hemen yenilenir',
