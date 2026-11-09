@@ -235,6 +235,7 @@ function onAdminMessage(m) {
 
 function afterPermsChange() {
   applyAdminUi();
+  if (typeof syncNsMsgPerm === "function") syncNsMsgPerm();
   renderAll();
   renderTextChannels();
   renderComposerLock();

@@ -914,6 +914,20 @@ ipcMain.handle('watch:resolve', async (_e, url) => {
   }
 });
 // RNNoise (yapay zekâ gürültü engelleme) WebAssembly dosyası
+// Ayarlar › Hakkında: Kanki'nin süreçlerinin bellek kullanımı (Görev Yöneticisi'ndeki gibi)
+ipcMain.handle('app:mem', () => {
+  const NAMES = { Browser: 'Ana süreç', Tab: 'Arayüz', GPU: 'Ekran kartı', Utility: 'Yardımcı' };
+  const parts = {};
+  let total = 0;
+  for (const p of app.getAppMetrics()) {
+    const mb = (p.memory?.workingSetSize || 0) / 1024;
+    const k = NAMES[p.type] || p.type;
+    parts[k] = (parts[k] || 0) + mb;
+    total += mb;
+  }
+  return { total: Math.round(total), parts: Object.entries(parts).map(([k, v]) => [k, Math.round(v)]).sort((a, b) => b[1] - a[1]) };
+});
+
 ipcMain.handle('asset:read', (_e, name) => {
   if (name !== 'rnnoise') return null;
   const dir = path.join(__dirname, '..', 'renderer', 'vendor', 'rnnoise');

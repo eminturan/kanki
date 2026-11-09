@@ -120,8 +120,8 @@ GitHub Actions paketleri derler, Release'e `latest.yml` ile birlikte ekler; kuru
 
 ## Müzik botu
 - Sunucuyu kuran kişinin **Kanki Admin** uygulamasında kendiliğinden çalışır ve kanal listesinde "Müzik Botu" olarak görünür.
-- Sohbete yaz: `!çal <YouTube linki ya da şarkı adı>` (oynatma listesi linki en fazla 50 şarkı ekler), `!geç`, `!duraklat`, `!devam`, `!dur` (kuyruğu da temizler), `!kuyruk`, `!çıkar <sıra>`, `!temizle`, `!karıştır`, `!tekrar`, `!ses <0-100>`, `!şimdi`, `!gel`, `!ayrıl`, `!yardım`.
-- Aynı işler sahnenin sağ üstündeki nota düğmesinden ve çalan şarkı çubuğundan da yapılır. Kişiye özel bot sesi: botun profil kartındaki ses sürgüsü.
+- Sohbete yaz: `!çal <YouTube linki ya da şarkı adı>` (oynatma listesi linki en fazla 50 şarkı ekler), `!geç`, `!duraklat`, `!devam`, `!sar <1:30 | +10 | -10>`, `!dur` (kuyruğu da temizler), `!kuyruk`, `!çıkar <sıra>`, `!temizle`, `!karıştır`, `!tekrar`, `!ses <0-100>`, `!şimdi`, `!gel`, `!ayrıl`, `!yardım`.
+- Aynı işler sahnenin sağ üstündeki nota düğmesinden ve çalan şarkı çubuğundan da yapılır; çubuğa tıklayıp sürükleyerek şarkı ileri/geri sarılır. Kişiye özel bot sesi: botun profil kartındaki ses sürgüsü.
 - Kanalda 1 dakika kimse kalmazsa bot durur ve kanaldan ayrılır.
 - Bir YouTube şarkısının başlaması 10–15 saniye sürebilir: bağlantı çözülür ve YouTube bazı videolarda akışı reklam süresi kadar (birkaç saniye) bekletir. Kuyruktaki sıradaki şarkı önceden hazırlandığı için geçişler genelde beklemesizdir. Canlı yayınlar çalınamaz.
 - YouTube için [yt-dlp](https://github.com/yt-dlp/yt-dlp) kullanılır: ilk kullanımda resmi GitHub sürümünden Kanki Admin'in veri klasörüne indirilir ve haftada bir kendini günceller. Doğrudan ses dosyası ve radyo bağlantıları buna gerek duymaz.
@@ -149,11 +149,11 @@ GitHub Actions paketleri derler, Release'e `latest.yml` ile birlikte ekler; kuru
 - İzlediğin yayının üst çubuğundaki kalemle (ya da Alt + tık) yayına nokta koy ya da çiz; işaret herkeste ve tüm ekran paylaşılıyorsa yayıncının ekranında 3 saniye görünür.
 
 ## Görünüm ve temalar
-Ayarlar › Görünüm: 8 tema (Kanki, Zifiri, Gece Mavisi, Neon, Gün Batımı, Okyanus, Şampiyon, Gündüz), vurgu rengi, bilgisayarın açık/koyu temasına uyma, cam efekti, arka plan ışıkları, konuşurken parlama, hareketleri azaltma, yüzen/bitişik paneller, yoğunluk ve sohbet yazı boyutu. Bu ayarlar sadece o bilgisayarda geçerli. Tema dosyaları: `src/renderer/themes.css` (renkler ve görünüm), `theme-boot.js` (ilk boyamadan önce temayı uygular), `appearance.js` (Görünüm sayfası).
+Ayarlar › Görünüm: 9 tema (Sade — efektsiz ve en hafif, Kanki, Zifiri, Gece Mavisi, Neon, Gün Batımı, Okyanus, Şampiyon, Gündüz), vurgu rengi, bilgisayarın açık/koyu temasına uyma, cam efekti, arka plan ışıkları, konuşurken parlama, hareketleri azaltma, yüzen/bitişik paneller, yoğunluk ve sohbet yazı boyutu. Bu ayarlar sadece o bilgisayarda geçerli. Tema dosyaları: `src/renderer/themes.css` (renkler ve görünüm), `theme-boot.js` (ilk boyamadan önce temayı uygular), `appearance.js` (Görünüm sayfası).
 
 ## Yönetim (Sunucu Ayarları)
 Kalkan düğmesi ya da sunucu menüsü › Sunucu ayarları. Sekmeler: Genel Bakış, Roller, Üyeler, Kanallar, Yasaklılar, Denetim Kaydı, Bağlantı. Her sekme sadece ilgili yetkisi olana görünür.
-- **Roller:** Discord'daki gibi. Rolün adı, rengi, "üyeleri ayrı göster" ayarı ve 23 yetkisi var (Yönetici, sunucuyu/rolleri/kanalları yönet, denetim kaydı, at, yasakla, zaman aşımı, sustur, sağırlaştır, taşı, mesajları yönet, @herkes, mesaj, dosya, GIF, anket, oylama, ses efekti, ekran paylaşımı, kamera, birlikte izle). Rolleri sürükleyerek sırala; üstteki rol alttakileri yönetir, kimse kendi rolüne eşit ya da üstteki birine işlem yapamaz. Sunucu sahibi (yönetici anahtarıyla bağlanan) her şeyi yapar ve kimse ona işlem yapamaz.
+- **Roller:** Discord'daki gibi. Rolün adı, rengi, "üyeleri ayrı göster" ayarı ve 24 yetkisi var (Yönetici, sunucuyu/rolleri/kanalları yönet, denetim kaydı, at, yasakla, zaman aşımı, sustur, sağırlaştır, taşı, mesajları yönet, @herkes, mesaj, dosya, GIF, anket, oylama, süslü mesaj yazısı, ses efekti, ekran paylaşımı, kamera, birlikte izle). Rolleri sürükleyerek sırala; üstteki rol alttakileri yönetir, kimse kendi rolüne eşit ya da üstteki birine işlem yapamaz. Sunucu sahibi (yönetici anahtarıyla bağlanan) her şeyi yapar ve kimse ona işlem yapamaz.
 - **@herkes:** herkesin varsayılan yetkileri (ör. GIF'i ya da ses efektlerini herkese kapatmak için).
 - **Moderatör:** yeni sunucularda hazır gelen rol. Eski sürümdeki moderatörler otomatik bu rolü alır.
 - **Moderasyon** (kişiye sağ tık): rol ver, taşı, sesten çıkar, sunucuda sustur/sağırlaştır, zaman aşımı (60 sn – 1 hafta; bu sürede yazamaz, konuşamaz, paylaşamaz), at, yasakla.

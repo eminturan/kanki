@@ -1576,3 +1576,30 @@ body.has-update .layout.chat-hidden .stage-head { padding-right: 56px; }
 }
 .wh-title { max-width: 30%; font-size: 12.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .wh-vol { width: 70px; accent-color: var(--accent); }
+
+/* Yetkisi olmayan seçenek */
+label.check.locked { opacity: .55; cursor: not-allowed; }
+#ns-inmsg-why { margin: 6px 0 0; font-size: 12px; }
+
+/* Müzik çubuğunda sarma: ince çubuğun tıklanma alanı büyük, üzerine gelince kalınlaşır */
+#music-bar .mb-progress.seekable { cursor: pointer; position: relative; touch-action: none; overflow: visible; }
+#music-bar .mb-progress i { border-radius: inherit; }
+#music-bar .mb-progress.seekable::before { content: ""; position: absolute; inset: -7px 0; }
+#music-bar .mb-progress.seekable:hover, #music-bar .mb-progress[data-drag] { height: 6px; }
+#music-bar .mb-progress[data-drag] i { transition: none; }
+/* CANLI rozeti dar yerlerde kesilmesin */
+.live, .live-badge { flex: none; white-space: nowrap; min-width: max-content; }
+
+/* Kendi eklenen oyunlar (Ayarlar › Profilim) */
+.custom-games-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 4px 0 10px 26px; }
+.custom-games { display: contents; }
+.cg-chip { display: inline-flex; align-items: center; gap: 4px; padding: 3px 4px 3px 9px; border-radius: 999px; background: var(--bg-3); border: 1px solid var(--line); font-size: 12.5px; }
+.cg-x { width: 18px; height: 18px; border-radius: 50%; color: var(--text-3); line-height: 1; }
+.cg-x:hover { background: var(--hover); color: var(--red); }
+
+/* Hakkında › Bellek kullanımı */
+.mem-box { margin-top: 14px; padding: 12px 14px; border-radius: var(--r-md, 10px); background: var(--bg-3); border: 1px solid var(--line); }
+.mem-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.mem-head span { font: 600 15px/1 var(--mono); color: var(--text); }
+.mem-parts { margin: 6px 0 8px; font-size: 12.5px; }
+.mem-box .hint { margin: 0; }

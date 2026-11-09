@@ -816,7 +816,7 @@ async function scanActivity() {
   let a = { game: '', music: '' };
   if (settings.showGame || settings.showMusic) {
     try {
-      a = (await kanki.scanActivity({ games: !!settings.showGame, music: !!settings.showMusic })) || a;
+      a = (await kanki.scanActivity({ games: !!settings.showGame, music: !!settings.showMusic, custom: settings.customGames || [] })) || a;
     } catch {}
   }
   const key = JSON.stringify(a);
@@ -825,7 +825,78 @@ async function scanActivity() {
     send({ t: 'activity', game: a.game || '', music: a.music || '' });
   }
 }
-setInterval(scanActivity, 20000);
+// Şarkı değişimi birkaç saniyede görünsün (program listesi ana süreçte 9 sn saklanır, Spotify başlığı her seferinde bakılır)
+let actBusy = false;
+setInterval(async () => {
+  if (actBusy) return;
+  actBusy = true;
+  try {
+    await scanActivity();
+  } finally {
+    actBusy = false;
+  }
+}, 4000);
+
+// Listede olmayan oyunu kendin ekle (Ayarlar › Profilim)
+function renderCustomGames() {
+  const box = $('#custom-games');
+  if (!box) return;
+  const list = settings.customGames || [];
+  box.replaceChildren(
+    ...list.map((g, i) =>
+      h('span', { class: 'cg-chip', title: `${g.exe}.exe` }, `🎮 ${g.name}`, h('button', { class: 'cg-x', title: 'Kaldır', onclick: () => {
+        settings.customGames = list.filter((_, j) => j !== i);
+        saveSettings();
+        renderCustomGames();
+        lastAct = '';
+        scanActivity();
+      } }, '×'))
+    )
+  );
+}
+async function addCustomGame() {
+  let names = [];
+  try {
+    names = (await kanki.scanActivity({ list: true }))?.names || [];
+  } catch {}
+  formModal({
+    title: '🎮 Oyun ekle',
+    desc: 'Oyun açıkken listeden programını seç (ya da dosya adını yaz) ve görünecek adını gir.',
+    fields: [
+      names.length
+        ? { key: 'exe', label: 'Çalışan program', type: 'select', options: [['', 'Seç…'], ...names.map((n) => [n, n])] }
+        : { key: 'exe', label: 'Programın dosya adı', placeholder: 'ör. Seafight' },
+      { key: 'name', label: 'Görünecek ad', placeholder: 'ör. Seafight', max: 60 },
+    ],
+    submit: 'Ekle',
+    onSubmit: (v) => {
+      const exe = String(v.exe || '').trim().replace(/\.exe$/i, '');
+      const name = String(v.name || '').trim() || exe;
+      if (!exe) return toast('Bir program seç', '', 'err');
+      settings.customGames = [...(settings.customGames || []).filter((g) => g.exe.toLowerCase() !== exe.toLowerCase()), { exe, name }].slice(-30);
+      saveSettings();
+      renderCustomGames();
+      lastAct = '';
+      scanActivity();
+      toast(`🎮 ${name} eklendi`, 'Oyun açıkken adının altında görünecek.');
+    },
+  });
+}
+$('#btn-add-game')?.addEventListener('click', addCustomGame);
+
+// Hakkında sayfası açıkken bellek kullanımı 3 sn'de bir yenilenir
+async function renderMem() {
+  const pane = document.querySelector('.settings-pane[data-pane="about"]');
+  if (!kanki.memUsage || !pane || pane.classList.contains('hidden') || $('#settings').classList.contains('hidden')) return;
+  try {
+    const m = await kanki.memUsage();
+    $('#mem-total').textContent = `${m.total} MB`;
+    $('#mem-parts').textContent = m.parts.map(([k, v]) => `${k} ${v} MB`).join(' · ');
+  } catch {}
+}
+setInterval(renderMem, 3000);
+document.addEventListener('click', (e) => e.target.closest('.snav[data-pane="about"]') && setTimeout(renderMem, 50));
+renderCustomGames();
 
 // =====================================================================
 //  Kendi kısayolların (oyundayken de çalışır)
@@ -1141,7 +1212,7 @@ function decorateTile(el, key, video) {
   el.append(layer);
   // Birlikte izle kontrolleri (sadece o yayın "birlikte izle" ise görünür)
   el.append(buildWatchBar(key));
-  if (!feat('marks') || isCamKey(key)) return;
+  if (!feat('marks') || isCamKey(key) || isOwnKey(key)) return;
   const btn = h('button', { class: 'tile-btn mark-btn', title: 'Yayına işaret koy / çiz (Alt + tık da olur)' });
   btn.append(svgEl(ICON_PEN));
   btn.addEventListener('click', (e) => {
@@ -1249,6 +1320,7 @@ function onMark(m) {
 // =====================================================================
 const ICON_WATCH = '<svg viewBox="0 0 24 24"><path d="M4 5h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Zm6 3.5v7l6-3.5-6-3.5Z"/></svg>';
 S.watch = new Map(); // benim birlikte izle yayınlarım: shareId -> { video, audioEl, ctx, title }
+S.watchHidden = new Set(); // sahneden gizlediğim kendi birlikte izle yayınlarım
 S.watchStates = new Map(); // izlediğim birlikte izle yayınlarının durumu
 function myWatchShare() {
   for (const id of S.watch.keys()) if (S.myShares.has(id)) return id;
@@ -1362,6 +1434,7 @@ async function startWatch({ src, audioSrc, title, revoke, remote }) {
     push();
     renderWatchHost();
     renderCallBar();
+    renderStage(); // videoyu başlatan da sahnede izlesin
     logEvent('🎬', `Birlikte izle başlattın: ${title}`, { dim: true });
   } catch (e) {
     video.pause();
@@ -1388,9 +1461,11 @@ function cleanupWatch(id) {
   w.ctx.close().catch(() => {});
   if (w.revoke) URL.revokeObjectURL(w.revoke);
   S.watch.delete(id);
+  S.watchHidden.delete(id);
   setTimeout(() => {
     renderWatchHost();
     renderCallBar();
+    renderStage();
   });
 }
 // Yayın kapanınca (düğmeden ya da başka yoldan) videoyu da kapat
@@ -1426,7 +1501,15 @@ function renderWatchHost() {
       h('span', { class: 'wh-title' }),
       h('input', { type: 'range', class: 'wh-seek', min: 0, max: 1000, value: 0 }),
       h('span', { class: 'wh-time' }),
-      h('input', { type: 'range', class: 'wh-vol', min: 0, max: 100, value: 80, title: 'Videonun sende ne kadar yüksek çalacağı' })
+      h('input', { type: 'range', class: 'wh-vol', min: 0, max: 100, value: 80, title: 'Videonun sende ne kadar yüksek çalacağı' }),
+      h('button', { class: 'btn sm wh-view', onclick: () => {
+        const sid = myWatchShare();
+        if (!sid) return;
+        if (S.watchHidden.has(sid)) S.watchHidden.delete(sid);
+        else S.watchHidden.add(sid);
+        renderStage();
+        renderWatchHost();
+      } })
     );
     const seek = bar.querySelector('.wh-seek');
     seek.addEventListener('input', () => (bar.dataset.drag = '1'));
@@ -1443,6 +1526,7 @@ function renderWatchHost() {
   const v = w.video;
   bar.querySelector('.wh-pp').innerHTML = v.paused ? ICON_PLAY : ICON_PAUSE;
   bar.querySelector('.wh-title').textContent = `🎬 ${w.title}`;
+  bar.querySelector('.wh-view').textContent = S.watchHidden.has(id) ? 'Sahnede göster' : 'Sahneden gizle';
   bar.querySelector('.wh-time').textContent = `${fmtClock(v.currentTime)} / ${fmtClock(v.duration)}`;
   if (!bar.dataset.drag && v.duration) bar.querySelector('.wh-seek').value = Math.round((v.currentTime / v.duration) * 1000);
 }

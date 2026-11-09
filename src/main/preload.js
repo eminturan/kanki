@@ -40,6 +40,7 @@ contextBridge.exposeInMainWorld('kanki', {
   showMark: (m) => ipcRenderer.invoke('mark:show', m),
   watchResolve: (url) => ipcRenderer.invoke('watch:resolve', url),
   readAsset: (name) => ipcRenderer.invoke('asset:read', name),
+  memUsage: () => ipcRenderer.invoke('app:mem'),
   onInvite: (cb) => ipcRenderer.on('invite', (_e, p) => cb(p)),
   autotest: process.env.KANKI_AUTOTEST ? JSON.parse(process.env.KANKI_AUTOTEST) : null,
 });

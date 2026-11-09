@@ -400,6 +400,7 @@
                 <p class="hint">Fotoğrafın ve durum yazın kanal listesinde, üye listesinde, sohbette ve profil kartında görünür. Fotoğraf sadece bu bilgisayarda saklanır, bağlandığın sunucuya gönderilir.</p>
                 <div class="checks one">
                   <label class="check"><input type="checkbox" id="set-show-game" /><span>Oynadığım oyunu adımın altında göster</span></label>
+                  <div class="custom-games-row"><div id="custom-games" class="custom-games"></div><button type="button" class="btn sm" id="btn-add-game">+ Listede olmayan oyunu ekle</button></div>
                   <label class="check"><input type="checkbox" id="set-show-music" /><span>Spotify'da dinlediğim şarkıyı göster</span></label>
                 </div>
                 <div class="field"><span>Görünen ad</span><div class="pe-nick-line">Bağlanırken yazdığın ad: <b id="pe-nick"></b></div></div>
@@ -425,6 +426,7 @@
               <div class="ns-presets" id="ns-presets"></div>
             </div>
             <label class="check ns-inmsg"><input type="checkbox" id="ns-inmsg" /><span>Mesajlarımda da bu yazı tipini ve rengi kullan</span></label>
+            <div class="hint hidden" id="ns-inmsg-why">Bunun için “Süslü mesaj yazısı” yetkisi olan bir rolün olmalı. Yöneticiden iste.</div>
             <div class="ns-actions"><button class="btn" id="ns-reset">Varsayılana dön</button></div>
           </section>
           <section class="settings-pane hidden" data-pane="appearance">
@@ -438,6 +440,7 @@
             <h3>Vurgu rengi</h3>
             <div class="accent-row" id="ap-accents"></div>
             <h3>Efektler</h3>
+            <p class="hint hidden" id="ap-lite-note">Sade temada efektler kapalı: uygulama daha az bellek ve ekran kartı kullanır.</p>
             <div class="checks one">
               <label class="check"><input type="checkbox" id="ap-glass" /><span>Cam efekti<small>Menüler ve pencereler buzlu cam gibi görünsün (zayıf ekran kartında kapat)</small></span></label>
               <label class="check"><input type="checkbox" id="ap-aurora" /><span>Arka plan ışıkları<small>Arkada yavaşça kayan yumuşak renkler (Kanki arka plandayken durur)</small></span></label>
@@ -576,6 +579,7 @@
               <span class="muted" id="update-check-result"></span>
             </div>
             <p class="hint">Kurulumlu Windows sürümü açılışta ve açık kaldığı sürece 30 dakikada bir yeni sürüm olup olmadığına bakar.</p>
+            <div class="mem-box"><div class="mem-head"><b>Bellek kullanımı</b><span id="mem-total">…</span></div><div class="mem-parts muted" id="mem-parts"></div><p class="hint">Daha az bellek için Ayarlar › Görünüm’den <b>Sade</b> temayı seç.</p></div>
           </section>
         </div>
         <button class="settings-close" data-close title="Kapat (Esc)"><svg viewBox="0 0 24 24"><path d="M6.4 5 5 6.4 10.6 12 5 17.6 6.4 19l5.6-5.6 5.6 5.6 1.4-1.4-5.6-5.6L19 6.4 17.6 5 12 10.6z"/></svg><span>ESC</span></button>

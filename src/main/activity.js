@@ -11,6 +11,7 @@ const path = require('path');
 
 // Program adı (küçük harf, .exe olmadan) -> oyun adı
 const GAMES = {
+  seafight: 'Seafight',
   'valorant-win64-shipping': 'Valorant',
   cs2: 'Counter-Strike 2',
   csgo: 'Counter-Strike: Global Offensive',
@@ -155,9 +156,13 @@ const run = (cmd, args, timeout = 8000) =>
     execFile(cmd, args, { windowsHide: true, timeout, maxBuffer: 8 * 1024 * 1024 }, (err, out) => resolve(err ? '' : String(out || '')));
   });
 
-function gameFrom(names) {
+const exeKey = (raw) => String(raw || '').toLowerCase().replace(/\.exe$/, '').trim();
+function gameFrom(names, custom = []) {
+  // Kullanıcının kendi eklediği oyunlar önce bakılır
+  const mine = new Map(custom.filter((g) => g && g.exe && g.name).map((g) => [exeKey(g.exe), String(g.name).slice(0, 60)]));
   for (const raw of names) {
-    const n = raw.toLowerCase().replace(/\.exe$/, '').trim();
+    const n = exeKey(raw);
+    if (mine.has(n)) return mine.get(n);
     if (GAMES[n]) return GAMES[n];
   }
   return '';
@@ -207,10 +212,22 @@ async function spotify(names) {
   return '';
 }
 
-async function scan({ games = true, music = true } = {}) {
+// Program listesi birkaç saniye saklanır: sık tarama (şarkı değişimi için) bilgisayarı yormasın
+let namesCache = { at: 0, names: [] };
+async function cachedNames(maxAge) {
+  if (Date.now() - namesCache.at > maxAge) namesCache = { at: Date.now(), names: await processNames() };
+  return namesCache.names;
+}
+async function scan({ games = true, music = true, custom = [], list = false } = {}) {
+  if (list) {
+    // "Oyun ekle" penceresi için: şu an çalışan programlar (sistem programları hariç)
+    const names = await cachedNames(0);
+    const skip = /^(svchost|system|idle|registry|smss|csrss|wininit|winlogon|services|lsass|fontdrvhost|dwm|conhost|explorer|runtimebroker|searchhost|sihost|taskhostw|ctfmon|dllhost|tasklist|backgroundtaskhost|applicationframehost|startmenuexperiencehost|textinputhost|shellexperiencehost|securityhealth.*|msedgewebview2|audiodg|spoolsv|memory compression|wudfhost|smartscreen|kanki.*|electron)$/i;
+    return { names: [...new Set(names.map((n) => n.replace(/\.exe$/i, '')))].filter((n) => !skip.test(n)).sort((a, b) => a.localeCompare(b)) };
+  }
   if (!games && !music) return { game: '', music: '' };
-  const names = await processNames();
-  return { game: games ? gameFrom(names) : '', music: music ? await spotify(names) : '' };
+  const names = await cachedNames(9000);
+  return { game: games ? gameFrom(names, custom) : '', music: music ? await spotify(names) : '' };
 }
 
 module.exports = { scan, GAMES };

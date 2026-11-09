@@ -1284,7 +1284,11 @@ const tileEls = new Map(); // key -> element
 const popouts = new Map(); // key -> { win, video }
 let zTop = 10;
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
-const visibleTileKeys = () => [...S.watching].filter((k) => !popouts.has(k) && !isCamKey(k));
+// Birlikte izle başlatan kişi kendi videosunu da sahnede büyük kutuda görür (kendi yayınının anahtarı: benimId|yayınId)
+const isOwnKey = (k) => !!S.myId && k.startsWith(S.myId + '|');
+const ownWatchKeys = () =>
+  typeof S.watch === 'undefined' || !S.myId ? [] : [...S.watch.keys()].filter((id) => S.myShares.has(id) && !S.watchHidden.has(id)).map((id) => shareKey(S.myId, id));
+const visibleTileKeys = () => [...[...S.watching].filter((k) => !popouts.has(k) && !isCamKey(k)), ...ownWatchKeys()];
 
 function placeTile(key) {
   if (!S.layoutCustom || S.layout.has(key)) return; // otomatik ızgarada yer render sırasında hesaplanır
@@ -1383,8 +1387,14 @@ function buildTile(key) {
     btn('Ayrı pencerede aç (istediğin yere, başka monitöre taşıyabilirsin)', ICON_POP, () => popOut(key)),
     btn('Tam ekran (F)', ICON_FULL, () => tileFullscreen(key)),
     btn('Sahneyi kapla / eski boyutuna dön (çift tıkla)', ICON_MAX, () => toggleMax(key)),
-    btn('İzlemeyi bırak', ICON_X, () => {
+    btn(isOwnKey(key) ? 'Sahneden gizle (video çalmaya devam eder)' : 'İzlemeyi bırak', ICON_X, () => {
       const [u, sid] = splitKey(key);
+      if (isOwnKey(key)) {
+        S.watchHidden.add(sid);
+        renderStage();
+        renderWatchHost();
+        return;
+      }
       watchShare(u, sid, false);
     })
   );
@@ -1510,10 +1520,12 @@ function renderTiles() {
     syncTileRc(k, el);
     el.querySelector('.tile-noaudio').classList.toggle('hidden', hasAudio || !sc);
     const v = el.querySelector('video');
-    const want = sc?.video || null;
+    const own = isOwnKey(k);
+    const want = own ? S.myShares.get(splitKey(k)[1])?.stream || null : sc?.video || null;
     if (v.srcObject !== want) v.srcObject = want;
     // İlk kare gelene kadar "Bağlanıyor…" göster
-    el.classList.toggle('waiting', !sc || !sc.video.getVideoTracks().length || v.readyState < 2);
+    el.classList.toggle('waiting', own ? v.readyState < 2 : !sc || !sc.video.getVideoTracks().length || v.readyState < 2);
+    el.classList.toggle('own', own);
   }
   $('#btn-grid').classList.toggle('hidden', keys.length < 1 || !S.layoutCustom);
 }
@@ -4623,6 +4635,17 @@ function renderNameStyleUi() {
       pr.append(sw);
     }
   $('#ns-inmsg').checked = !!st.inMessages;
+  syncNsMsgPerm();
+}
+// "Mesajlarımda da kullan" bir rol yetkisine bağlı (eski sunucularda serbest)
+const nsMsgAllowed = () => !feat('perms') || can('styledMessages');
+function syncNsMsgPerm() {
+  const ok = nsMsgAllowed();
+  const box = $('#ns-inmsg');
+  box.disabled = !ok;
+  box.closest('label').classList.toggle('locked', !ok);
+  box.closest('label').title = ok ? '' : 'Bunun için “Süslü mesaj yazısı” yetkisi olan bir rol gerekir.';
+  $('#ns-inmsg-why').classList.toggle('hidden', ok);
 }
 $('#ns-c1').addEventListener('input', (e) => setNameStyle({ c1: e.target.value }));
 $('#ns-c2').addEventListener('input', (e) => setNameStyle({ c2: e.target.value }));
@@ -4698,9 +4721,48 @@ function tickMusic() {
   const pos = botPosition();
   const dur = st.current.duration || 0;
   bar.querySelector('.mb-time').textContent = st.loading ? 'yükleniyor…' : dur ? `${fmtTime(pos)} / ${fmtTime(dur)}` : fmtTime(pos);
-  bar.querySelector('.mb-progress i').style.width = dur ? `${Math.min(100, (pos / dur) * 100)}%` : '0%';
+  const prog = bar.querySelector('.mb-progress');
+  const shown = prog.dataset.drag ? Number(prog.dataset.drag) * dur : pos;
+  if (prog.dataset.drag) bar.querySelector('.mb-time').textContent = `${fmtTime(shown)} / ${fmtTime(dur)}`;
+  prog.querySelector('i').style.width = dur ? `${Math.min(100, (shown / dur) * 100)}%` : '0%';
+  prog.classList.toggle('seekable', !!dur && !st.loading);
 }
 setInterval(tickMusic, 500);
+// Çubuğa tıklayıp sürükleyerek şarkıyı ileri/geri sar (bırakınca bota !sar gider)
+{
+  const prog = $('#music-bar .mb-progress');
+  const frac = (e) => {
+    const r = prog.getBoundingClientRect();
+    return Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
+  };
+  prog.addEventListener('pointerdown', (e) => {
+    const dur = S.botState?.current?.duration || 0;
+    if (!dur || S.botState.loading || e.button !== 0) return;
+    prog.setPointerCapture(e.pointerId);
+    prog.dataset.drag = String(frac(e));
+    tickMusic();
+  });
+  prog.addEventListener('pointermove', (e) => {
+    if (!prog.dataset.drag) return;
+    prog.dataset.drag = String(frac(e));
+    tickMusic();
+  });
+  const end = (e, send) => {
+    if (!prog.dataset.drag) return;
+    const dur = S.botState?.current?.duration || 0;
+    const sec = Math.round(frac(e) * dur);
+    delete prog.dataset.drag;
+    if (send && dur) {
+      botCmd('sar', sec);
+      // Sunucudan yeni durum gelene kadar çubuk geri zıplamasın
+      if (S.botState) Object.assign(S.botState, { position: sec, at: Date.now() });
+    }
+    tickMusic();
+  };
+  prog.addEventListener('pointerup', (e) => end(e, true));
+  prog.addEventListener('pointercancel', (e) => end(e, false));
+  prog.title = 'Tıkla ya da sürükle: ileri/geri sar';
+}
 
 function renderMusicPop() {
   const pop = $('#music-pop');

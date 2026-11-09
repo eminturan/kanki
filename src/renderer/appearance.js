@@ -3,6 +3,7 @@
 //  Ayarlar settings içinde düz anahtarlar olarak durur, saveSettings() ile saklanır.
 // =====================================================================
 const KANKI_THEMES = [
+  { id: 'sade', name: 'Sade', mood: 'Efektsiz, en az bellek', lite: true },
   { id: 'kanki', name: 'Kanki', mood: 'İmza yeşil, derin koyu' },
   { id: 'oled', name: 'Zifiri', mood: 'Saf siyah, pil dostu' },
   { id: 'midnight', name: 'Gece Mavisi', mood: 'Serin lacivert gece' },
@@ -31,6 +32,9 @@ function apThemeId() {
   if (!settings.themeAuto) return ok;
   return apMqLight.matches ? 'light' : ok === 'light' ? 'kanki' : ok;
 }
+
+// Sade tema: efektler (cam, ışıklar, parlama) seçimden bağımsız kapalı
+const apIsLite = () => !!KANKI_THEMES.find((t) => t.id === apThemeId())?.lite;
 
 // WCAG yardımcıları: seçilen vurgu rengi her temada okunur kalsın
 const apRgb = (hex) => { const n = parseInt(hex.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
@@ -68,9 +72,11 @@ function applyAppearance() {
   const schemeChanged = r.dataset.scheme !== scheme;
   r.dataset.theme = id;
   r.dataset.scheme = scheme;
-  r.classList.toggle('no-blur', !settings.glass);
-  r.classList.toggle('no-aurora', !settings.aurora);
-  r.classList.toggle('no-glow', !settings.speakGlow);
+  const lite = apIsLite();
+  r.classList.toggle('lite', lite);
+  r.classList.toggle('no-blur', lite || !settings.glass);
+  r.classList.toggle('no-aurora', lite || !settings.aurora);
+  r.classList.toggle('no-glow', lite || !settings.speakGlow);
   r.classList.toggle('reduce-motion', settings.motion === 'reduce' || (settings.motion === 'system' && apMqReduce.matches));
   r.classList.toggle('flush', settings.panels === 'flush');
   r.classList.toggle('compact', settings.density === 'compact');
@@ -92,7 +98,7 @@ function apSetTheme(id, ev, card) {
   settings.themeAuto = false; // elle seçim, sistemle eşleştirmeyi kapatır
   saveSettings();
   const r = document.documentElement;
-  if (!document.startViewTransition || r.classList.contains('reduce-motion')) return applyAppearance();
+  if (!document.startViewTransition || r.classList.contains('reduce-motion') || r.classList.contains('lite') || KANKI_THEMES.find((t) => t.id === id)?.lite) return applyAppearance();
   let x = ev?.clientX, y = ev?.clientY;
   if (!x && !y && card) { const b = card.getBoundingClientRect(); x = b.left + b.width / 2; y = b.top + b.height / 2; }
   const rad = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y));
@@ -122,6 +128,14 @@ function apSyncPane() {
   pane.querySelector('#ap-glass').checked = !!settings.glass;
   pane.querySelector('#ap-aurora').checked = !!settings.aurora;
   pane.querySelector('#ap-glow').checked = !!settings.speakGlow;
+  const lite = apIsLite();
+  for (const id of ['#ap-glass', '#ap-aurora', '#ap-glow']) {
+    const inp = pane.querySelector(id);
+    inp.disabled = lite;
+    inp.closest('label, .sw-row, .row')?.classList.toggle('ap-fx', true);
+    inp.closest('label, .sw-row, .row')?.classList.toggle('disabled', lite);
+  }
+  pane.querySelector('#ap-lite-note')?.classList.toggle('hidden', !lite);
   for (const seg of pane.querySelectorAll('.seg[data-key]')) {
     for (const b of seg.children) b.classList.toggle('active', b.dataset.v === String(settings[seg.dataset.key]));
   }
@@ -181,7 +195,7 @@ function apSetLevel(id, db) {
   }
 }
 setInterval(() => {
-  if (!settings.speakGlow || typeof audio === 'undefined' || typeof S === 'undefined' || !S.myId) return;
+  if (!settings.speakGlow || apIsLite() || typeof audio === 'undefined' || typeof S === 'undefined' || !S.myId) return;
   try {
     if (S.transmitting) apSetLevel(S.myId, audio.level);
     for (const [id, r] of audio.remote) if (r.speaking && r.analyser) apSetLevel(id, rmsDb(r.analyser, apLvlBuf));

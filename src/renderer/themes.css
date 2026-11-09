@@ -59,6 +59,27 @@
   --pane-a: 100%;
 }
 
+/* Sade: efektsiz, hafif tema (cam, arka plan ışıkları, parlama ve sürekli animasyonlar kapalı; en az bellek ve ekran kartı) */
+:root[data-theme="sade"], [data-theme="sade"] {
+  --scheme: dark;
+  --bg-0: #0f1113; --bg-1: #15181b; --bg-2: #1a1d21; --bg-3: #22262b; --bg-4: #2c3137;
+  --floating: #1a1d21; --card: #1e2226;
+  --input-bg: #111316; --input-line: rgba(255, 255, 255, 0.12);
+  --line: rgba(255, 255, 255, 0.07); --line-2: rgba(255, 255, 255, 0.16);
+  --text: #e8ecea; --text-2: #aab3ae; --text-3: #848d88;
+  --accent: #22d47e; --accent-2: #45e598; --accent-ink: #03140a;
+  --accent-soft: rgba(34, 212, 126, 0.14); --hover: rgba(255, 255, 255, 0.05); --selected: rgba(34, 212, 126, 0.12);
+  --glow: transparent;
+  --green: #22d47e; --red: #ff5a69; --amber: #f5b83d;
+  --danger: #d9293e; --danger-ink: #ffffff;
+  --link: #6ea8ff; --info: #6fb6ff; --code: #b6f5d4;
+  --shadow: rgba(0, 0, 0, 0.5); --glass-hi: transparent; --scrim: rgba(0, 0, 0, 0.6);
+  --grad-a: #22d47e; --grad-b: #22d47e;
+  --app-bg: #0f1113;
+  --label-font: var(--font);
+  --pane-a: 100%; --glass-a: 100%;
+}
+
 :root[data-theme="midnight"], [data-theme="midnight"] {
   --scheme: dark;
   --bg-0: #060914; --bg-1: #0a0f1f; --bg-2: #0d1326; --bg-3: #151d36; --bg-4: #1f2947;
@@ -217,6 +238,15 @@
 :root.compact .member .avatar { width: 28px; height: 28px; }
 :root.compact .cb-btn { width: 40px; height: 40px; }
 :root.compact .server-header, :root.compact .stage-head, :root.compact .chat-head { height: 46px; }
+
+/* Hafif mod (Sade tema): katman oluşturan ve sürekli çizim isteyen her şey kapalı */
+:root.lite *, :root.lite *::before, :root.lite *::after { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+:root.lite body::before { display: none !important; }
+:root.lite .live::after, :root.lite .live-badge::after, :root.lite #connect-screen .brand-logo::after { display: none !important; }
+:root.lite .empty-stage .empty-icon, :root.lite .live::before, :root.lite .live-badge::before { animation: none !important; }
+:root.lite .avatar.speaking, :root.lite .p-card .avatar.speaking { box-shadow: 0 0 0 2px var(--dot-ring, var(--bg-1)), 0 0 0 4px var(--green) !important; transition: none; }
+:root.lite .modal.settings-full { background: var(--bg-0); }
+:root.lite .ap-fx.disabled { opacity: .5; pointer-events: none; }
 
 /* ---------- 5. İskelet: aurora, yüzen paneller ---------- */
 html, body { background: var(--bg-0); }

@@ -6,6 +6,26 @@
  */
 const CHANGELOG = [
   {
+    version: '1.0.20',
+    date: '2026-11-09',
+    title: 'Sade tema, müzikte sarma, daha hızlı şarkı/oyun gösterimi',
+    added: [
+      'Sade tema (Ayarlar › Görünüm): cam, arka plan ışıkları, parlama ve sürekli animasyonlar kapalı; uygulama daha az bellek ve ekran kartı kullanır.',
+      'Ayarlar › Hakkında’da Kanki’nin bellek kullanımı görünür.',
+      'Müzik botu: alttaki çubuğa tıklayıp sürükleyerek şarkıyı ileri/geri sarabilirsin. Sohbetten de olur: !sar 1:30, !sar +10, !sar -10.',
+      'Listede olmayan oyunu kendin ekle: Ayarlar › Profilim › “Listede olmayan oyunu ekle”, açık programlardan seç.',
+      'Seafight artık tanınıyor.',
+      'Yeni rol yetkisi “Süslü mesaj yazısı”: Yazı stilindeki “mesajlarımda da kullan” seçeneğini sadece bu yetkiye sahip roldekiler açabilir.',
+    ],
+    changed: [
+      'Spotify’da çalan şarkı ve oynanan oyun artık 4–10 saniye içinde görünüyor (önce 20 saniyeye kadar sürüyordu).',
+    ],
+    fixed: [
+      'Birlikte izle’yi başlatan kişi videoyu sahnede göremiyordu; artık kendi videosu da büyük kutuda açılıyor (çubuktaki düğmeyle gizlenebilir).',
+      'CANLI yazısı dar yerlerde kesiliyordu.',
+    ],
+  },
+  {
     version: '1.0.19',
     date: '2026-11-09',
     title: 'Yeni tasarım, temalar, roller ve çok daha fazlası',

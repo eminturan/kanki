@@ -62,6 +62,7 @@ const PERMS = [
   ['useGifs', 'GIF gönder', 'GIF arar ve gönderir.', 'sohbet'],
   ['createPolls', 'Anket, çark, takım', 'Anket açar, çark çevirir, takım kurar.', 'sohbet'],
   ['startVotes', 'Oylama başlat', 'Oylamayla susturma ya da AFK’ya gönderme başlatır.', 'sohbet'],
+  ['styledMessages', 'Süslü mesaj yazısı', 'Yazı stilindeki yazı tipini ve rengi mesajlarında da kullanır.', 'sohbet'],
   ['useSoundboard', 'Ses efektleri', 'Ses efekti panelini kullanır.', 'ses'],
   ['stream', 'Ekran paylaş', 'Ekranını ya da bir pencereyi yayınlar.', 'ses'],
   ['camera', 'Kamera', 'Kamerasını açar.', 'ses'],
@@ -217,7 +218,7 @@ function startServer(opts = {}) {
     away: u.away,
     presence: u.presence || 'online',
     statusText: u.statusText || '',
-    nameStyle: u.nameStyle || null,
+    nameStyle: nsOf(u),
     hasAvatar: !!u.avatar,
     admin: !!u.admin,
     mod: isModUser(u),
@@ -253,6 +254,12 @@ function startServer(opts = {}) {
   const NS_FONTS = ['default', 'audiowide', 'pixel', 'pacifico', 'bangers', 'righteous', 'lobster', 'caveat', 'glitch', 'cinzel', 'fredoka', 'mono'];
   const NS_FX = ['none', 'gradient', 'neon', 'shimmer', 'rainbow', 'pulse', 'fire'];
   const hex = (c) => (/^#[0-9a-f]{6}$/i.test(String(c || '')) ? String(c).toLowerCase() : '');
+  // "Mesajlarımda da kullan" sadece Süslü mesaj yazısı yetkisi olanlarda geçerli
+  const nsOf = (u) => {
+    const st = u?.nameStyle;
+    if (!st) return null;
+    return st.inMessages && !u.bot && !can(u, 'styledMessages') ? { ...st, inMessages: false } : st;
+  };
   const cleanNameStyle = (st) => {
     if (!st || typeof st !== 'object') return null;
     const font = NS_FONTS.includes(st.font) ? st.font : 'default';
@@ -532,7 +539,7 @@ function startServer(opts = {}) {
   }
   const newMsg = (me, cid, text = '') => {
     const msg = { t: 'chat', id: crypto.randomUUID(), channelId: cid, from: me.id, name: me.name, text, ts: Date.now(), _k: me.clientKey };
-    if (me.nameStyle) msg.ns = me.nameStyle;
+    if (me.nameStyle) msg.ns = nsOf(me);
     return msg;
   };
   const postMsg = (cid, msg) => {
@@ -1247,7 +1254,7 @@ function startServer(opts = {}) {
           // @herkes yetkisi yoksa bahsetme bildirim göndermesin (yazı aynen görünür)
           const body = me.bot || can(me, 'mentionEveryone') ? text : neutralizeEveryone(text);
           const msg = { t: 'chat', id: crypto.randomUUID(), channelId: cid, from: me.id, name: me.name, text: body, ts: Date.now(), _k: me.clientKey };
-          if (me.nameStyle) msg.ns = me.nameStyle; // isim stili mesajla saklanır (kişi çıkınca da görünsün)
+          if (me.nameStyle) msg.ns = nsOf(me); // isim stili mesajla saklanır (kişi çıkınca da görünsün)
           if (image) {
             msg.image = image;
             msg.imageW = Math.max(0, Math.min(10000, Number(m.imageW) || 0));

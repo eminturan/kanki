@@ -216,6 +216,7 @@ const CMDS = {
   ayrıl: 'leave', ayril: 'leave', leave: 'leave', git: 'leave', çık: 'leave',
   karıştır: 'shuffle', karistir: 'shuffle', shuffle: 'shuffle',
   tekrar: 'loop', loop: 'loop', döngü: 'loop',
+  sar: 'seek', seek: 'seek', atla: 'seek',
   yardım: 'help', yardim: 'help', help: 'help', komutlar: 'help',
 };
 const fmt = (s) => {
@@ -254,7 +255,7 @@ async function handleCmd(m) {
   switch (c) {
     case 'help':
       return say(
-        '🎵 **Müzik botu komutları:** `!çal <YouTube linki ya da şarkı adı>` · `!geç` · `!duraklat` · `!devam` · `!dur` · `!kuyruk` · `!çıkar <sıra>` · `!temizle` · `!karıştır` · `!tekrar` · `!ses <0-100>` · `!şimdi` · `!gel` · `!ayrıl`'
+        '🎵 **Müzik botu komutları:** `!çal <YouTube linki ya da şarkı adı>` · `!geç` · `!duraklat` · `!devam` · `!sar <1:30 | +10 | -10>` · `!dur` · `!kuyruk` · `!çıkar <sıra>` · `!temizle` · `!karıştır` · `!tekrar` · `!ses <0-100>` · `!şimdi` · `!gel` · `!ayrıl`'
       );
     case 'join':
       if (here) return say('Zaten buradayım 🎧');
@@ -344,6 +345,25 @@ async function handleCmd(m) {
       }
       pushState();
       return say('🔀 Kuyruk karıştırıldı.');
+    case 'seek': {
+      // !sar 1:30 · !sar 90 · !sar +10 · !sar -15 (müzik panelindeki çubuk da bunu gönderir)
+      if (!B.current || B.loading) return;
+      const a = String(m.arg || '').trim().replace(',', '.');
+      const rel = /^[+-]/.test(a);
+      const parts = a.replace(/^[+-]/, '').split(':').map(Number);
+      if (!a || parts.some((x) => !Number.isFinite(x) || x < 0) || parts.length > 3) return say('Kullanım: `!sar 1:30` · `!sar +10` · `!sar -10`');
+      let sec = parts.reduce((t, x) => t * 60 + x, 0);
+      if (rel) sec = el.currentTime + (a[0] === '-' ? -sec : sec);
+      const dur = Number.isFinite(el.duration) ? el.duration : B.current.duration || 0;
+      sec = Math.max(0, dur ? Math.min(sec, dur - 1) : sec);
+      try {
+        el.currentTime = sec;
+      } catch {
+        return say('⚠️ Bu şarkıda ileri/geri sarılamıyor.');
+      }
+      pushState();
+      return;
+    }
     case 'loop':
       B.loop = !B.loop;
       pushState();
@@ -433,6 +453,7 @@ el.addEventListener('error', () => {
   say(`⚠️ Akış kesildi: ${B.current.title}. Sıradakine geçiliyor.`);
   playNext(true);
 });
+el.addEventListener('seeked', () => pushState()); // sarınca ilerleme çubuğu herkeste hemen güncellensin
 el.addEventListener('playing', () => pushState()); // gerçek başlama anı (ilerleme çubuğu doğru başlasın)
 el.addEventListener('loadedmetadata', () => {
   if (B.current && !B.current.duration && Number.isFinite(el.duration)) B.current.duration = Math.round(el.duration);
