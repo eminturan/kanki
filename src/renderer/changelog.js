@@ -6,6 +6,12 @@
  */
 const CHANGELOG = [
   {
+    version: '1.0.35',
+    date: '2026-11-09',
+    title: 'Ana sayfa kartı çıkınca hemen yenilenir',
+    fixed: ['Sunucudan çıkınca ana sayfadaki kartta bir süre hâlâ çevrimiçi görünüyordun; artık hemen listeden düşüyorsun, kart birkaç saniye içinde yeniden güncellenir.'],
+  },
+  {
     version: '1.0.34',
     date: '2026-11-09',
     title: 'Sunucudan çıkınca ses kartı düzeltmesi',

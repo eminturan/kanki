@@ -393,6 +393,12 @@ async function svFetchInfo(e) {
       SV.info.set(e.id, r.ok || r.status === 404 ? { ok: false, old: true } : { ok: false });
     } else {
       const d = await r.json();
+      // Az önce çıktıysan sunucu bunu henüz görmemiş olabilir: kendini birkaç saniye listede gösterme
+      const l = SV.left;
+      if (l && l.id === e.id && l.until > Date.now() && (d.names || []).includes(l.name)) {
+        d.names = d.names.filter((n) => n !== l.name);
+        d.online = Math.max(0, (d.online || 1) - 1);
+      }
       SV.info.set(e.id, { ok: true, ...d });
       if ('iconV' in d) svSyncIcon(e, d.iconV);
       // Kayıtlı adı güncel tut
@@ -417,6 +423,16 @@ async function svPoll() {
   if (!$('#home-screen').classList.contains('hidden')) renderHome();
 }
 setInterval(svPoll, 30000);
+// Sunucudan çıkınca kartta kendini hemen kaldır; sunucu çıkışı (ngrok üzerinden) birkaç saniyede görür, kart sonra tekrar yenilenir
+function svAfterLeave(id, myName) {
+  SV.left = { id, name: myName, until: Date.now() + 8000 };
+  const inf = SV.info.get(id);
+  if (inf?.ok && myName && (inf.names || []).includes(myName)) {
+    inf.names = inf.names.filter((n) => n !== myName);
+    inf.online = Math.max(0, (inf.online || 1) - 1);
+  }
+  for (const ms of [2000, 6000]) setTimeout(svPoll, ms);
+}
 
 // ---------- Profil çubuğu (sol altta tek, geniş) ----------
 function renderMeBar() {

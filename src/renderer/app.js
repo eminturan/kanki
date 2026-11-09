@@ -1741,6 +1741,8 @@ function syncVoicePanel() {
 }
 // Telefon düğmesi: sunucudan tamamen çıkar, ana sayfaya döner
 function disconnect() {
+  const leftId = typeof svCurrentId === 'function' ? svCurrentId() : null;
+  const leftName = S.myName;
   S.intentionalClose = true;
   clearTimeout(S.reconnectTimer);
   // Temizlikte bir adım hata verse bile çıkış yarım kalmasın, ekran yenilensin
@@ -1764,6 +1766,7 @@ function disconnect() {
   S.users.clear();
   S.chat.clear();
   syncVoicePanel();
+  if (leftId && typeof svAfterLeave === 'function') svAfterLeave(leftId, leftName);
   $('#reconnect-banner').classList.add('hidden');
   $('#app').classList.add('hidden');
   if (!S.web && typeof showHome === 'function') return showHome(); // sol çubuklu ana sayfa (servers.js)
