@@ -6,6 +6,12 @@
  */
 const CHANGELOG = [
   {
+    version: '1.0.26',
+    date: '2026-11-09',
+    title: 'Tarayıcıdan katılma ayarı',
+    changed: ['Tarayıcıdan katılma artık Sunucu Ayarları › Bağlantı’dan açılıp kapanıyor ve başta kapalı; kapalıyken sunucu adresi tarayıcıda Kanki’yi açmaz, ngrok kotası harcanmaz.'],
+  },
+  {
     version: '1.0.25',
     date: '2026-11-09',
     title: 'Tarayıcıdan ve telefondan katılma',

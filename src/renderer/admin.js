@@ -1559,7 +1559,8 @@ async function renderConnection() {
   // TURN: sunucuyu yöneten görür ve değiştirir
   const turnOk = can('manageServer') && feat('webClient');
   $('#adm-turn-section').classList.toggle('hidden', !turnOk);
-  $('#adm-web-hint').classList.toggle('hidden', !feat('webClient'));
+  $('#adm-web-row').classList.toggle('hidden', !turnOk);
+  if (turnOk && SS.info) $('#adm-web-on').checked = !!SS.info.webClient;
   if (turnOk && SS.info && document.activeElement?.closest('#adm-turn-section') == null) {
     $('#adm-turn-url').value = SS.info.turnUrl || '';
     $('#adm-turn-user').value = SS.info.turnUser || '';
@@ -1600,6 +1601,11 @@ async function renderConnection() {
     addAddr(S.url.replace(/^wss?:\/\//, ''), 'bağlı olduğun sunucu');
   }
 }
+$('#adm-web-on').addEventListener('change', (e) => {
+  send({ t: 'setConfig', webClient: e.target.checked });
+  toast(e.target.checked ? 'Tarayıcıdan katılma açıldı' : 'Tarayıcıdan katılma kapatıldı', e.target.checked ? 'Sunucunun internet adresi tarayıcıda Kanki’yi açar.' : 'Adres tarayıcıda artık Kanki’yi açmaz; ngrok kotası harcanmaz.');
+  setTimeout(refreshAdmin, 400);
+});
 $('#adm-turn-save').addEventListener('click', () => {
   const urls = $('#adm-turn-url').value.trim();
   const bad = urls && urls.split(',').map((x) => x.trim()).filter(Boolean).find((x) => !/^turns?:\S+$/i.test(x));

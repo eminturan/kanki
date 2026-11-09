@@ -711,7 +711,9 @@
               <h3>Bağlantı adresleri</h3>
               <p class="hint">Arkadaşların Kanki'de bu adreslerden birini yazarak bağlanır. Kopyalamak için tıkla.</p>
               <div class="addr-list" id="adm-addresses"></div>
-              <p class="hint" id="adm-web-hint">Telefondan ya da kurulum yapmadan bağlanmak için internet adresini tarayıcıda açmak yeter (ngrok ilk açılışta bir uyarı sayfası gösterir; "Visit Site"a basılır).</p>
+              <div class="adm-web-row" id="adm-web-row">
+                <label class="ss-switch-row"><span class="ss-sw-text"><b>Tarayıcıdan ve telefondan katılma</b><small>Açıkken sunucunun internet adresi tarayıcıda Kanki'yi açar (ngrok ilk açılışta bir uyarı sayfası gösterir; "Visit Site"a basılır). Her sayfa açılışı yaklaşık 0,7 MB ngrok kotası harcar; kullanmıyorsanız kapalı tutun.</small></span><span class="ss-switch"><input type="checkbox" id="adm-web-on" /><i></i></span></label>
+              </div>
             </div>
             <div class="ss-card" id="adm-turn-section">
               <h3>Mobil veri için aktarma sunucusu (TURN)</h3>

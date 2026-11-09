@@ -1026,10 +1026,14 @@ function startServer(opts = {}) {
       });
       return res.end(f.buf);
     }
-    // Tarayıcıdan açılırsa Kanki'nin web hali; diğer istekler (sağlık kontrolü vb.) eskisi gibi düz yazı
+    // Tarayıcıdan açılırsa Kanki'nin web hali (Sunucu Ayarları › Bağlantı'dan açılır; kapalıyken ngrok kotası harcanmaz)
     if (u.pathname !== '/' || /text\/html/.test(req.headers.accept || '')) {
-      if (serveWeb(req, res, u.pathname)) return;
+      if (conf.webClient === true && serveWeb(req, res, u.pathname)) return;
       if (u.pathname !== '/') return json(404, { error: 'Bulunamadı' });
+      if (conf.webClient !== true) {
+        res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
+        return res.end(`${serverName}: tarayıcıdan katılma kapalı. Kanki uygulamasıyla bağlan.\n`);
+      }
     }
     res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
     res.end(`${serverName} çalışıyor. Bağlı kullanıcı: ${users.size}\n`);
@@ -2183,6 +2187,7 @@ function startServer(opts = {}) {
           if ('linkPreviews' in m) set('linkPreviews', !!m.linkPreviews, m.linkPreviews ? 'bağlantı önizlemeleri açık' : 'bağlantı önizlemeleri kapalı');
           if (typeof m.announcement === 'string') setAnnouncement(me, m.announcement);
           // TURN bilgileri bağlanan herkese gider (WebRTC için gerekli); bu yüzden gizli sayılmaz
+          if ('webClient' in m) set('webClient', !!m.webClient, m.webClient ? 'tarayıcıdan katılma açık' : 'tarayıcıdan katılma kapalı');
           if (typeof m.turnUrl === 'string') set('turnUrl', m.turnUrl.trim().slice(0, 400), 'TURN adresi');
           if (typeof m.turnUser === 'string') set('turnUser', m.turnUser.trim().slice(0, 200), 'TURN kullanıcı adı');
           if (typeof m.turnPass === 'string') set('turnPass', m.turnPass.slice(0, 200), 'TURN şifresi');
@@ -2285,6 +2290,7 @@ function startServer(opts = {}) {
             turnUrl: conf.turnUrl || '',
             turnUser: conf.turnUser || '',
             turnSet: !!conf.turnPass,
+            webClient: conf.webClient === true,
             announcement: conf.announcement || null,
             audit: can(me, 'viewAudit') ? auditLog.slice(-100).reverse() : [],
           });

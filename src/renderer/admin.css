@@ -405,3 +405,6 @@ button.role-chip.add:hover { border-color: var(--accent); color: var(--accent); 
 /* Bağlantı › TURN */
 .ss-row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 @media (max-width: 560px) { .ss-row2 { grid-template-columns: 1fr; } }
+
+/* Bağlantı › tarayıcıdan katılma anahtarı */
+.adm-web-row { margin-top: 12px; }

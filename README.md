@@ -149,7 +149,7 @@ GitHub Actions paketleri derler, Release'e `latest.yml` ile birlikte ekler; kuru
 - İzlediğin yayının üst çubuğundaki kalemle (ya da Alt + tık) yayına nokta koy ya da çiz; işaret herkeste ve tüm ekran paylaşılıyorsa yayıncının ekranında 3 saniye görünür.
 
 ## Tarayıcıdan ve telefondan katılma
-Kanki Admin'in internet adresi (ngrok, ör. `https://isim.ngrok-free.dev`) tarayıcıda açılınca Kanki'nin web hali gelir; kurulum gerekmez. ngrok ilk açılışta bir uyarı sayfası gösterir, "Visit Site"a basılır.
+Sunucu Ayarları › Bağlantı'dan "Tarayıcıdan ve telefondan katılma" açılınca (başta kapalı) Kanki Admin'in internet adresi (ngrok, ör. `https://isim.ngrok-free.dev`) tarayıcıda Kanki'nin web halini açar; kurulum gerekmez. Her sayfa açılışı yaklaşık 0,7 MB ngrok kotası harcar. ngrok ilk açılışta bir uyarı sayfası gösterir, "Visit Site"a basılır.
 - Telefonda tek panel ve alt sekmeler (Kanallar / Sahne / Sohbet). Paylaş › Ana ekrana ekle ile uygulama gibi açılır.
 - Çalışanlar: ses, yazışma, dosya, GIF, anket/çark, ses efektleri, müzik botu, yayın izleme. Bilgisayar tarayıcısından ekran paylaşımı da olur.
 - Olmayanlar: telefonda ekran paylaşımı, oyun/Spotify gösterimi, oyun içi katman, genel kısayollar, YouTube ile birlikte izle başlatma.
