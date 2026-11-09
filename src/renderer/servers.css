@@ -156,3 +156,19 @@ body.has-rail #connect-tabs, body.has-rail #connect-screen .field:has(#in-nick),
 .nr-who small { color: var(--text-3); font-size: 12px; }
 .no-room .empty-icon { width: 72px; height: 72px; border-radius: 22px; display: grid; place-items: center; background: var(--grad, var(--accent)); color: var(--accent-ink); box-shadow: 0 18px 50px -12px var(--glow, transparent); }
 .no-room .empty-icon svg { width: 32px; height: 32px; fill: currentColor; }
+
+/* ---------- Sol alttaki kart: ses bağlantısı + profil (Discord gibi) ---------- */
+#me-bar.me-dock {
+  height: auto; padding: 0; display: flex; flex-direction: column; overflow: hidden;
+}
+#me-bar .voice-panel {
+  margin: 0; border: 0; border-radius: 0; border-bottom: 1px solid var(--line); background: transparent; padding: 10px 10px 10px 12px;
+}
+#me-bar .voice-panel.hidden { display: none; }
+#me-bar .me-panel { margin: 0; border: 0; border-radius: 0; box-shadow: none; background: transparent; height: 56px; padding: 0 8px 0 10px; }
+#me-bar .voice-actions { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+#me-bar .voice-actions .btn.share { height: 34px; padding: 0; justify-content: center; }
+#me-bar .voice-actions .btn.share span { display: none; }
+#me-bar .voice-actions .btn.share svg { width: 18px; height: 18px; fill: currentColor; }
+body.has-rail .sidebar { padding-bottom: calc(var(--dock-h, 58px) + 12px); }
+body.has-rail .rail { padding-bottom: calc(var(--dock-h, 58px) + 18px); }

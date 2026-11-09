@@ -6,6 +6,16 @@
  */
 const CHANGELOG = [
   {
+    version: '1.0.32',
+    date: '2026-11-09',
+    title: 'Sol altta Discord gibi ses ve profil kartı',
+    added: ['Sol altta tek kart: üstte ses bağlantısı (kanal, sesten çık, kamera, ekran, ses efektleri, birlikte izle), altta profil (Discord gibi).'],
+    changed: [
+      'Telefon düğmesi artık sadece sesten çıkarır, sunucuda kalırsın; tekrar bir kanala tıklayınca girersin. Sunucudan tamamen çıkmak için sunucu menüsü ya da soldaki simgeye sağ tık › Sunucudan çık.',
+    ],
+    fixed: ['Bağlantıyı kesip sol çubuktan tekrar tıklayınca sunucuya yeniden bağlanılmıyordu.'],
+  },
+  {
     version: '1.0.31',
     date: '2026-11-09',
     title: 'Sunucuya girince otomatik sese girilmiyor',

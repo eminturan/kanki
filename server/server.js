@@ -1209,7 +1209,7 @@ function startServer(opts = {}) {
           admin: isAdmin,
           mod: isModUser(me),
           token: me.token,
-          features: ['sfx', 'activity', 'log', 'pins', 'polls', 'votes', 'files', 'preview', 'gif', 'roles', 'chpass', 'afk', 'bans', 'marks', 'watch', 'perms', 'audit', 'timeout', 'serverDeafen', 'moveAll', 'purge', 'slowmode', 'readOnly', 'announce', 'welcomeMessage', 'headers', 'afkMic', 'webClient', 'info'],
+          features: ['sfx', 'activity', 'log', 'pins', 'polls', 'votes', 'files', 'preview', 'gif', 'roles', 'chpass', 'afk', 'bans', 'marks', 'watch', 'perms', 'audit', 'timeout', 'serverDeafen', 'moveAll', 'purge', 'slowmode', 'readOnly', 'announce', 'welcomeMessage', 'headers', 'afkMic', 'webClient', 'info', 'leaveVoice'],
           // Roller ve yetkiler
           perms: [...permsOf(me)],
           roles: userRoleIds(me),
@@ -1282,6 +1282,10 @@ function startServer(opts = {}) {
       if (m.t === 'adminInfo' && !isStaff(me)) return errorTo(me, 'Yönetim paneli için bir yönetim yetkin olmalı.', 'forbidden');
 
       switch (m.t) {
+        case 'leaveVoice':
+          // Sesten çık, sunucuda kal (Discord'daki telefon düğmesi gibi)
+          moveUser(me, null);
+          break;
         case 'join': {
           const ch = channels.find((c) => c.id === m.channelId);
           if (!ch || ch.type === 'text' || ch.id === me.channelId) break;

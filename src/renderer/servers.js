@@ -286,6 +286,7 @@ function svAddForm() {
 function svMenu(ev, e) {
   ev.preventDefault?.();
   const items = [];
+  if (svCurrentId() === e.id) items.push({ label: 'Sunucudan çık', run: () => disconnect() }, '-');
   if (e.id === HOST_ID) items.push({ label: 'Sunucu ayarları (port, ngrok)…', run: () => svHostForm() });
   else {
     items.push({ label: 'Adresi kopyala', run: () => (navigator.clipboard.writeText(e.address), toast('Adres kopyalandı', e.address)) });
@@ -402,11 +403,29 @@ document.addEventListener('click', (e) => e.target.closest('.snav[data-pane="pro
 // ---------- Açılış ----------
 function serversBoot(info) {
   svMigrate();
-  // Profil çubuğu kenar çubuğundan çıkar, sol altta çubuğun ve kanalların altına yayılır
-  const bar = $('.me-panel');
-  if (bar && !svIsWeb()) {
-    bar.id = 'me-bar';
-    document.body.append(bar);
+  // Sol alttaki kart (Discord gibi): üstte ses bağlantısı, altta profil; çubuğun ve kanalların altına yayılır
+  const me = $('.me-panel');
+  const voice = $('.voice-panel');
+  if (me && voice && !svIsWeb()) {
+    const dock = h('div', { id: 'me-bar', class: 'me-dock' });
+    dock.append(voice, me);
+    document.body.append(dock);
+    // Ses efektleri ve birlikte izle de bu karttan açılır
+    const acts = voice.querySelector('.voice-actions');
+    const mk = (id, title, icon, run) => {
+      const b = h('button', { class: 'btn share icon-only', id, title, onclick: run });
+      b.innerHTML = icon;
+      return b;
+    };
+    acts.append(
+      mk('dock-sfx', 'Ses efektleri', ICON_SFX, (e) => {
+        e.stopPropagation();
+        $('#cb-sfx').click();
+      }),
+      mk('dock-watch', 'Birlikte izle', ICON_WATCH, () => $('#cb-watch').click())
+    );
+    // Kartın yüksekliği kadar kanal listesi ve çubuk alttan boşluk bırakır
+    new ResizeObserver(() => document.documentElement.style.setProperty('--dock-h', `${dock.offsetHeight}px`)).observe(dock);
   }
   const t = kanki.autotest && !kanki.autotest.manual ? kanki.autotest : null;
   if (t?.name) settings.nick = t.name;

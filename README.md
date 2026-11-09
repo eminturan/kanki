@@ -98,6 +98,7 @@ GitHub Actions paketleri derler, Release'e `latest.yml` ile birlikte ekler; kuru
 - **Sol çubuk** (Discord gibi): en üstte ana sayfa, altında eklenen sunucular. Simgedeki sayı içeride kaç kişi olduğunu, gri nokta sunucuya ulaşılamadığını gösterir. Tıklayınca o sunucunun içi açılır ama sese girilmez; ses kanalına tıklayınca girilir (aynı anda tek sunucudasın). Bağlantı koparsa yeniden bağlanırken önceki kanala dönülür. Sağ tık: adresi kopyala, şifreyi değiştir, listeden kaldır.
 - **Ana sayfa:** sunucu kartları (çevrimiçi sayısı, kimler içeride, canlı yayın) ve "Sunucu ekle" (adres ya da davet bağlantısı yapıştırılır). Kart bilgisi sunucunun `/info` adresinden gelir (şifreli sunucuda isimler gösterilmez); 30 saniyede bir yenilenir.
 - **Kanki Admin:** kendi sunucun listede "Senin sunucun" olarak durur, "Başlat ve gir" ile açılır. Port, şifre, ngrok ayarları çubuktaki sunucu düğmesinde.
+- **Sol alttaki kart** (Discord gibi): seste iken üstte ses bağlantısı (kanal adı, sesten çık, kamera, ekran, ses efektleri, birlikte izle), altta profil. Telefon düğmesi sadece sesten çıkarır; sunucudan çıkmak için sunucu menüsü ya da çubuktaki simgeye sağ tık › Sunucudan çık.
 - Tarayıcıdan girenlerde çubuk yoktur: ad girilir ve doğrudan o sunucuya bağlanılır.
 
 ## Ekran paylaşımı

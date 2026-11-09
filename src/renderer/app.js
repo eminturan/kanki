@@ -1734,6 +1734,15 @@ function onDisconnected() {
   }, 2000);
 }
 
+// Telefon düğmesi: sesten çık ama sunucuda kal (eski sunucularda tamamen ayrılır)
+function leaveVoice() {
+  if (!S.myId) return;
+  if (!feat('leaveVoice')) return disconnect();
+  if (!S.channelId) return;
+  S.lastChannelId = null;
+  stopAllShares();
+  send({ t: 'leaveVoice' });
+}
 function disconnect() {
   S.intentionalClose = true;
   clearTimeout(S.reconnectTimer);
@@ -1748,6 +1757,7 @@ function disconnect() {
   S.ws?.close();
   S.ws = null;
   S.channelId = S.lastChannelId = null;
+  S.myId = null; // bağlantı kesildi: sol çubuktan tekrar tıklayınca yeniden bağlanılsın
   S.isAdmin = false;
   applyAdminUi();
   hideModal('admin-panel');
@@ -3128,7 +3138,7 @@ for (const id of ['#in-address', '#in-password', '#in-nick']) $(id).addEventList
 $('#btn-mic').addEventListener('click', toggleMute);
 $('#btn-deafen').addEventListener('click', toggleDeafen);
 $('#btn-settings').addEventListener('click', openSettings);
-$('#btn-disconnect').addEventListener('click', disconnect);
+$('#btn-disconnect').addEventListener('click', leaveVoice);
 $('#btn-share').addEventListener('click', openPicker);
 $('#btn-go-live').addEventListener('click', goLive);
 $('#btn-add-channel').addEventListener('click', () => promptChannel(null));
@@ -3475,7 +3485,7 @@ $('#server-menu-btn').addEventListener('click', (e) => {
     can('manageChannels') && { label: 'Kanal oluştur', run: () => createChannelForm() },
     '-',
     { label: 'Ayarlar', run: openSettings },
-    { label: 'Bağlantıyı kes', danger: true, run: disconnect },
+    { label: 'Sunucudan çık', danger: true, run: disconnect },
   ]);
   e.stopPropagation();
 });
@@ -4399,7 +4409,7 @@ function renderCallBar() {
   set('#cb-watch', ICON_WATCH, 'Birlikte izle: YouTube ya da video dosyası', myWatchShare() ? 'on' : '');
   set('#cb-mic', S.muted ? ICON.micOff : ICON.mic, S.muted ? 'Mikrofonu aç (Ctrl+Shift+M)' : 'Mikrofonu kapat (Ctrl+Shift+M)', S.muted ? 'off' : '');
   set('#cb-deafen', S.deafened ? ICON.headOff : ICON.head, S.deafened ? 'Sesi aç (Ctrl+Shift+D)' : 'Sesi kapat (Ctrl+Shift+D)', S.deafened ? 'off' : '');
-  set('#cb-leave', ICON.power, 'Bağlantıyı kes', 'leave');
+  set('#cb-leave', ICON.power, 'Sesten çık', 'leave');
   $('#cb-share').disabled = screens >= MAX_SHARES;
   gateCallBar(); // yetkisi olmayan özellikler gizlenir, kilitler görünür (admin.js)
 }
@@ -4407,7 +4417,7 @@ $('#cb-camera').addEventListener('click', toggleCamera);
 $('#cb-share').addEventListener('click', openPicker);
 $('#cb-mic').addEventListener('click', toggleMute);
 $('#cb-deafen').addEventListener('click', toggleDeafen);
-$('#cb-leave').addEventListener('click', disconnect);
+$('#cb-leave').addEventListener('click', leaveVoice);
 $('#cb-sfx').addEventListener('click', (e) => {
   e.stopPropagation();
   toggleSfxPop();
