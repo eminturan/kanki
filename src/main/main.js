@@ -74,7 +74,7 @@ if (!process.env.KANKI_AUTOTEST) {
     else app.setAsDefaultProtocolClient('kanki');
   } catch {}
   // Tek kopya: ikinci açılış (ör. davet bağlantısı) açık olan pencereye gider
-  if (!app.requestSingleInstanceLock()) app.quit();
+  if (!app.requestSingleInstanceLock()) app.exit(0); // pencere açmadan hemen çık
   else
     app.on('second-instance', (_e, argv) => {
       const p = argv.map(inviteFrom).find(Boolean);
