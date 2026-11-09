@@ -95,7 +95,7 @@ GitHub Actions paketleri derler, Release'e `latest.yml` ile birlikte ekler; kuru
 
 ## Giriş ve sunucu listesi
 - İlk açılışta sadece **kullanıcı adı** sorulur (şifre yok); ad bu bilgisayarda hatırlanır, Ayarlar › Profilim'den değiştirilir.
-- **Sol çubuk** (Discord gibi): en üstte ana sayfa, altında eklenen sunucular. Simgedeki sayı içeride kaç kişi olduğunu, gri nokta sunucuya ulaşılamadığını gösterir. Tıklayınca o sunucuya geçilir (aynı anda tek sunucudasın). Sağ tık: adresi kopyala, şifreyi değiştir, listeden kaldır.
+- **Sol çubuk** (Discord gibi): en üstte ana sayfa, altında eklenen sunucular. Simgedeki sayı içeride kaç kişi olduğunu, gri nokta sunucuya ulaşılamadığını gösterir. Tıklayınca o sunucunun içi açılır ama sese girilmez; ses kanalına tıklayınca girilir (aynı anda tek sunucudasın). Bağlantı koparsa yeniden bağlanırken önceki kanala dönülür. Sağ tık: adresi kopyala, şifreyi değiştir, listeden kaldır.
 - **Ana sayfa:** sunucu kartları (çevrimiçi sayısı, kimler içeride, canlı yayın) ve "Sunucu ekle" (adres ya da davet bağlantısı yapıştırılır). Kart bilgisi sunucunun `/info` adresinden gelir (şifreli sunucuda isimler gösterilmez); 30 saniyede bir yenilenir.
 - **Kanki Admin:** kendi sunucun listede "Senin sunucun" olarak durur, "Başlat ve gir" ile açılır. Port, şifre, ngrok ayarları çubuktaki sunucu düğmesinde.
 - Tarayıcıdan girenlerde çubuk yoktur: ad girilir ve doğrudan o sunucuya bağlanılır.

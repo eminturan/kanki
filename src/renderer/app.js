@@ -286,7 +286,8 @@ function audioTick() {
   else audio.level = -100;
 
   let open = false;
-  if (!S.muted && !S.deafened && audio.micTrack) {
+  // Bir ses kanalında değilken mikrofon gitmez ve konuşma halkası yanmaz
+  if (!S.muted && !S.deafened && audio.micTrack && S.channelId) {
     if (settings.mode === 'open') open = true;
     else if (settings.mode === 'ptt') open = S.pttDown;
     else {
@@ -1680,6 +1681,7 @@ function connect(url, password) {
           password: S.password,
           adminKey: S.adminKey || undefined,
           channelId: S.lastChannelId,
+          noAutoJoin: !S.lastChannelId && !(kanki.autotest && !kanki.autotest.manual), // sunucuya girince sese değil, kanala tıklayınca girilir
           muted: S.muted,
           deafened: S.deafened,
           presence: effectivePresence(),
@@ -2173,8 +2175,23 @@ function renderStage() {
   const ch = S.channels.find((c) => c.id === S.channelId);
   $('#stage-title').textContent = ch ? ch.name : '';
   $('#voice-where').textContent = ch ? `${ch.name} / ${S.serverName}` : S.serverName;
-  const members = [...S.users.values()].filter((u) => u.channelId === S.channelId);
-  $('#stage-sub').textContent = `${members.length} kişi`;
+  const members = S.channelId ? [...S.users.values()].filter((u) => u.channelId === S.channelId) : [];
+  $('#stage-sub').textContent = S.channelId ? `${members.length} kişi` : `${[...S.users.values()].filter((u) => !u.bot).length} kişi çevrimiçi`;
+  if (!S.channelId && S.myId) $('#stage-title').textContent = S.serverName || '';
+  // Ses kanalında değilken ses paneli gizli; sohbet ilk yazı kanalını gösterir
+  $('.voice-panel')?.classList.toggle('hidden', !S.channelId);
+  if (S.myId && !S.channelId && !S.chatView) {
+    const t = S.channels.find((c) => c.type === 'text');
+    if (t)
+      setTimeout(() => {
+        if (S.channelId || S.chatView) return;
+        openChat(t.id);
+        S.chatAuto = true; // kendiliğinden açıldı: odaya girince odanın sohbetine geçilir
+      });
+  } else if (S.channelId && S.chatAuto) {
+    S.chatAuto = false;
+    setTimeout(() => S.chatView && openChat(null));
+  }
   renderChatHead();
   $('#member-count').textContent = String(S.users.size || '');
   renderMembers();
@@ -2261,6 +2278,35 @@ function renderParticipants(members, strip = false) {
   const box = $('#participants');
   box.innerHTML = '';
   const usedCams = new Set();
+  // Sunucudasın ama bir ses kanalında değilsin: kanallar ve kimin nerede olduğu, tıklayınca girilir
+  if (S.myId && !S.channelId) {
+    const voice = S.channels.filter((c) => c.type !== 'text' && !c.header);
+    const people = (cid) => [...S.users.values()].filter((u) => u.channelId === cid);
+    box.append(
+      h(
+        'div',
+        { class: 'no-room' },
+        h('div', { class: 'empty-icon' }, svgEl(ICON.channel)),
+        h('div', { class: 'nr-title' }, `${S.serverName || 'Sunucu'} sunucusundasın`),
+        h('div', { class: 'muted' }, 'Konuşmak için bir ses kanalına tıkla. Yazı kanallarını sese girmeden de okuyup yazabilirsin.'),
+        h(
+          'div',
+          { class: 'nr-list' },
+          ...voice.map((c) => {
+            const ps = people(c.id);
+            return h(
+              'button',
+              { class: `nr-ch ${ps.length ? 'busy' : ''}`, onclick: () => joinChannel(c.id), title: `${c.name} kanalına gir` },
+              h('span', { class: 'nr-ico' }, svgEl(ICON.channel)),
+              h('span', { class: 'nr-name' }, c.name, c.locked ? ' 🔒' : ''),
+              h('span', { class: 'nr-who' }, ...ps.slice(0, 4).map((u) => avatar(u.name, 'nr-av')), ps.length ? h('b', {}, String(ps.length)) : h('small', {}, 'boş'))
+            );
+          })
+        )
+      )
+    );
+    return cleanupCams(usedCams);
+  }
   if (members.length <= 1 && !strip && !myCamera()) {
     box.append(
       h(
@@ -4975,6 +5021,7 @@ function renderTextChannels() {
 }
 // Sağ paneldeki sohbeti değiştir: yazı kanalı ya da (null) bulunduğum ses kanalının sohbeti
 function openChat(cid) {
+  S.chatAuto = false; // kişi kendisi seçti
   const text = cid && isTextCh(cid);
   const next = text ? cid : null;
   if (next !== S.chatView) {

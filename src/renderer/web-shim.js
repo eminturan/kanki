@@ -150,7 +150,7 @@
     let wasHidden = true;
     new MutationObserver(() => {
       const hidden = app.classList.contains('hidden');
-      if (wasHidden && !hidden) setTab('stage');
+      if (wasHidden && !hidden) setTimeout(() => setTab(typeof S !== 'undefined' && S.channelId ? 'stage' : 'channels'), 600);
       wasHidden = hidden;
     }).observe(app, { attributes: true, attributeFilter: ['class'] });
     // Telefon tarayıcıları sesi ancak bir dokunuştan sonra çalar: her dokunuşta duran sesleri ve ses motorunu uyandır

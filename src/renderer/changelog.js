@@ -6,6 +6,18 @@
  */
 const CHANGELOG = [
   {
+    version: '1.0.31',
+    date: '2026-11-09',
+    title: 'Sunucuya girince otomatik sese girilmiyor',
+    changed: [
+      'Sol çubuktan sunucuya tıklayınca içerisi (kanallar, sohbet, kim nerede) açılır ama sese girilmez; ses kanalına tıklayınca girilirsin (Discord gibi). Bu sırada ilk yazı kanalı açık olur, odaya girince odanın sohbetine geçilir.',
+    ],
+    fixed: [
+      'Bir ses kanalında değilken mikrofon açık kalıyor ve sol alttaki resmin etrafındaki konuşma halkası yanıp sönüyordu.',
+      'Sunucudan çıktıktan sonra sol çubuktan tekrar girilemiyordu.',
+    ],
+  },
+  {
     version: '1.0.30',
     date: '2026-11-09',
     title: 'Yeni giriş ekranı ve Discord gibi sunucu listesi',

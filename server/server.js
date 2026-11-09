@@ -1238,6 +1238,12 @@ function startServer(opts = {}) {
         const wch = channels.find((c) => c.id === m.channelId && joinable(c));
         // Şifreli ya da dolu kanala yeniden bağlanırken Lobi'ye düşülür
         const bypass = can(me, 'moveMembers') || can(me, 'manageChannels');
+        // Yeni istemci: sunucuya girince sese otomatik girilmez, kişi kanala tıklayınca girer (Discord gibi).
+        // Bağlantı koptuktan sonra yeniden bağlanırken önceki kanala dönülür.
+        if (m.noAutoJoin && !wch) {
+          broadcastState();
+          return;
+        }
         const wanted = wch && (bypass || (!wch.pwHash && !(wch.limit && voiceCount(wch.id) >= wch.limit))) ? wch.id : lobbyId();
         moveUser(me, wanted);
         return;
