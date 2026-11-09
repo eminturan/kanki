@@ -6,6 +6,15 @@
  */
 const CHANGELOG = [
   {
+    version: '1.0.40',
+    date: '2026-11-09',
+    title: 'Yıldırım isim efekti',
+    added: [
+      'Yazı stiline yeni efekt: Yıldırım. Adın beyaz parlar, iki yanından sırayla yıldırımlar çakar. Yıldırımın rengi Renkler bölümündeki "⚡ Yıldırım rengi" ile seçilir.',
+      'Yeni yetki: "Yıldırım isim efekti". Efekti sadece bu yetkisi olan roldekiler (ve sunucu sahibi) kullanabilir; yetkisi olmayanlarda düğme kilitli görünür. Yetki alınınca isim düz görünür, seçim saklanır ve yetki geri verilince kendiliğinden geri gelir.',
+    ],
+  },
+  {
     version: '1.0.39',
     date: '2026-11-09',
     title: 'Oyun içi katman düzeltmeleri',

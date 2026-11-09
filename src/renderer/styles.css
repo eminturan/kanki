@@ -1235,7 +1235,45 @@ body.has-update .layout.chat-hidden .stage-head { padding-right: 56px; }
 .msg-text.ns-msg { font-size: 1.04em; }
 .msg-text.ns-f-pixel { font-size: .72em; line-height: 1.8; }
 .user .uname.ns { display: block; }
-@media (prefers-reduced-motion: reduce) { .ns-x-shimmer, .ns-x-rainbow, .ns-x-pulse, .ns-x-fire { animation: none; } }
+/* Yıldırım: isim beyaz parlar, iki yanından sırayla --n3 renginde yıldırımlar çakar */
+.ns-x-storm {
+  position: relative; color: #fff !important;
+  text-shadow: 0 0 2px var(--n1), 0 0 7px var(--n1);
+  filter: drop-shadow(0 0 3px var(--n3)) drop-shadow(0 0 6px var(--n2));
+  animation: ns-storm-text 3.2s linear infinite;
+}
+.ns-x-storm::before, .ns-x-storm::after {
+  content: ''; position: absolute; top: -.3em; width: .8em; height: 1.6em; pointer-events: none; opacity: 0;
+  background: color-mix(in srgb, var(--n3) 70%, #fff);
+  --bolt: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 30'%3E%3Cpath d='M10 0 L7.5 6 L10.5 8 L5 16 L8.5 17.5 L3 30 L12 15 L8.5 13.5 L13 5 L11 4 Z' fill='%23000'/%3E%3Cpath d='M7.5 6 L3 9 M5 16 L1.5 19.5' stroke='%23000' stroke-width='1.2' fill='none'/%3E%3C/svg%3E");
+  -webkit-mask: var(--bolt) center / contain no-repeat; mask: var(--bolt) center / contain no-repeat;
+}
+.ns-x-storm::before { left: -.35em; animation: ns-storm-a 3.2s steps(1) infinite; }
+.ns-x-storm::after { right: -.35em; animation: ns-storm-b 3.2s steps(1) infinite; }
+@keyframes ns-storm-a {
+  0% { opacity: 1; transform: rotate(8deg); }
+  3% { opacity: 0; } 5% { opacity: .9; } 8% { opacity: 0; }
+  60% { opacity: 1; transform: translateX(1.4em) rotate(-6deg) scaleX(-1); }
+  63% { opacity: 0; }
+}
+@keyframes ns-storm-b {
+  0% { opacity: 0; }
+  30% { opacity: 1; transform: rotate(-10deg) scaleX(-1); }
+  33% { opacity: 0; } 35% { opacity: .85; } 37% { opacity: 0; }
+  82% { opacity: 1; transform: translateX(-1.2em) rotate(12deg); }
+  85% { opacity: 0; }
+}
+@keyframes ns-storm-text {
+  0%, 30%, 60%, 82% { text-shadow: 0 0 3px #fff, 0 0 8px var(--n3), 0 0 16px var(--n2); }
+  4%, 34%, 64%, 86%, 100% { text-shadow: 0 0 2px var(--n1), 0 0 7px var(--n1); }
+}
+/* Kırpılan dar satırlarda (kanal/üye listesi, alt köşe) gölge filtresi kutu gibi görünür: orada sadece yazı parlaması */
+.user .uname.ns-x-storm, .member-name .ns-x-storm, #me-name .ns-x-storm { filter: none; animation: none; text-shadow: 0 0 1px var(--n1), 0 0 3px var(--n3); }
+.user .uname.ns-x-storm::before, .user .uname.ns-x-storm::after, .member-name .ns-x-storm::before, .member-name .ns-x-storm::after,
+#me-name .ns-x-storm::before, #me-name .ns-x-storm::after { background: var(--n3); }
+.ns-fx.locked { opacity: .55; cursor: not-allowed; }
+.ns-fx .ns-lock { margin-left: 6px; font-size: 12px; }
+@media (prefers-reduced-motion: reduce) { .ns-x-shimmer, .ns-x-rainbow, .ns-x-pulse, .ns-x-fire, .ns-x-storm, .ns-x-storm::before, .ns-x-storm::after { animation: none; } }
 
 /* ---------- Ayarlar › Yazı stili ---------- */
 .ns-preview { padding: 6px 0 10px; border-radius: 8px; background: var(--bg-1); border: 1px solid var(--line); margin-bottom: 4px; }

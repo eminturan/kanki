@@ -4316,7 +4316,7 @@ function renderProfilePreview() {
     h(
       'div',
       { class: 'pf-body' },
-      h('div', { class: 'pf-name' }, nameEl(name, hasNameStyle(settings.nameStyle) ? settings.nameStyle : null)),
+      h('div', { class: 'pf-name' }, nameEl(name, myShownStyle())),
       h('div', { class: `pf-custom ${settings.statusText ? '' : 'muted'}` }, settings.statusText || 'Durum yazısı yok'),
       h('div', { class: 'pf-status' }, h('span', { class: `status-dot inline ${pres}` }), PRESENCE[pres].label)
     )
@@ -4795,6 +4795,7 @@ const NAME_FX = [
   ['rainbow', 'Gökkuşağı'],
   ['pulse', 'Nabız'],
   ['fire', 'Ateş'],
+  ['storm', 'Yıldırım'],
 ];
 const NS_PRESETS = [
   ['#22d47e', '#3d8bfd'],
@@ -4805,13 +4806,22 @@ const NS_PRESETS = [
   ['#3d8bfd', '#a855f7'],
   ['#ffffff', '#9fb0a8'],
 ];
-const NS_DEFAULT = { font: 'default', effect: 'none', c1: '', c2: '', inMessages: false };
+const NS_DEFAULT = { font: 'default', effect: 'none', c1: '', c2: '', c3: '', inMessages: false };
+const NS_BOLT = '#8fd3ff'; // yıldırımın varsayılan rengi
 const myNameStyle = () => ({ ...NS_DEFAULT, ...(settings.nameStyle || {}) });
 const hasNameStyle = (st) => !!st && (st.font !== 'default' || st.effect !== 'none' || !!st.c1);
-const styleOfUser = (u) => (!u ? null : u.id === S.myId ? (hasNameStyle(settings.nameStyle) ? settings.nameStyle : null) : u.nameStyle || null);
+// Yıldırım efekti "Yıldırım isim efekti" yetkisi isteyen sunucularda sadece yetkisi olana açık
+const stormAllowed = () => feat('storm') && (!feat('perms') || can('stormName'));
+// Kendi stilim: yetkim yoksa Yıldırım düz görünür (seçim saklanır, yetki gelince geri gelir)
+function myShownStyle() {
+  let st = settings.nameStyle;
+  if (st?.effect === 'storm' && !stormAllowed()) st = { ...st, effect: 'none' };
+  return hasNameStyle(st) ? st : null;
+}
+const styleOfUser = (u) => (!u ? null : u.id === S.myId ? myShownStyle() : u.nameStyle || null);
 // Kişi çevrimiçiyse güncel stili, değilse mesajla saklanan stili kullan
 function nameStyleFor(name, fallback = null) {
-  if (name && name === S.myName) return hasNameStyle(settings.nameStyle) ? settings.nameStyle : null;
+  if (name && name === S.myName) return myShownStyle();
   const u = [...S.users.values()].find((x) => x.name === name);
   return u ? styleOfUser(u) : fallback;
 }
@@ -4823,6 +4833,7 @@ function applyNameStyle(el, st, name) {
   el.classList.add('ns', `ns-f-${f}`, `ns-x-${fx}`);
   el.style.setProperty('--n1', st.c1 || colorFor(name || '?'));
   el.style.setProperty('--n2', st.c2 || '#22d47e');
+  if (fx === 'storm') el.style.setProperty('--n3', st.c3 || NS_BOLT);
   return el;
 }
 const nameEl = (name, st, cls = '') => applyNameStyle(h('span', { class: cls }, name), st, name);
@@ -4836,7 +4847,7 @@ function renderMeName() {
   const el = $('#me-name');
   if (!el || !S.myName) return;
   el.innerHTML = '';
-  el.append(nameEl(S.myName, styleOfUser(S.users.get(S.myId)) || (hasNameStyle(settings.nameStyle) ? settings.nameStyle : null)));
+  el.append(nameEl(S.myName, myShownStyle()));
 }
 
 // ---------- Ayarlar sekmesi ----------
@@ -4861,7 +4872,9 @@ function setNameStyle(patch) {
 function renderNameStyleUi() {
   const st = myNameStyle();
   const name = S.myName || settings.nick || 'Kanki';
-  const shown = hasNameStyle(st) ? st : null;
+  const stormOk = stormAllowed();
+  const shownSt = st.effect === 'storm' && !stormOk ? { ...st, effect: 'none' } : st;
+  const shown = hasNameStyle(shownSt) ? shownSt : null;
   // Önizleme: sohbet mesajı + üye listesi satırı
   const pv = $('#ns-preview');
   pv.innerHTML = '';
@@ -4888,14 +4901,24 @@ function renderNameStyleUi() {
     );
   const fxBox = $('#ns-effects');
   fxBox.innerHTML = '';
-  for (const [id, label] of NAME_FX)
+  for (const [id, label] of NAME_FX) {
+    const locked = id === 'storm' && !stormOk;
     fxBox.append(
       h(
         'button',
-        { class: `ns-fx ${st.effect === id ? 'active' : ''}`, onclick: () => setNameStyle({ effect: id }) },
-        applyNameStyle(h('span', {}, label), { ...st, effect: id, font: 'default', c1: st.c1 || colorFor(name) }, name)
+        {
+          class: `ns-fx ${st.effect === id ? 'active' : ''} ${locked ? 'locked' : ''}`,
+          title: locked ? (S.myId && !feat('storm') ? 'Bu sunucu Yıldırım efektini desteklemiyor (Kanki Admin güncel değil).' : 'Bunun için “Yıldırım isim efekti” yetkisi olan bir rol gerekir.') : '',
+          onclick: () => !locked && setNameStyle({ effect: id }),
+        },
+        applyNameStyle(h('span', {}, label), { ...st, effect: id, font: 'default', c1: st.c1 || colorFor(name) }, name),
+        locked ? h('span', { class: 'ns-lock' }, '🔒') : null
       )
     );
+  }
+  $('#ns-c3-wrap').classList.toggle('hidden', st.effect !== 'storm' || !stormOk);
+  $('#ns-c3').value = st.c3 || NS_BOLT;
+  $('#ns-storm-why').classList.toggle('hidden', stormOk);
   $('#ns-c1').value = st.c1 || colorFor(name);
   $('#ns-c2').value = st.c2 || '#22d47e';
   const pr = $('#ns-presets');
@@ -4932,6 +4955,7 @@ function syncNsMsgPerm() {
 }
 $('#ns-c1').addEventListener('input', (e) => setNameStyle({ c1: e.target.value }));
 $('#ns-c2').addEventListener('input', (e) => setNameStyle({ c2: e.target.value }));
+$('#ns-c3').addEventListener('input', (e) => setNameStyle({ c3: e.target.value }));
 $('#ns-inmsg').addEventListener('change', (e) => setNameStyle({ inMessages: e.target.checked }));
 $('#ns-reset').addEventListener('click', () => {
   settings.nameStyle = null;

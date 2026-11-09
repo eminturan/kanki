@@ -174,7 +174,7 @@ Ayarlar › Görünüm: 9 tema (Sade — efektsiz ve en hafif, Kanki, Zifiri, Ge
 
 ## Yönetim (Sunucu Ayarları)
 Kalkan düğmesi ya da sunucu menüsü › Sunucu ayarları. Sekmeler: Genel Bakış, Roller, Üyeler, Kanallar, Yasaklılar, Denetim Kaydı, Bağlantı. Her sekme sadece ilgili yetkisi olana görünür.
-- **Roller:** Discord'daki gibi. Rolün adı, rengi, "üyeleri ayrı göster" ayarı ve 25 yetkisi var (Yönetici, sunucuyu/rolleri/kanalları yönet, denetim kaydı, at, yasakla, zaman aşımı, sustur, sağırlaştır, taşı, mesajları yönet, @herkes, mesaj, dosya, GIF, anket, oylama, süslü mesaj yazısı, ses efekti, ekran paylaşımı, kamera, birlikte izle, flash at). Rolleri sürükleyerek sırala; üstteki rol alttakileri yönetir, kimse kendi rolüne eşit ya da üstteki birine işlem yapamaz. Sunucu sahibi (yönetici anahtarıyla bağlanan) her şeyi yapar ve kimse ona işlem yapamaz.
+- **Roller:** Discord'daki gibi. Rolün adı, rengi, "üyeleri ayrı göster" ayarı ve 26 yetkisi var (Yönetici, sunucuyu/rolleri/kanalları yönet, denetim kaydı, at, yasakla, zaman aşımı, sustur, sağırlaştır, taşı, mesajları yönet, @herkes, mesaj, dosya, GIF, anket, oylama, süslü mesaj yazısı, yıldırım isim efekti, ses efekti, ekran paylaşımı, kamera, birlikte izle, flash at). Rolleri sürükleyerek sırala; üstteki rol alttakileri yönetir, kimse kendi rolüne eşit ya da üstteki birine işlem yapamaz. Sunucu sahibi (yönetici anahtarıyla bağlanan) her şeyi yapar ve kimse ona işlem yapamaz.
 - **@herkes:** herkesin varsayılan yetkileri (ör. GIF'i ya da ses efektlerini herkese kapatmak için).
 - **Moderatör:** yeni sunucularda hazır gelen rol. Eski sürümdeki moderatörler otomatik bu rolü alır.
 - **Moderasyon** (kişiye sağ tık): rol ver, taşı, sesten çıkar, sunucuda sustur/sağırlaştır, zaman aşımı (60 sn – 1 hafta; bu sürede yazamaz, konuşamaz, paylaşamaz), at, yasakla.
@@ -197,10 +197,11 @@ Kalkan düğmesi ya da sunucu menüsü › Sunucu ayarları. Sekmeler: Genel Bak
 - **Yapay zekâ gürültü engelleme (RNNoise):** Ayarlar › Ses ve görüntü › Ses işleme.
 
 ## Yazı stili
-- Ayarlar › Yazı stili: adın için yazı tipi (12 seçenek), efekt (düz, gradyan, neon, parıltı, gökkuşağı, nabız, ateş) ve iki renk. Önizleme anında güncellenir.
+- Ayarlar › Yazı stili: adın için yazı tipi (12 seçenek), efekt (düz, gradyan, neon, parıltı, gökkuşağı, nabız, ateş, yıldırım) ve iki renk (Yıldırım seçiliyse bir de yıldırım rengi). Önizleme anında güncellenir.
 - "Mesajlarımda da kullan" açılırsa mesaj metnin de aynı yazı tipi ve renkle görünür (efektsiz, okunaklı kalsın diye).
 - Yazı tipleri uygulamanın içinde gelir (SIL Open Font License), internet gerekmez.
 - "Mesajlarımda da bu yazı tipini ve rengi kullan" seçeneği herkeste kapalı başlar; sadece **Süslü mesaj yazısı** yetkisi olan roldekiler açabilir (yönetici Roller'den verir). Yetki alınınca seçenek kendiliğinden kapanır.
+- **Yıldırım** efekti sadece **Yıldırım isim efekti** yetkisi olan roldekilerde (ve sunucu sahibinde) çalışır; yetkisi olmayanda düğme kilitli görünür, başkalarına isim düz gider. Yetki geri verilince seçilen efekt kendiliğinden geri gelir. Kanal ve üye listesi gibi dar satırlarda yıldırımlar biraz kırpılabilir.
 
 ## Uzaktan kontrol
 - İzlediğin **tüm ekran** yayınının üst çubuğundaki fare simgesiyle kontrol iste. Yayıncıya onay penceresi çıkar; 30 saniye içinde yanıt vermezse istek reddedilir.

@@ -832,6 +832,7 @@ html .srv-settings, html .ann-banner, html .composer-lock, html .role-chip, html
 :root[data-scheme="light"] .ns-x-neon { color: color-mix(in oklab, var(--n1) 55%, #000) !important; text-shadow: 0 0 8px color-mix(in srgb, var(--n2) 45%, transparent); }
 :root[data-scheme="light"] .ns-x-gradient, :root[data-scheme="light"] .ns-x-shimmer,
 :root[data-scheme="light"] .ns-x-rainbow, :root[data-scheme="light"] .ns-x-fire { filter: brightness(.72) saturate(1.3); }
+:root[data-scheme="light"] .ns-x-storm { color: color-mix(in oklab, var(--n1) 55%, #000) !important; }
 :root[data-scheme="light"] .avatar:not(.has-img)::after { background: linear-gradient(160deg, rgba(255, 255, 255, .18), transparent 60%); }
 
 /* ---------- 17. Tema kişilikleri ---------- */

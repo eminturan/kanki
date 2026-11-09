@@ -236,7 +236,8 @@ function onAdminMessage(m) {
 
 function afterPermsChange() {
   applyAdminUi();
-  if (typeof syncNsMsgPerm === "function") syncNsMsgPerm();
+  if (typeof renderNameStyleUi === "function") renderNameStyleUi(); // süslü mesaj ve Yıldırım yetkisi
+  if (typeof renderMeName === "function") renderMeName();
   renderAll();
   renderTextChannels();
   renderComposerLock();
