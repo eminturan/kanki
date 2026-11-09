@@ -6,6 +6,12 @@
  */
 const CHANGELOG = [
   {
+    version: '1.0.39',
+    date: '2026-11-09',
+    title: 'Görünürlük kaydırıcısı düzeltmesi',
+    fixed: ['Oyun içi katmandaki Görünürlük kaydırıcısı %100\'deyken sağında boşluk kalıyordu (metin kutusu çerçevesi alıyordu).'],
+  },
+  {
     version: '1.0.38',
     date: '2026-11-09',
     title: 'Oylama susturmasını kaldırma',
