@@ -189,7 +189,7 @@ self.KANKI_COLORS_LIGHT = ['#316fca', '#7d53dd', '#c23b7d', '#b35310', '#0e7d71'
 const apLvlBuf = new Float32Array(1024);
 function apSetLevel(id, db) {
   if (!id) return;
-  const q = String(Math.round(Math.max(0, Math.min(1, (db + 58) / 30)) * 10) / 10);
+  const q = String(Math.round(Math.max(0, Math.min(1, (db + 58) / 30)) * 4) / 4); // 5 kademe: az değişsin, az çizilsin
   for (const el of document.querySelectorAll(`[data-av="${id}"].speaking`)) {
     if (el.style.getPropertyValue('--lvl') !== q) el.style.setProperty('--lvl', q);
   }
@@ -200,7 +200,7 @@ setInterval(() => {
     if (S.transmitting) apSetLevel(S.myId, audio.level);
     for (const [id, r] of audio.remote) if (r.speaking && r.analyser) apSetLevel(id, rmsDb(r.analyser, apLvlBuf));
   } catch {}
-}, 80);
+}, 160);
 
 // Canlı gelen mesaj aşağıdan kayarak girsin; sohbet baştan çizilirken (renderChat) hiçbir şey oynamasın
 const apChatLog = document.getElementById('chat-log');

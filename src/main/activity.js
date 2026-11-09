@@ -226,7 +226,7 @@ async function scan({ games = true, music = true, custom = [], list = false } = 
     return { names: [...new Set(names.map((n) => n.replace(/\.exe$/i, '')))].filter((n) => !skip.test(n)).sort((a, b) => a.localeCompare(b)) };
   }
   if (!games && !music) return { game: '', music: '' };
-  const names = await cachedNames(9000);
+  const names = await cachedNames(25000);
   return { game: games ? gameFrom(names, custom) : '', music: music ? await spotify(names) : '' };
 }
 

@@ -224,6 +224,8 @@
 :root.no-blur *, :root.no-blur *::before, :root.no-blur *::after { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
 :root.no-aurora body::before { display: none; }
 :root.bg-paused body::before { animation-play-state: paused; }
+/* Kanki arkadayken (oyun oynarken) süs animasyonları da durur: CANLI parıltısı, isim efektleri, yıldırımlar… */
+:root.bg-paused *, :root.bg-paused *::before, :root.bg-paused *::after { animation-play-state: paused !important; }
 :root.reduce-motion *, :root.reduce-motion *::before, :root.reduce-motion *::after {
   animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important;
 }
@@ -253,7 +255,8 @@ html, body { background: var(--bg-0); }
 #app, #connect-screen { background-color: transparent; }
 body::before {
   content: ""; position: fixed; inset: -10%; z-index: -1; pointer-events: none;
-  background: var(--app-bg); animation: k-aurora 90s var(--ease) infinite alternate; will-change: translate, scale;
+  background: var(--app-bg); animation: k-aurora 90s steps(45) infinite alternate;
+  /* Adımlı: her karede değil 2 sn'de bir kayar. Üstündeki buzlu cam paneller her kare yeniden bulanıklaşmasın (boşta ekran kartı yükünün çoğu buydu) */
 }
 @keyframes k-aurora { from { translate: -2% -1%; scale: 1.04; } to { translate: 2% 1.5%; scale: 1; } }
 ::selection { background: color-mix(in srgb, var(--accent) 35%, transparent); }
@@ -871,3 +874,9 @@ html .srv-settings, html .ann-banner, html .composer-lock, html .role-chip, html
   .user .badges .live-badge { font-size: 0; padding: 3px; gap: 0; }
   .user .badges .live-badge::before { width: 6px; height: 6px; }
 }
+
+/* ---------- Performans: konuşma halkası ve kart kenarlığı geçişsiz ----------
+   Biri konuşurken halka saniyede birkaç kez yanıp söner; her seferinde box-shadow geçişi 6–10 kare boyunca
+   ekranı (ve üstteki buzlu camı) yeniden çizdiriyordu. Anında değişince aynı görüntü çok daha az iş. */
+.avatar, .avatar.speaking, .p-card .avatar.speaking, .p-card::after { transition: none; }
+.p-card { transition: translate var(--t-med) var(--ease); }

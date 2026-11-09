@@ -825,7 +825,8 @@ async function scanActivity() {
     send({ t: 'activity', game: a.game || '', music: a.music || '' });
   }
 }
-// Şarkı değişimi birkaç saniyede görünsün (program listesi ana süreçte 9 sn saklanır, Spotify başlığı her seferinde bakılır)
+// Şarkı değişimi ~10 sn'de görünür (program listesi ana süreçte 25 sn saklanır, Spotify başlığı her taramada bakılır).
+// Daha sık bakmak Windows'ta her seferinde tasklist çalıştırıp düşük bilgisayarlarda oyunu kastırıyordu.
 let actBusy = false;
 setInterval(async () => {
   if (actBusy) return;
@@ -835,7 +836,7 @@ setInterval(async () => {
   } finally {
     actBusy = false;
   }
-}, 4000);
+}, 10000);
 
 // Listede olmayan oyunu kendin ekle (Ayarlar › Profilim)
 function renderCustomGames() {

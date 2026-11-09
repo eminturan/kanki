@@ -6,6 +6,17 @@
  */
 const CHANGELOG = [
   {
+    version: '1.0.43',
+    date: '2026-11-10',
+    title: 'Daha az işlemci kullanımı',
+    changed: [
+      'Ses kanalındayken Kanki yaklaşık yarı yarıya daha az işlemci kullanıyor (ölçümde %35 → %18). Düşük bilgisayarlarda oyunları ve diğer programları daha az kastırır.',
+      'Konuşma halkası ve kart kenarlığı artık yumuşak geçişsiz, anında yanıyor: her yanıp sönmede ekran 6–10 kez yeniden çiziliyordu.',
+      'Arka plan ışıkları her karede değil 2 saniyede bir kayıyor; Kanki arkadayken (oyun oynarken) bütün süs animasyonları duruyor.',
+      'Konuşma göstergesi kelime aralarında yanıp sönmüyor; oynadığın oyun ve dinlediğin şarkı 4 yerine 10 saniyede bir kontrol ediliyor (Windows\'ta her kontrol işlemci harcıyordu).',
+    ],
+  },
+  {
     version: '1.0.42',
     date: '2026-11-09',
     title: 'Yıldırım artık her efektle birlikte',

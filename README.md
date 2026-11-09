@@ -170,7 +170,9 @@ Sunucu Ayarları › Bağlantı'dan "Tarayıcıdan ve telefondan katılma" açı
 - Sunucu sadece `src/renderer` içindeki arayüz dosyalarını verir (klasör dışına çıkılamaz); tarayıcı katmanı `web-shim.js` ve `web.css`.
 
 ## Görünüm ve temalar
-Ayarlar › Görünüm: 9 tema (Sade — efektsiz ve en hafif, Kanki, Zifiri, Gece Mavisi, Neon, Gün Batımı, Okyanus, Şampiyon, Gündüz), vurgu rengi, bilgisayarın açık/koyu temasına uyma, cam efekti, arka plan ışıkları, konuşurken parlama, hareketleri azaltma, yüzen/bitişik paneller, yoğunluk ve sohbet yazı boyutu. Bu ayarlar sadece o bilgisayarda geçerli. Uygulamanın ne kadar bellek kullandığı Ayarlar › Hakkında'da görünür; en az bellek için Sade tema. Tema dosyaları: `src/renderer/themes.css` (renkler ve görünüm), `theme-boot.js` (ilk boyamadan önce temayı uygular), `appearance.js` (Görünüm sayfası).
+Ayarlar › Görünüm: 9 tema (Sade — efektsiz ve en hafif, Kanki, Zifiri, Gece Mavisi, Neon, Gün Batımı, Okyanus, Şampiyon, Gündüz), vurgu rengi, bilgisayarın açık/koyu temasına uyma, cam efekti, arka plan ışıkları, konuşurken parlama, hareketleri azaltma, yüzen/bitişik paneller, yoğunluk ve sohbet yazı boyutu. Bu ayarlar sadece o bilgisayarda geçerli. Uygulamanın ne kadar bellek kullandığı Ayarlar › Hakkında'da görünür; en az bellek için Sade tema.
+
+**Performans:** Kanki arkadayken (oyun oynarken) arka plan ışıkları ve süs animasyonları durur; konuşma halkası geçişsiz yanar (her geçiş ekranı birkaç kez yeniden çizdiriyordu); oyun/şarkı taraması 10 sn'de bir yapılır. Ses kanalında ölçülen işlemci kullanımı 1.0.43'te yaklaşık yarıya indi. Düşük bilgisayarda en hafif seçenek Sade temadır. Tema dosyaları: `src/renderer/themes.css` (renkler ve görünüm), `theme-boot.js` (ilk boyamadan önce temayı uygular), `appearance.js` (Görünüm sayfası).
 
 ## Yönetim (Sunucu Ayarları)
 Kalkan düğmesi ya da sunucu menüsü › Sunucu ayarları. Sekmeler: Genel Bakış, Roller, Üyeler, Kanallar, Yasaklılar, Denetim Kaydı, Bağlantı. Her sekme sadece ilgili yetkisi olana görünür.
