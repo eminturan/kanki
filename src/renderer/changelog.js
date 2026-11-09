@@ -6,6 +6,12 @@
  */
 const CHANGELOG = [
   {
+    version: '1.0.28',
+    date: '2026-11-09',
+    title: 'Süslü mesaj yazısı başta kapalı',
+    changed: ['Yazı stilindeki “Mesajlarımda da bu yazı tipini ve rengi kullan” herkeste kapalı başlar. Süslü mesaj yazısı yetkisi olan açıp kapatabilir; yetkisi olmayanda (ya da yetkisi alınınca) kapalı kalır.'],
+  },
+  {
     version: '1.0.27',
     date: '2026-11-09',
     title: 'Oylamayla susturma 1 dakika',

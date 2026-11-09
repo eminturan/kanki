@@ -4693,9 +4693,21 @@ function renderNameStyleUi() {
 }
 // "Mesajlarımda da kullan" bir rol yetkisine bağlı (eski sunucularda serbest)
 const nsMsgAllowed = () => !feat('perms') || can('styledMessages');
+// Bir kerelik: "mesajlarımda da kullan" herkeste kapalı başlar (yetkisi olan kendisi açar)
+if (!settings.nsMsgDefaultOff) {
+  if (settings.nameStyle?.inMessages) {
+    settings.nameStyle = { ...settings.nameStyle, inMessages: false };
+    if (!hasNameStyle(settings.nameStyle)) settings.nameStyle = null;
+  }
+  settings.nsMsgDefaultOff = true;
+  saveSettings();
+}
 function syncNsMsgPerm() {
   const ok = nsMsgAllowed();
+  // Yetkisi yoksa seçenek kapalı kalır (sonradan yetki alırsa kendisi açar)
+  if (!ok && myNameStyle().inMessages) return setNameStyle({ inMessages: false });
   const box = $('#ns-inmsg');
+  box.checked = ok && !!myNameStyle().inMessages;
   box.disabled = !ok;
   box.closest('label').classList.toggle('locked', !ok);
   box.closest('label').title = ok ? '' : 'Bunun için “Süslü mesaj yazısı” yetkisi olan bir rol gerekir.';

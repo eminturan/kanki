@@ -188,7 +188,7 @@ Kalkan düğmesi ya da sunucu menüsü › Sunucu ayarları. Sekmeler: Genel Bak
 - Ayarlar › Yazı stili: adın için yazı tipi (12 seçenek), efekt (düz, gradyan, neon, parıltı, gökkuşağı, nabız, ateş) ve iki renk. Önizleme anında güncellenir.
 - "Mesajlarımda da kullan" açılırsa mesaj metnin de aynı yazı tipi ve renkle görünür (efektsiz, okunaklı kalsın diye).
 - Yazı tipleri uygulamanın içinde gelir (SIL Open Font License), internet gerekmez.
-- "Mesajlarımda da bu yazı tipini ve rengi kullan" seçeneğini sadece **Süslü mesaj yazısı** yetkisi olan roldekiler açabilir (yönetici Roller'den verir).
+- "Mesajlarımda da bu yazı tipini ve rengi kullan" seçeneği herkeste kapalı başlar; sadece **Süslü mesaj yazısı** yetkisi olan roldekiler açabilir (yönetici Roller'den verir). Yetki alınınca seçenek kendiliğinden kapanır.
 
 ## Uzaktan kontrol
 - İzlediğin **tüm ekran** yayınının üst çubuğundaki fare simgesiyle kontrol iste. Yayıncıya onay penceresi çıkar; 30 saniye içinde yanıt vermezse istek reddedilir.
