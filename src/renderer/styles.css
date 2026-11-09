@@ -1608,8 +1608,7 @@ label.check.locked { opacity: .55; cursor: not-allowed; }
 .overlay-sub { transition: opacity .15s; }
 .overlay-sub.off { opacity: .45; pointer-events: none; }
 
-/* Güncelleme düğmesi yeri JS ile başlık satırına göre ayarlanır (placeUpdateBtn); duyuru bandı kaydırması gereksiz */
-body:has(#ann-banner:not(.hidden)) .update-btn { translate: none; }
+/* Güncelleme düğmesi yeri JS ile başlık satırına göre ayarlanır (placeUpdateBtn); duyuru bandı da hesaba katılır */
 
 /* Müzik çubuğu: birlikte izledeki gibi tutamaç nokta */
 #music-bar .mb-progress i { position: relative; }

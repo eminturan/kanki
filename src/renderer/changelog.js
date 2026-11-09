@@ -6,6 +6,12 @@
  */
 const CHANGELOG = [
   {
+    version: '1.0.24',
+    date: '2026-11-09',
+    title: 'Güncelleme düğmesi düzeltmesi',
+    fixed: ['Duyuru bandı açıkken güncelleme düğmesi başlık satırının altına kayıyordu.'],
+  },
+  {
     version: '1.0.23',
     date: '2026-11-09',
     title: 'Başlık kanalları, AFK’da mikrofon kapalı',

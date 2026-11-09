@@ -263,7 +263,6 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--accent
 .titlebar-title { font: 650 11px var(--label-font); letter-spacing: .1em; text-transform: uppercase; color: var(--text-3); }
 .titlebar-icon { background: transparent; color: var(--accent); }
 /* Duyuru şeridi açıkken sağ üstteki güncelleme düğmesi şeridin kapatma düğmesinin üstüne binmesin: şerit boyu kadar aşağı in */
-body:has(#ann-banner:not(.hidden)) .update-btn { translate: 0 36px; }
 
 .layout { gap: var(--gap); padding: 0 var(--gap) var(--gap); }
 /* Sohbet sütunu geniş pencerede biraz büyüsün: anket/çark/dosya kartları ve kanal adı (# duy…) sığsın */
