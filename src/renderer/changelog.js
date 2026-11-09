@@ -8,8 +8,11 @@ const CHANGELOG = [
   {
     version: '1.0.39',
     date: '2026-11-09',
-    title: 'Görünürlük kaydırıcısı düzeltmesi',
-    fixed: ['Oyun içi katmandaki Görünürlük kaydırıcısı %100\'deyken sağında boşluk kalıyordu (metin kutusu çerçevesi alıyordu).'],
+    title: 'Oyun içi katman düzeltmeleri',
+    fixed: [
+      'Oyun içi katman açıkken uygulama kapatılınca şeffaf katman ekranda kalıyor, Kanki arka planda açık kalıp tekrar açılamıyordu (Görev Yöneticisi\'nden kapatmak gerekiyordu). Artık ana pencereyle birlikte bütün yardımcı pencereler kapanıyor; arka planda kalsa bile tekrar açınca pencere geliyor.',
+      'Oyun içi katmandaki Görünürlük kaydırıcısı %100\'deyken sağında boşluk kalıyordu (metin kutusu çerçevesi alıyordu).',
+    ],
   },
   {
     version: '1.0.38',

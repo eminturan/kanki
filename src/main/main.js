@@ -82,7 +82,7 @@ if (!process.env.KANKI_AUTOTEST) {
       else if (win) {
         if (win.isMinimized()) win.restore();
         win.focus();
-      }
+      } else if (app.isReady()) createWindow(); // ana pencere bir şekilde kapanmışsa yeniden aç
     });
 }
 app.on('open-url', (e, url) => {
@@ -147,7 +147,12 @@ function createWindow() {
     // Ana pencere kapanınca yayın pencereleri de kapansın
     win?.once('closed', () => !child.isDestroyed() && child.close());
   });
-  win.on('closed', () => (win = null));
+  win.on('closed', () => {
+    win = null;
+    // Ana pencere kapanınca oyun içi katman, flash, yayın işareti, uzaktan kontrol çubuğu ve müzik botu gibi
+    // yardımcı pencereler de kapansın; yoksa uygulama arka planda açık kalıyor ve tekrar açılamıyordu.
+    for (const w of BrowserWindow.getAllWindows()) if (!w.isDestroyed()) w.destroy();
+  });
   if (process.env.KANKI_AUTOTEST) {
     win.webContents.on('console-message', (e) => {
       const msg = e.message;
