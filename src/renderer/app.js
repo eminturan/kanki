@@ -3421,7 +3421,7 @@ function openProfile(uid, anchor) {
     { class: 'pf-body' },
     h('div', { class: 'pf-name' }, nameEl(u.name, styleOfUser(u)), isMe ? ' (sen)' : ''),
     statusText ? h('div', { class: 'pf-custom' }, statusText) : null,
-    activityText(u) ? h('div', { class: 'pf-activity' }, activityText(u)) : null,
+    ...activityLines(u).map((t) => h('div', { class: 'pf-activity' }, t)),
     h('div', { class: 'pf-status' }, h('span', { class: `status-dot inline ${pres}` }), PRESENCE[pres].label, ch ? h('span', { class: 'muted' }, ` · ${ch.name}`) : null),
     tags,
     profileRoles(u) // roller ve moderasyon durumu (admin.js)

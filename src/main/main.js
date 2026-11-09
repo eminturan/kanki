@@ -768,18 +768,18 @@ const OVERLAY_W = 240;
 const OVERLAY_H = 320;
 const OVERLAY_HTML = `<!doctype html><meta charset="utf-8"><style>
 html,body{margin:0;height:100%;background:transparent;overflow:hidden;font:600 13px -apple-system,"Segoe UI",sans-serif;color:#fff}
-#l{display:flex;flex-direction:column;gap:4px;padding:6px;height:100%;box-sizing:border-box}
+#l{display:flex;flex-direction:column;gap:4px;padding:6px;height:100%;box-sizing:border-box;opacity:var(--o,.75)}
 body.b #l{justify-content:flex-end}
 body.r #l{align-items:flex-end}
-.u{display:flex;align-items:center;gap:7px;padding:3px 10px 3px 3px;border-radius:14px;background:rgba(8,10,11,.72);max-width:226px;opacity:.75;transition:opacity .1s}
-.u.s{opacity:1;background:rgba(8,10,11,.88)}
+.u{display:flex;align-items:center;gap:7px;padding:3px 10px 3px 3px;border-radius:14px;background:rgba(8,10,11,.5);max-width:226px;opacity:.6;transition:opacity .1s}
+.u.s{opacity:1;background:rgba(8,10,11,.72)}
 .a{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-size:11px;color:#081009;flex:none;box-shadow:0 0 0 2px transparent}
 .u.s .a{box-shadow:0 0 0 2px #22d47e}
 .n{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-shadow:0 1px 2px #000}
 .i{font-size:11px;opacity:.85}
 .c{font:600 10px ui-monospace,Menlo,Consolas,monospace;color:#9fb3aa;padding:0 6px;text-shadow:0 1px 2px #000}
 </style><body><div id="l"></div><script>
-function upd(p){document.body.className=(p.pos[0]==='b'?'b ':'')+(p.pos[1]==='r'?'r':'');
+function upd(p){document.body.className=(p.pos[0]==='b'?'b ':'')+(p.pos[1]==='r'?'r':'');document.body.style.setProperty('--o',(p.alpha||75)/100);
 var l=document.getElementById('l');l.innerHTML='';
 if(p.channel&&p.items.length){var c=document.createElement('div');c.className='c';c.textContent=p.channel;l.appendChild(c);}
 p.items.forEach(function(x){var d=document.createElement('div');d.className='u'+(x.speaking?' s':'');
@@ -904,9 +904,9 @@ ipcMain.handle('mark:show', async (_e, m) => {
 
 // Birlikte izle: YouTube videosunun görüntü ve ses adresleri (yt-dlp)
 let watchHeaders = {};
-ipcMain.handle('watch:resolve', async (_e, url) => {
+ipcMain.handle('watch:resolve', async (_e, url, maxHeight) => {
   try {
-    const r = await music.video(String(url || ''));
+    const r = await music.video(String(url || ''), undefined, maxHeight);
     watchHeaders = r.headers || {};
     return r;
   } catch (e) {

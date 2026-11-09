@@ -6,6 +6,23 @@
  */
 const CHANGELOG = [
   {
+    version: '1.0.21',
+    date: '2026-11-09',
+    title: 'Oyun ve şarkı birlikte, video kalitesi, düzenlemeler',
+    added: [
+      'Birlikte izle’ye kalite seçimi: Otomatik (1080p’ye kadar, önerilen), 720p ya da 480p (yavaş internet). Seçim hatırlanır. YouTube artık 720p yerine 1080p’ye kadar açılır.',
+      'Oyun içi katmana görünürlük ayarı; katman artık daha saydam ve göze batmıyor.',
+      'Kişiler listesinde sunucu sahibi en üstte, kendi başlığı altında.',
+    ],
+    changed: [
+      'Hem oyun oynayıp hem müzik dinleyen kişide ikisi birlikte görünüyor.',
+      'Oyun içi katman kapalıyken alt seçenekleri soluk ve pasif.',
+    ],
+    fixed: [
+      'Kanal listesinde uzun ya da süslü isimler rozetlerin yüzünden sığmıyordu; rozetler küçüldü, yer darsa CANLI yazısı kırmızı noktaya iner.',
+    ],
+  },
+  {
     version: '1.0.20',
     date: '2026-11-09',
     title: 'Sade tema, müzikte sarma, daha hızlı şarkı/oyun gösterimi',

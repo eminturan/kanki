@@ -553,16 +553,23 @@
             <p class="hint">Oyun oynarken ekranın köşesinde kimin konuştuğunu gösteren küçük, her zaman üstte duran bir kutu. Fareyle tıklanamaz, oyunu engellemez. Tam ekran (özel) moddaki oyunlarda görünmeyebilir; oyunu "kenarlıksız pencere" moduna al.</p>
             <div class="checks one">
               <label class="check"><input type="checkbox" id="set-overlay" /><span>Konuşanlar katmanını göster</span></label>
-              <label class="check"><input type="checkbox" id="set-overlay-only" /><span>Sadece konuşanları göster</span></label>
             </div>
-            <label class="field" style="max-width:280px"><span>Konum</span>
-              <select id="set-overlay-pos">
-                <option value="tl">Sol üst</option>
-                <option value="tr">Sağ üst</option>
-                <option value="bl">Sol alt</option>
-                <option value="br">Sağ alt</option>
-              </select>
-            </label>
+            <div class="overlay-sub" id="overlay-sub">
+              <div class="checks one">
+                <label class="check"><input type="checkbox" id="set-overlay-only" /><span>Sadece konuşanları göster</span></label>
+              </div>
+              <label class="field" style="max-width:280px"><span>Konum</span>
+                <select id="set-overlay-pos">
+                  <option value="tl">Sol üst</option>
+                  <option value="tr">Sağ üst</option>
+                  <option value="bl">Sol alt</option>
+                  <option value="br">Sağ alt</option>
+                </select>
+              </label>
+              <label class="field" style="max-width:280px"><span>Görünürlük <b id="set-overlay-alpha-val" class="muted"></b></span>
+                <input type="range" id="set-overlay-alpha" min="25" max="100" step="5" />
+              </label>
+            </div>
           </section>
           <section class="settings-pane hidden" data-pane="about">
             <h2>Hakkında</h2>

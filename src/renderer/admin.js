@@ -433,6 +433,10 @@ function memberGroups() {
   const all = [...S.users.values()];
   const placed = new Set();
   const groups = [];
+  // Sunucu sahibi her zaman en üstte, kendi başlığı altında
+  const owners = all.filter((u) => (u.admin || u.owner) && !u.bot);
+  owners.forEach((u) => placed.add(u.id));
+  if (owners.length) groups.push(['👑 Sunucu sahibi', owners, '']);
   if (feat('perms'))
     for (const r of S.roles) {
       if (!r.hoist || r.id === 'everyone') continue;

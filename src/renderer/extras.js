@@ -799,16 +799,16 @@ setInterval(async () => {
 // =====================================================================
 //  Oynadığın oyun ve Spotify'da dinlediğin şarkı
 // =====================================================================
-function activityText(u) {
+// Oyun ve şarkı aynı anda olabilir: ikisi de gösterilir
+function activityLines(u) {
   const a = u?.activity;
-  if (!a) return '';
-  if (a.game) return `🎮 ${a.game} oynuyor`;
-  if (a.music) return `🎵 ${a.music}`;
-  return '';
+  if (!a) return [];
+  return [a.game ? `🎮 ${a.game} oynuyor` : '', a.music ? `🎵 ${a.music}` : ''].filter(Boolean);
 }
+const activityText = (u) => activityLines(u).join(' · ');
 function activityBadge(u, badges) {
   if (!u.activity) return;
-  badges.prepend(h('span', { class: 'act-badge', title: activityText(u) }, u.activity.game ? '🎮' : '🎵'));
+  badges.prepend(h('span', { class: 'act-badge', title: activityLines(u).join('\n') }, u.activity.game && u.activity.music ? '🎮🎵' : u.activity.game ? '🎮' : '🎵'));
 }
 let lastAct = '';
 async function scanActivity() {
@@ -1095,8 +1095,25 @@ kanki.onKeybind?.((id) => {
   bind('#set-show-game', 'showGame', () => ((lastAct = ''), scanActivity()));
   bind('#set-show-music', 'showMusic', () => ((lastAct = ''), scanActivity()));
   bind('#set-rnnoise', 'rnnoise', () => S.myId && startMic());
-  bind('#set-overlay', 'overlay');
+  // Katman kapalıyken alt seçenekler pasif
+  const syncOverlayOpts = () => {
+    const off = !settings.overlay;
+    $('#set-overlay-only').disabled = off;
+    $('#set-overlay-pos').disabled = off;
+    $('#set-overlay-alpha').disabled = off;
+    $('#overlay-sub').classList.toggle('off', off);
+  };
+  bind('#set-overlay', 'overlay', syncOverlayOpts);
   bind('#set-overlay-only', 'overlayOnly');
+  const alpha = $('#set-overlay-alpha');
+  alpha.value = settings.overlayAlpha || 75;
+  $('#set-overlay-alpha-val').textContent = `%${alpha.value}`;
+  alpha.addEventListener('input', () => {
+    settings.overlayAlpha = Number(alpha.value);
+    $('#set-overlay-alpha-val').textContent = `%${alpha.value}`;
+    saveSettings();
+  });
+  syncOverlayOpts();
   $('#set-overlay-pos').value = settings.overlayPos || 'tl';
   $('#set-overlay-pos').addEventListener('change', (e) => {
     settings.overlayPos = e.target.value;
@@ -1120,7 +1137,7 @@ setInterval(() => {
       .sort((a, b) => a.name.localeCompare(b.name, 'tr'));
     if (settings.overlayOnly) items = items.filter((x) => x.speaking);
   }
-  const payload = { on, pos: settings.overlayPos || 'tl', channel: chName(S.channelId), items };
+  const payload = { on, pos: settings.overlayPos || 'tl', alpha: settings.overlayAlpha || 75, channel: chName(S.channelId), items };
   const key = JSON.stringify(payload);
   if (key !== overlayKey) {
     overlayKey = key;
@@ -1338,10 +1355,18 @@ function watchForm() {
   formModal({
     title: '🎬 Birlikte izle',
     desc: 'Videoyu sen oynatırsın, kanaldakiler yayın olarak izler; herkes durdurup ileri-geri sarabilir. YouTube bağlantısı yapıştır ya da bilgisayarından bir video dosyası seç.',
-    fields: [{ key: 'url', label: 'YouTube bağlantısı', placeholder: 'https://www.youtube.com/watch?v=…', max: 500 }],
+    fields: [
+      { key: 'url', label: 'YouTube bağlantısı', placeholder: 'https://www.youtube.com/watch?v=…', max: 500 },
+      { key: 'q', label: 'Kalite', type: 'select', value: settings.watchQuality || 'auto', options: WATCH_Q },
+    ],
     submit: 'Başlat',
-    extra: { label: 'Video dosyası seç…', onClick: pickVideoFile },
+    extra: { label: 'Video dosyası seç…', onClick: () => {
+      const q = $('#form-modal select')?.value;
+      if (q) setWatchQuality(q);
+      pickVideoFile();
+    } },
     onSubmit: (v) => {
+      setWatchQuality(v.q);
       const url = v.url.trim();
       if (!/^https?:\/\//i.test(url)) {
         toast('Bir YouTube bağlantısı yapıştır', 'Ya da "Video dosyası seç" ile bilgisayarından bir dosya aç.', 'err');
@@ -1350,6 +1375,19 @@ function watchForm() {
       startWatchYouTube(url);
     },
   });
+}
+// Kalite: Otomatik = 1080p'ye kadar (yayın en fazla 1080p gider, üstü boşa iner). Yavaş internette 720p/480p.
+const WATCH_Q = [['auto', 'Otomatik — 1080p’ye kadar (önerilen)'], ['720', '720p — orta internet'], ['480', '480p — yavaş internet']];
+const watchMaxH = () => ({ 720: 720, 480: 480 })[settings.watchQuality] || 1080;
+function setWatchQuality(q) {
+  if (!WATCH_Q.some(([k]) => k === q) || settings.watchQuality === q) return;
+  settings.watchQuality = q;
+  saveSettings();
+}
+// Yayın bit hızı videonun gerçek yüksekliğine ve seçilen sınıra göre
+function watchBitrate(videoHeight) {
+  const h = Math.min(videoHeight || 1080, watchMaxH());
+  return h >= 1000 ? autoBitrate('1080', 30) : h >= 700 ? autoBitrate('720', 30) : 1200;
 }
 function pickVideoFile() {
   const inp = h('input', { type: 'file', accept: 'video/*,.mkv,.mp4,.webm,.mov,.m4v' });
@@ -1363,7 +1401,7 @@ async function startWatchYouTube(url) {
   if (!kanki.watchResolve) return toast('Bu sürüm YouTube açamıyor', '', 'err');
   toast('Video hazırlanıyor…', 'YouTube videosu 10–20 saniyede başlar.', '', 6000);
   try {
-    const r = await kanki.watchResolve(url);
+    const r = await kanki.watchResolve(url, watchMaxH());
     if (r.error) throw new Error(r.error);
     const wait = (r.availableAt || 0) - Date.now();
     if (wait > 0) await new Promise((res) => setTimeout(res, Math.min(wait + 300, 30000)));
@@ -1410,7 +1448,7 @@ async function startWatch({ src, audioSrc, title, revoke, remote }) {
     if (!vt) throw new Error('Videodan görüntü alınamadı.');
     const stream = new MediaStream([vt, ...dest.stream.getAudioTracks()]);
     const label = `🎬 ${title}`.slice(0, 60);
-    const id = addShare(stream, { fps: '30', res: '1080', bitrate: autoBitrate('1080', 30), bitrateSel: '0', hint: 'motion', audioMode: 'clean', watch: true }, label);
+    const id = addShare(stream, { fps: '30', res: '1080', bitrate: watchBitrate(video.videoHeight), bitrateSel: '0', hint: 'motion', audioMode: 'clean', watch: true }, label);
     const w = { video, audioEl, ctx, monitor, title, revoke: revoke ? src : null, timer: null };
     S.watch.set(id, w);
     const push = () => broadcastWatch(id);

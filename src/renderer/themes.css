@@ -859,3 +859,16 @@ html .srv-settings, html .ann-banner, html .composer-lock, html .role-chip, html
 @keyframes k-float { 50% { translate: 0 -6px; } }
 @keyframes k-live { 50% { opacity: .35; } }
 @keyframes k-spin { to { rotate: 1turn; } }
+
+/* Kanal ağacı: isim sığsın diye rozetler küçük; satır darsa CANLI sadece kırmızı noktaya iner */
+.user { container-type: inline-size; }
+.user .uname { flex: 0 1 auto; min-width: 2.5em; }
+.user .badges { flex: none; gap: 3px; }
+.user .badges .live-badge { padding: 1px 4px 1px 3px; gap: 3px; font-size: 8.5px; letter-spacing: .03em; border-radius: 4px; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .14); }
+.user .badges .live-badge::before { width: 4px; height: 4px; }
+.user .badges .act-badge { font-size: 11px; letter-spacing: -2px; }
+.user .badges svg { width: 14px; height: 14px; }
+@container (max-width: 215px) {
+  .user .badges .live-badge { font-size: 0; padding: 3px; gap: 0; }
+  .user .badges .live-badge::before { width: 6px; height: 6px; }
+}

@@ -186,12 +186,14 @@ async function streamNow(pageUrl, onStatus) {
 }
 
 // Birlikte izle: en fazla 720p görüntü + ayrı ses (YouTube'da 360p üstü ses ve görüntü ayrı gelir)
-const VIDEO_FORMAT =
-  'bestvideo[height<=720][vcodec^=avc1][protocol^=http]+bestaudio[acodec=opus][protocol^=http]/bestvideo[height<=720][protocol^=http]+bestaudio[protocol^=http]/best[height<=720][protocol^=http]/best[protocol^=http]';
-async function video(pageUrl, onStatus) {
+// Birlikte izle kalitesi: en fazla bu yükseklik (yayın zaten en fazla 1080p gönderir, üstü boşa iner)
+const videoFormat = (h) =>
+  `bestvideo[height<=${h}][vcodec^=avc1][protocol^=http]+bestaudio[acodec=opus][protocol^=http]/bestvideo[height<=${h}][protocol^=http]+bestaudio[protocol^=http]/best[height<=${h}][protocol^=http]/best[protocol^=http]`;
+async function video(pageUrl, onStatus, maxHeight = 1080) {
+  const H = [480, 720, 1080].includes(Number(maxHeight)) ? Number(maxHeight) : 1080;
   if (!isUrl(pageUrl)) throw new Error('Geçerli bir bağlantı değil.');
   await ensureYtDlp(onStatus);
-  const info = JSON.parse(await ytdlp(['-J', '--no-playlist', '-f', VIDEO_FORMAT, pageUrl]));
+  const info = JSON.parse(await ytdlp(['-J', '--no-playlist', '-f', videoFormat(H), pageUrl]));
   if (info.is_live) throw new Error('Canlı yayınlar açılamıyor.');
   const fmts = info.requested_formats || [info];
   const v = fmts.find((f) => f.vcodec && f.vcodec !== 'none') || fmts[0];
