@@ -93,6 +93,13 @@ git push origin main v1.0.3
 ```
 GitHub Actions paketleri derler, Release'e `latest.yml` ile birlikte ekler; kurulu uygulamalar güncellemeyi buradan görür.
 
+## Giriş ve sunucu listesi
+- İlk açılışta sadece **kullanıcı adı** sorulur (şifre yok); ad bu bilgisayarda hatırlanır, Ayarlar › Profilim'den değiştirilir.
+- **Sol çubuk** (Discord gibi): en üstte ana sayfa, altında eklenen sunucular. Simgedeki sayı içeride kaç kişi olduğunu, gri nokta sunucuya ulaşılamadığını gösterir. Tıklayınca o sunucuya geçilir (aynı anda tek sunucudasın). Sağ tık: adresi kopyala, şifreyi değiştir, listeden kaldır.
+- **Ana sayfa:** sunucu kartları (çevrimiçi sayısı, kimler içeride, canlı yayın) ve "Sunucu ekle" (adres ya da davet bağlantısı yapıştırılır). Kart bilgisi sunucunun `/info` adresinden gelir (şifreli sunucuda isimler gösterilmez); 30 saniyede bir yenilenir.
+- **Kanki Admin:** kendi sunucun listede "Senin sunucun" olarak durur, "Başlat ve gir" ile açılır. Port, şifre, ngrok ayarları çubuktaki sunucu düğmesinde.
+- Tarayıcıdan girenlerde çubuk yoktur: ad girilir ve doğrudan o sunucuya bağlanılır.
+
 ## Ekran paylaşımı
 - **Aynı anda birden fazla yayın:** Herkes en fazla 3 ekran/pencere paylaşabilir (ör. oyun + Discord penceresi + kod editörü). Paylaşırken sol alttaki **Ekran** düğmesiyle yenisi eklenir, her birinin altta kendi **Durdur** düğmesi vardır. Sistem sesi yankı yapmasın diye sadece ilk yayına eklenir.
 - **Aynı anda birden fazla yayın izleme:** Kanaldaki tüm yayınlar üstte düğme olarak görünür; tıklayınca sahneye eklenir. Yayınlar otomatik olarak en büyük sığacak şekilde dizilir.

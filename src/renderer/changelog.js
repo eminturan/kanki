@@ -6,6 +6,18 @@
  */
 const CHANGELOG = [
   {
+    version: '1.0.30',
+    date: '2026-11-09',
+    title: 'Yeni giriş ekranı ve Discord gibi sunucu listesi',
+    added: [
+      'Giriş ekranı: sadece kullanıcı adı, şifre yok. Ad bu bilgisayarda hatırlanır; Ayarlar › Profilim’den değiştirilebilir.',
+      'Solda sunucu çubuğu (Discord gibi): eklediğin sunucular yuvarlak simgeler olarak durur, içeride kaç kişi olduğu üstünde görünür; tıklayınca o sunucuya geçersin.',
+      'Ana sayfa: sunucu kartları (kaç kişi çevrimiçi, kimler içeride, canlı yayın var mı) ve “Sunucu ekle” (adres ya da davet bağlantısı).',
+      'Profil çubuğu sol altta tek ve geniş: çubuğun ve kanal listesinin altında.',
+      'Kanki Admin: kendi sunucun listede “Senin sunucun” olarak durur, “Başlat ve gir” ile açılır; sunucu kurma ayarları soldaki sunucu düğmesinde.',
+    ],
+  },
+  {
     version: '1.0.29',
     date: '2026-11-09',
     title: 'Müzik botunda hazır radyolar',

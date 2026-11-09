@@ -1753,6 +1753,7 @@ function disconnect() {
   S.chat.clear();
   $('#reconnect-banner').classList.add('hidden');
   $('#app').classList.add('hidden');
+  if (!S.web && typeof showHome === 'function') return showHome(); // sol çubuklu ana sayfa (servers.js)
   $('#connect-screen').classList.remove('hidden');
   renderRecent();
 }
@@ -2111,6 +2112,7 @@ function renderTree() {
   };
   walk(null, 0);
   tree.scrollTop = scroll;
+  if (typeof renderRail === "function") renderRail(); // sol çubuktaki kişi sayısı
 }
 
 function userRow(u, depth) {
@@ -2949,6 +2951,8 @@ function renderRecent() {
 
 function setConnectError(msg) {
   $('#connect-error').textContent = msg || '';
+  // Ana sayfadan bağlanırken hata bağlanma ekranında değil bildirim olarak çıkar
+  if (msg && $('#connect-screen').classList.contains('hidden')) toast('Bağlanılamadı', msg, 'err', 6000);
 }
 
 async function enterApp(url, password, address) {
@@ -2977,9 +2981,11 @@ async function enterApp(url, password, address) {
       if (S.variant === 'admin' && S.adminKey) entry.adminKey = S.adminKey;
       settings.recent = [entry, ...settings.recent.filter((x) => x.address !== address)].slice(0, 6);
       saveSettings();
+      if (!S.web) serversRemember(address, password, S.serverName); // sol çubuktaki sunucu listesi (servers.js)
     }
     $('#connect-screen').classList.add('hidden');
     $('#app').classList.remove('hidden');
+    if (typeof svShow === 'function') svShow('app');
     everConnected = true;
     $('#launch-update').classList.add('hidden');
     renderAll();
@@ -5434,10 +5440,11 @@ $('#btn-release-notes').addEventListener('click', () => showWhatsNew('0.0.0', S.
   applyAdminUi();
   renderRecent();
   renderControls();
+  serversBoot(info); // giriş ekranı / ana sayfa / sol çubuk (servers.js)
 
   // ---- Otomatik test modu ----
   const t = kanki.autotest;
-  if (t) {
+  if (t && !t.manual) { // manual: giriş ekranı ve ana sayfa elle (test betiği) kullanılır
     $('#in-nick').value = t.name;
     if (t.host) {
       $('#in-host-port').value = t.host;

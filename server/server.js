@@ -1026,6 +1026,30 @@ function startServer(opts = {}) {
       });
       return res.end(f.buf);
     }
+    // Sunucu kartı (Kanki ana sayfası ve sol çubuk): ad, kaç kişi çevrimiçi, canlı yayın var mı.
+    // Şifreli sunucuda kimlerin içeride olduğu gösterilmez, sadece sayı.
+    if (u.pathname === '/info') {
+      const hdr = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'ngrok-skip-browser-warning', 'Cache-Control': 'no-store' };
+      if (req.method === 'OPTIONS') {
+        res.writeHead(204, hdr);
+        return res.end();
+      }
+      if (req.method === 'GET') {
+        const people = [...users.values()].filter((x) => !x.bot);
+        const body = JSON.stringify({
+          kanki: true,
+          name: serverName,
+          online: people.length,
+          inVoice: people.filter((x) => x.channelId).length,
+          live: people.reduce((n, x) => n + (x.shares || []).filter((s) => s.kind !== 'camera').length, 0),
+          names: password ? [] : people.slice(0, 6).map((x) => x.name),
+          locked: !!password,
+          version: webVersion,
+        });
+        res.writeHead(200, { ...hdr, 'Content-Type': 'application/json; charset=utf-8' });
+        return res.end(body);
+      }
+    }
     // Tarayıcıdan açılırsa Kanki'nin web hali (Sunucu Ayarları › Bağlantı'dan açılır; kapalıyken ngrok kotası harcanmaz)
     if (u.pathname !== '/' || /text\/html/.test(req.headers.accept || '')) {
       if (conf.webClient === true && serveWeb(req, res, u.pathname)) return;
@@ -1185,7 +1209,7 @@ function startServer(opts = {}) {
           admin: isAdmin,
           mod: isModUser(me),
           token: me.token,
-          features: ['sfx', 'activity', 'log', 'pins', 'polls', 'votes', 'files', 'preview', 'gif', 'roles', 'chpass', 'afk', 'bans', 'marks', 'watch', 'perms', 'audit', 'timeout', 'serverDeafen', 'moveAll', 'purge', 'slowmode', 'readOnly', 'announce', 'welcomeMessage', 'headers', 'afkMic', 'webClient'],
+          features: ['sfx', 'activity', 'log', 'pins', 'polls', 'votes', 'files', 'preview', 'gif', 'roles', 'chpass', 'afk', 'bans', 'marks', 'watch', 'perms', 'audit', 'timeout', 'serverDeafen', 'moveAll', 'purge', 'slowmode', 'readOnly', 'announce', 'welcomeMessage', 'headers', 'afkMic', 'webClient', 'info'],
           // Roller ve yetkiler
           perms: [...permsOf(me)],
           roles: userRoleIds(me),

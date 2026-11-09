@@ -1166,7 +1166,19 @@ function handleInvite(payload) {
   }
   if (!d?.a) return;
   if (S.myId && normalizeAddress(d.a) === S.url) return toast(`Zaten ${d.n || d.a} sunucusundasın`);
+  // Henüz kullanıcı adı yoksa önce giriş, sonra davet
+  if (!settings.nick && typeof SV !== 'undefined') {
+    SV.pendingInvite = payload;
+    return toast(`${d.n || 'Sunucu'} daveti`, 'Önce kullanıcı adını yaz, sonra sunucuya girersin.');
+  }
   const go = () => {
+    // Sunucu listeye eklenir ve girilir (sol çubukta kalır)
+    if (typeof svOpen === 'function' && !S.web) {
+      svMigrate();
+      if (!settings.servers.some((x) => x.address === d.a)) settings.servers.push({ address: d.a, password: d.p || '', adminKey: '', name: d.n || '' });
+      saveSettings();
+      return svOpen({ id: d.a, address: d.a, password: d.p || '', name: d.n || '' });
+    }
     if (S.ws) disconnect();
     $('.tab[data-tab="join"]')?.click();
     $('#in-address').value = d.a;

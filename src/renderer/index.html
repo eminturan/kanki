@@ -8,10 +8,49 @@
   <link rel="stylesheet" href="styles.css" />
   <link rel="stylesheet" href="themes.css" />
   <link rel="stylesheet" href="admin.css" />
+  <link rel="stylesheet" href="servers.css" />
   <script src="theme-boot.js"></script>
 </head>
 <body>
   <!-- ================= BAĞLANTI EKRANI ================= -->
+  <!-- Giriş: sadece kullanıcı adı (servers.js) -->
+  <section id="login-screen" class="screen hidden">
+    <div class="drag-strip"></div>
+    <div class="login-card">
+      <div class="brand-logo login-logo"><svg viewBox="0 0 24 24"><path d="M12 3a4 4 0 0 0-4 4v5a4 4 0 0 0 8 0V7a4 4 0 0 0-4-4Zm-7 9a1 1 0 1 1 2 0 5 5 0 0 0 10 0 1 1 0 1 1 2 0 7 7 0 0 1-6 6.93V21h3a1 1 0 1 1 0 2H8a1 1 0 1 1 0-2h3v-2.07A7 7 0 0 1 5 12Z"/></svg></div>
+      <h1>Kanki'ye hoş geldin</h1>
+      <p class="login-sub">Arkadaşlarının seni göreceği adı yaz, başlayalım.</p>
+      <label class="login-label" for="login-name">Kullanıcı adın</label>
+      <div class="login-row"><div class="avatar login-av" id="login-av">?</div><input id="login-name" maxlength="32" placeholder="Örn. KullanıcıAdı" autocomplete="off" spellcheck="false" /></div>
+      <div class="login-error" id="login-error"></div>
+      <button class="btn primary wide login-go" id="login-go">Devam →</button>
+      <div class="login-note">Şifre yok. Adın <b>bu bilgisayarda hatırlanır</b>; bir dahaki açılışta bu ekran gelmez. Sonra Ayarlar › Profilim'den değiştirebilirsin.</div>
+    </div>
+  </section>
+
+  <!-- Sol sunucu çubuğu (Discord gibi) -->
+  <nav id="rail" class="rail hidden">
+    <button class="ri ri-home" id="rail-home" title="Ana sayfa"><svg viewBox="0 0 24 24"><path d="M12 3 3 10v10a1 1 0 0 0 1 1h5v-6h6v6h5a1 1 0 0 0 1-1V10l-9-7Z"/></svg></button>
+    <div class="ri-sep"></div>
+    <div class="ri-list" id="rail-list"></div>
+    <button class="ri ri-add" id="rail-add" title="Sunucu ekle">+</button>
+    <button class="ri ri-host hidden" id="rail-host" title="Sunucu kur"><svg viewBox="0 0 24 24"><path d="M4 4h16a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1Zm0 9h16a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-5a1 1 0 0 1 1-1Zm3-6a1 1 0 1 0 0 2 1 1 0 0 0 0-2Zm0 9a1 1 0 1 0 0 2 1 1 0 0 0 0-2Z"/></svg></button>
+  </nav>
+  <div class="rail-tip hidden" id="rail-tip"></div>
+
+  <!-- Ana sayfa: sunucu kartları -->
+  <section id="home-screen" class="screen hidden">
+    <div class="drag-strip"></div>
+    <div class="home-main">
+      <div class="home-hello">
+        <div class="avatar home-av" id="home-av"></div>
+        <div><h1 id="home-title">Selam</h1><p id="home-sub">Bir sunucuya tıkla, hemen içeri gir. Sol çubuktan da geçebilirsin.</p></div>
+      </div>
+      <div class="home-sec">Sunucuların</div>
+      <div class="home-grid" id="home-grid"></div>
+    </div>
+  </section>
+
   <section id="connect-screen" class="screen">
     <div class="drag-strip"></div>
     <div class="connect-card">
@@ -405,6 +444,7 @@
                   </div>
                   <input type="file" id="avatar-file" accept="image/*" hidden />
                 </div>
+                <label class="field"><span>Kullanıcı adı</span><input id="set-nick" maxlength="32" placeholder="Örn. KullanıcıAdı" autocomplete="off" spellcheck="false" /></label>
                 <label class="field"><span>Durum yazısı</span><input id="set-status-text" maxlength="80" placeholder="Ör. 🎮 Oyun oynuyor" autocomplete="off" /></label>
                 <p class="hint">Fotoğrafın ve durum yazın kanal listesinde, üye listesinde, sohbette ve profil kartında görünür. Fotoğraf sadece bu bilgisayarda saklanır, bağlandığın sunucuya gönderilir.</p>
                 <div class="checks one">
@@ -833,5 +873,6 @@
   <script src="extras.js"></script>
   <script src="appearance.js"></script>
   <script src="admin.js"></script>
+  <script src="servers.js"></script>
 </body>
 </html>
