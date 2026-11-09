@@ -1,0 +1,9 @@
+{
+  "name": "Kanki",
+  "short_name": "Kanki",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#0b0f0d",
+  "theme_color": "#0b0f0d",
+  "icons": [{ "src": "web-icon.png", "sizes": "256x256", "type": "image/png" }]
+}

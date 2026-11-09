@@ -148,6 +148,14 @@ GitHub Actions paketleri derler, Release'e `latest.yml` ile birlikte ekler; kuru
 - YouTube için yt-dlp kullanılır (ilk kullanımda indirilir). 720p'ye kadar.
 - İzlediğin yayının üst çubuğundaki kalemle (ya da Alt + tık) yayına nokta koy ya da çiz; işaret herkeste ve tüm ekran paylaşılıyorsa yayıncının ekranında 3 saniye görünür.
 
+## Tarayıcıdan ve telefondan katılma
+Kanki Admin'in internet adresi (ngrok, ör. `https://isim.ngrok-free.dev`) tarayıcıda açılınca Kanki'nin web hali gelir; kurulum gerekmez. ngrok ilk açılışta bir uyarı sayfası gösterir, "Visit Site"a basılır.
+- Telefonda tek panel ve alt sekmeler (Kanallar / Sahne / Sohbet). Paylaş › Ana ekrana ekle ile uygulama gibi açılır.
+- Çalışanlar: ses, yazışma, dosya, GIF, anket/çark, ses efektleri, müzik botu, yayın izleme. Bilgisayar tarayıcısından ekran paylaşımı da olur.
+- Olmayanlar: telefonda ekran paylaşımı, oyun/Spotify gösterimi, oyun içi katman, genel kısayollar, YouTube ile birlikte izle başlatma.
+- Mobil veride ses bağlanmazsa: Sunucu Ayarları › Bağlantı'ya bir TURN sunucusu (ör. metered.ca ücretsiz hesap) yazılır.
+- Sunucu sadece `src/renderer` içindeki arayüz dosyalarını verir (klasör dışına çıkılamaz); tarayıcı katmanı `web-shim.js` ve `web.css`.
+
 ## Görünüm ve temalar
 Ayarlar › Görünüm: 9 tema (Sade — efektsiz ve en hafif, Kanki, Zifiri, Gece Mavisi, Neon, Gün Batımı, Okyanus, Şampiyon, Gündüz), vurgu rengi, bilgisayarın açık/koyu temasına uyma, cam efekti, arka plan ışıkları, konuşurken parlama, hareketleri azaltma, yüzen/bitişik paneller, yoğunluk ve sohbet yazı boyutu. Bu ayarlar sadece o bilgisayarda geçerli. Tema dosyaları: `src/renderer/themes.css` (renkler ve görünüm), `theme-boot.js` (ilk boyamadan önce temayı uygular), `appearance.js` (Görünüm sayfası).
 

@@ -6,6 +6,16 @@
  */
 const CHANGELOG = [
   {
+    version: '1.0.25',
+    date: '2026-11-09',
+    title: 'Tarayıcıdan ve telefondan katılma',
+    added: [
+      'Tarayıcıdan katılma: sunucunun internet adresi (ngrok) tarayıcıda açılınca Kanki’nin web hali gelir; kurulum gerekmez. Telefonda Kanallar / Sahne / Sohbet sekmeleriyle çalışır, ana ekrana uygulama gibi eklenebilir.',
+      'Tarayıcıdan: sesli konuşma, yazışma, dosya, GIF, anket, ses efektleri, müzik botu ve yayın izleme. Bilgisayardaki tarayıcıdan ekran paylaşımı da yapılabilir (telefonda yapılamaz).',
+      'Sunucu Ayarları › Bağlantı: mobil veride bağlanamayanlar için aktarma sunucusu (TURN) bilgileri.',
+    ],
+  },
+  {
     version: '1.0.24',
     date: '2026-11-09',
     title: 'Güncelleme düğmesi düzeltmesi',

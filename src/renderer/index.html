@@ -711,6 +711,17 @@
               <h3>Bağlantı adresleri</h3>
               <p class="hint">Arkadaşların Kanki'de bu adreslerden birini yazarak bağlanır. Kopyalamak için tıkla.</p>
               <div class="addr-list" id="adm-addresses"></div>
+              <p class="hint" id="adm-web-hint">Telefondan ya da kurulum yapmadan bağlanmak için internet adresini tarayıcıda açmak yeter (ngrok ilk açılışta bir uyarı sayfası gösterir; "Visit Site"a basılır).</p>
+            </div>
+            <div class="ss-card" id="adm-turn-section">
+              <h3>Mobil veri için aktarma sunucusu (TURN)</h3>
+              <p class="hint">Ses ve görüntü kişiler arasında doğrudan gider. Mobil veride ya da bazı modemlerde doğrudan bağlantı kurulamazsa ses bu aktarma sunucusu üzerinden gider. Ücretsiz bir TURN hesabı (ör. metered.ca) açıp bilgilerini buraya yaz. Boş bırakırsan sadece doğrudan bağlantı denenir. Değişiklik, kişiler yeniden bağlanınca geçerli olur.</p>
+              <label class="field"><span>TURN adresleri (virgülle)</span><input id="adm-turn-url" placeholder="turn:global.relay.metered.ca:80, turns:global.relay.metered.ca:443?transport=tcp" autocomplete="off" /></label>
+              <div class="ss-row2">
+                <label class="field"><span>Kullanıcı adı</span><input id="adm-turn-user" autocomplete="off" /></label>
+                <label class="field"><span>Şifre</span><input id="adm-turn-pass" type="password" autocomplete="new-password" /></label>
+              </div>
+              <div class="ss-actions"><button class="btn primary" id="adm-turn-save">Kaydet</button></div>
             </div>
             <div class="ss-card ss-danger" id="adm-host-section">
               <h3>Bu bilgisayardaki sunucu</h3>

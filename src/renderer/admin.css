@@ -401,3 +401,7 @@ button.role-chip.add:hover { border-color: var(--accent); color: var(--accent); 
   .ss-stats { grid-template-columns: repeat(2, 1fr); }
   .ss-swatches { grid-template-columns: 64px 64px repeat(7, 30px); grid-template-rows: repeat(3, 30px); }
 }
+
+/* Bağlantı › TURN */
+.ss-row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 560px) { .ss-row2 { grid-template-columns: 1fr; } }

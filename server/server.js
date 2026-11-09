@@ -184,6 +184,13 @@ function startServer(opts = {}) {
       log('Ayarlar kaydedilemedi:', e.message);
     }
   }
+  // TURN (aktarma sunucusu): mobil veride doğrudan bağlanamayanların sesi bunun üzerinden gider. Sunucu Ayarları › Bağlantı
+  const iceNow = () => {
+    const list = [...iceServers];
+    const urls = String(conf.turnUrl || '').split(',').map((s) => s.trim()).filter((s) => /^turns?:[^\s]+$/i.test(s)).slice(0, 4);
+    if (urls.length) list.push({ urls, username: conf.turnUser || '', credential: conf.turnPass || '' });
+    return list;
+  };
   const afkId = () => (channels.find((c) => c.id === conf.afkChannelId && joinable(c)) || channels.find((c) => joinable(c) && /^afk$/i.test(c.name)))?.id || null;
   // AFK kanalında mikrofon açılamaz
   const inAfk = (u) => !!u && !u.bot && !!u.channelId && u.channelId === afkId();
@@ -885,6 +892,63 @@ function startServer(opts = {}) {
   // Aynı anda süren yüklemeler: bellek şişirilmesin diye kişi başı 2, toplam 200 MB
   let uploadingBytes = 0;
   const UPLOAD_INFLIGHT_MAX = 200 * 1024 * 1024;
+
+  // ---------- Tarayıcıdan katılma: Kanki'nin arayüzü aynı adresten web sayfası olarak sunulur ----------
+  // Sadece src/renderer içindeki bilinen türde dosyalar; klasör dışına çıkılamaz. index.html'e web katmanı eklenir.
+  const WEB_ROOT = path.join(__dirname, '..', 'src', 'renderer');
+  const WEB_TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.png': 'image/png', '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.woff2': 'font/woff2', '.woff': 'font/woff', '.ttf': 'font/ttf', '.wasm': 'application/wasm', '.json': 'application/json', '.webmanifest': 'application/manifest+json' };
+  let webVersion = '';
+  try {
+    webVersion = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8')).version || '';
+  } catch {}
+  let webIndex = null;
+  function webIndexHtml() {
+    if (webIndex) return webIndex;
+    let html = fs.readFileSync(path.join(WEB_ROOT, 'index.html'), 'utf8');
+    const head =
+      '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content" />\n' +
+      '  <meta name="theme-color" content="#0b0f0d" />\n' +
+      '  <meta name="apple-mobile-web-app-capable" content="yes" />\n' +
+      `  <meta name="kanki-version" content="${webVersion}" />\n` +
+      '  <link rel="manifest" href="manifest.webmanifest" />\n' +
+      '  <link rel="apple-touch-icon" href="web-icon.png" />\n' +
+      '  <link rel="stylesheet" href="web.css" />\n' +
+      '  <script src="web-shim.js"></script>\n  ';
+    html = html.replace('<script src="theme-boot.js"></script>', head + '<script src="theme-boot.js"></script>');
+    return (webIndex = html);
+  }
+  function serveWeb(req, res, pathname) {
+    if (req.method !== 'GET' && req.method !== 'HEAD') return false;
+    let rel = pathname === '/' ? 'index.html' : pathname.slice(1);
+    try {
+      rel = decodeURIComponent(rel);
+    } catch {
+      return false;
+    }
+    if (!/^[A-Za-z0-9_\-./]+$/.test(rel) || rel.includes('..') || rel.startsWith('/')) return false;
+    const ext = path.extname(rel).toLowerCase();
+    const type = WEB_TYPES[ext];
+    if (!type) return false;
+    const file = path.join(WEB_ROOT, rel);
+    if (!file.startsWith(WEB_ROOT + path.sep)) return false;
+    let body;
+    try {
+      body = rel === 'index.html' ? Buffer.from(webIndexHtml()) : fs.readFileSync(file);
+    } catch {
+      return false;
+    }
+    res.writeHead(200, {
+      'Content-Type': type,
+      'Content-Length': body.length,
+      'Cache-Control': rel === 'index.html' || ext === '.js' || ext === '.css' ? 'no-cache' : 'max-age=86400',
+      'X-Content-Type-Options': 'nosniff',
+      'Referrer-Policy': 'no-referrer',
+      ...(rel === 'index.html' ? { 'X-Frame-Options': 'DENY' } : {}),
+    });
+    res.end(req.method === 'HEAD' ? undefined : body);
+    return true;
+  }
+
   function handleHttp(req, res) {
     let u;
     try {
@@ -961,6 +1025,11 @@ function startServer(opts = {}) {
         'X-Content-Type-Options': 'nosniff',
       });
       return res.end(f.buf);
+    }
+    // Tarayıcıdan açılırsa Kanki'nin web hali; diğer istekler (sağlık kontrolü vb.) eskisi gibi düz yazı
+    if (u.pathname !== '/' || /text\/html/.test(req.headers.accept || '')) {
+      if (serveWeb(req, res, u.pathname)) return;
+      if (u.pathname !== '/') return json(404, { error: 'Bulunamadı' });
     }
     res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
     res.end(`${serverName} çalışıyor. Bağlı kullanıcı: ${users.size}\n`);
@@ -1108,11 +1177,11 @@ function startServer(opts = {}) {
           id: me.id,
           name,
           serverName,
-          iceServers,
+          iceServers: iceNow(),
           admin: isAdmin,
           mod: isModUser(me),
           token: me.token,
-          features: ['sfx', 'activity', 'log', 'pins', 'polls', 'votes', 'files', 'preview', 'gif', 'roles', 'chpass', 'afk', 'bans', 'marks', 'watch', 'perms', 'audit', 'timeout', 'serverDeafen', 'moveAll', 'purge', 'slowmode', 'readOnly', 'announce', 'welcomeMessage', 'headers', 'afkMic'],
+          features: ['sfx', 'activity', 'log', 'pins', 'polls', 'votes', 'files', 'preview', 'gif', 'roles', 'chpass', 'afk', 'bans', 'marks', 'watch', 'perms', 'audit', 'timeout', 'serverDeafen', 'moveAll', 'purge', 'slowmode', 'readOnly', 'announce', 'welcomeMessage', 'headers', 'afkMic', 'webClient'],
           // Roller ve yetkiler
           perms: [...permsOf(me)],
           roles: userRoleIds(me),
@@ -2113,6 +2182,10 @@ function startServer(opts = {}) {
           if (typeof m.welcomeMessage === 'string') set('welcomeMessage', m.welcomeMessage.trim().slice(0, 500), 'hoş geldin mesajı');
           if ('linkPreviews' in m) set('linkPreviews', !!m.linkPreviews, m.linkPreviews ? 'bağlantı önizlemeleri açık' : 'bağlantı önizlemeleri kapalı');
           if (typeof m.announcement === 'string') setAnnouncement(me, m.announcement);
+          // TURN bilgileri bağlanan herkese gider (WebRTC için gerekli); bu yüzden gizli sayılmaz
+          if (typeof m.turnUrl === 'string') set('turnUrl', m.turnUrl.trim().slice(0, 400), 'TURN adresi');
+          if (typeof m.turnUser === 'string') set('turnUser', m.turnUser.trim().slice(0, 200), 'TURN kullanıcı adı');
+          if (typeof m.turnPass === 'string') set('turnPass', m.turnPass.slice(0, 200), 'TURN şifresi');
           saveConf();
           broadcastState();
           send(ws, { t: 'adminNotice', message: 'Sunucu ayarları kaydedildi.' });
@@ -2209,6 +2282,9 @@ function startServer(opts = {}) {
             description: conf.description || '',
             welcomeMessage: conf.welcomeMessage || '',
             linkPreviews: conf.linkPreviews !== false,
+            turnUrl: conf.turnUrl || '',
+            turnUser: conf.turnUser || '',
+            turnSet: !!conf.turnPass,
             announcement: conf.announcement || null,
             audit: can(me, 'viewAudit') ? auditLog.slice(-100).reverse() : [],
           });

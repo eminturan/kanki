@@ -942,7 +942,8 @@ async function captureDisplay(sourceId, video, wantAudio) {
       : false;
     return navigator.mediaDevices.getDisplayMedia({ video, audio, selfBrowserSurface: 'exclude', systemAudio: 'include' });
   };
-  for (const mode of wantAudio ? ['clean', 'plain', false] : [false]) {
+  const modes = S.web ? [wantAudio ? 'plain' : false] : wantAudio ? ['clean', 'plain', false] : [false];
+  for (const mode of modes) {
     try {
       const stream = await tryCapture(mode);
       return { stream, audioMode: mode && stream.getAudioTracks().length ? mode : false };
@@ -5410,6 +5411,13 @@ $('#btn-release-notes').addEventListener('click', () => showWhatsNew('0.0.0', S.
     $('#in-admin-key').value = settings.recent[0].adminKey || '';
   } else if (info.defaultServer) {
     $('#in-address').value = info.defaultServer;
+  }
+  if (info.web) {
+    // Tarayıcıdan: sayfayı veren sunucuya bağlanılır; adres ve son bağlananlar gizli
+    S.web = true;
+    $('#in-address').value = location.origin;
+    $('#in-address').closest('.field').classList.add('hidden');
+    settings.recent = [];
   }
   applyAdminUi();
   renderRecent();

@@ -1556,6 +1556,15 @@ $('#ss-audit-by').addEventListener('change', (e) => {
 
 // ---------- Bağlantı (adresler, yönetici anahtarı, sunucuyu kapat) ----------
 async function renderConnection() {
+  // TURN: sunucuyu yöneten görür ve değiştirir
+  const turnOk = can('manageServer') && feat('webClient');
+  $('#adm-turn-section').classList.toggle('hidden', !turnOk);
+  $('#adm-web-hint').classList.toggle('hidden', !feat('webClient'));
+  if (turnOk && SS.info && document.activeElement?.closest('#adm-turn-section') == null) {
+    $('#adm-turn-url').value = SS.info.turnUrl || '';
+    $('#adm-turn-user').value = SS.info.turnUser || '';
+    $('#adm-turn-pass').placeholder = SS.info.turnSet ? '•••••• (değiştirmek için yaz)' : '';
+  }
   let st = { hosting: false };
   try {
     st = await kanki.serverStatus();
@@ -1591,6 +1600,17 @@ async function renderConnection() {
     addAddr(S.url.replace(/^wss?:\/\//, ''), 'bağlı olduğun sunucu');
   }
 }
+$('#adm-turn-save').addEventListener('click', () => {
+  const urls = $('#adm-turn-url').value.trim();
+  const bad = urls && urls.split(',').map((x) => x.trim()).filter(Boolean).find((x) => !/^turns?:\S+$/i.test(x));
+  if (bad) return toast('TURN adresi geçersiz', `"${bad}" turn: ya da turns: ile başlamalı.`, 'err');
+  const msg = { t: 'setConfig', turnUrl: urls, turnUser: $('#adm-turn-user').value.trim() };
+  if ($('#adm-turn-pass').value) msg.turnPass = $('#adm-turn-pass').value;
+  else if (!urls) msg.turnPass = '';
+  send(msg);
+  $('#adm-turn-pass').value = '';
+  setTimeout(refreshAdmin, 400);
+});
 $('#adm-show-key').addEventListener('click', (e) => {
   e.preventDefault();
   if (!S.adminKey) return;
