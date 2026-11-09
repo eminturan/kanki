@@ -201,7 +201,7 @@ Kalkan düğmesi ya da sunucu menüsü › Sunucu ayarları. Sekmeler: Genel Bak
 - "Mesajlarımda da kullan" açılırsa mesaj metnin de aynı yazı tipi ve renkle görünür (efektsiz, okunaklı kalsın diye).
 - Yazı tipleri uygulamanın içinde gelir (SIL Open Font License), internet gerekmez.
 - "Mesajlarımda da bu yazı tipini ve rengi kullan" seçeneği herkeste kapalı başlar; sadece **Süslü mesaj yazısı** yetkisi olan roldekiler açabilir (yönetici Roller'den verir). Yetki alınınca seçenek kendiliğinden kapanır.
-- **Yıldırım** efekti sadece **Yıldırım isim efekti** yetkisi olan roldekilerde (ve sunucu sahibinde) çalışır; yetkisi olmayanda düğme kilitli görünür, başkalarına isim düz gider. Yetki geri verilince seçilen efekt kendiliğinden geri gelir. Kanal ve üye listesi gibi dar satırlarda yıldırımlar biraz kırpılabilir.
+- **Yıldırım** efekti sadece **Yıldırım isim efekti** yetkisi olan roldekilerde (ve sunucu sahibinde) çalışır; yetkisi olmayanda düğme kilitli görünür, başkalarına isim düz gider. Yetki geri verilince seçilen efekt kendiliğinden geri gelir.
 
 ## Uzaktan kontrol
 - İzlediğin **tüm ekran** yayınının üst çubuğundaki fare simgesiyle kontrol iste. Yayıncıya onay penceresi çıkar; 30 saniye içinde yanıt vermezse istek reddedilir.

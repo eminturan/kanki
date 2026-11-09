@@ -1267,10 +1267,9 @@ body.has-update .layout.chat-hidden .stage-head { padding-right: 56px; }
   0%, 30%, 60%, 82% { text-shadow: 0 0 3px #fff, 0 0 8px var(--n3), 0 0 16px var(--n2); }
   4%, 34%, 64%, 86%, 100% { text-shadow: 0 0 2px var(--n1), 0 0 7px var(--n1); }
 }
-/* Kırpılan dar satırlarda (kanal/üye listesi, alt köşe) gölge filtresi kutu gibi görünür: orada sadece yazı parlaması */
-.user .uname.ns-x-storm, .member-name .ns-x-storm, #me-name .ns-x-storm { filter: none; animation: none; text-shadow: 0 0 1px var(--n1), 0 0 3px var(--n3); }
-.user .uname.ns-x-storm::before, .user .uname.ns-x-storm::after, .member-name .ns-x-storm::before, .member-name .ns-x-storm::after,
-#me-name .ns-x-storm::before, #me-name .ns-x-storm::after { background: var(--n3); }
+/* Dar satırlar (kanal/üye listesi, alt köşe) taşanı kırpar: parlama ve yıldırımlar sığsın diye kırpma alanını
+   dolgu + eksi kenar boşluğuyla genişlet (yerleşim değişmez), efekt sohbettekiyle aynı görünsün */
+.user .uname.ns-x-storm, .member-name:has(> .ns-x-storm), #me-name:has(> .ns-x-storm) { padding: 12px 16px; margin: -12px -16px; }
 .ns-fx.locked { opacity: .55; cursor: not-allowed; }
 .ns-fx .ns-lock { margin-left: 6px; font-size: 12px; }
 @media (prefers-reduced-motion: reduce) { .ns-x-shimmer, .ns-x-rainbow, .ns-x-pulse, .ns-x-fire, .ns-x-storm, .ns-x-storm::before, .ns-x-storm::after { animation: none; } }

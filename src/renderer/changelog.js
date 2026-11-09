@@ -6,6 +6,12 @@
  */
 const CHANGELOG = [
   {
+    version: '1.0.41',
+    date: '2026-11-09',
+    title: 'Yıldırım efekti her yerde aynı',
+    fixed: ['Yıldırım isim efekti kanal listesinde, üye listesinde ve sol alttaki adında sönük görünüyordu (parlama ve animasyon kısılmıştı). Artık sohbetteki gibi tam parlıyor ve yıldırımlar çakıyor.'],
+  },
+  {
     version: '1.0.40',
     date: '2026-11-09',
     title: 'Yıldırım isim efekti',
