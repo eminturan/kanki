@@ -13,7 +13,10 @@ const CHANGELOG = [
     changed: [
       'Telefon düğmesi artık sadece sesten çıkarır, sunucuda kalırsın; tekrar bir kanala tıklayınca girersin. Sunucudan tamamen çıkmak için sunucu menüsü ya da soldaki simgeye sağ tık › Sunucudan çık.',
     ],
-    fixed: ['Bağlantıyı kesip sol çubuktan tekrar tıklayınca sunucuya yeniden bağlanılmıyordu.'],
+    fixed: [
+      'Bağlantıyı kesip sol çubuktan tekrar tıklayınca sunucuya yeniden bağlanılmıyordu.',
+      'Bilgisayarda kamera yoksa kamera düğmeleri pasif (soluk) durur; kamera takılınca kendiliğinden açılır.',
+    ],
   },
   {
     version: '1.0.31',

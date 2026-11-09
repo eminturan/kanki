@@ -1131,8 +1131,8 @@ function renderSelfShare() {
   const cam = $('#btn-camera');
   if (cam) {
     cam.classList.toggle('on', !!myCamera());
-    cam.disabled = !S.channelId;
-    cam.title = myCamera() ? 'Kamerayı kapat' : 'Kamerayı aç';
+    cam.disabled = !S.channelId || (S.hasCam === false && !myCamera());
+    cam.title = S.hasCam === false && !myCamera() ? 'Bu bilgisayarda kamera bulunamadı' : myCamera() ? 'Kamerayı kapat' : 'Kamerayı aç';
   }
   renderCallBar();
   const existing = new Map([...box.children].map((el) => [el.dataset.id, el]));
@@ -4383,6 +4383,19 @@ $('#set-camera').addEventListener('change', async (e) => {
 // Ayarlar kapanınca önizleme kamerası da kapansın
 new MutationObserver(() => $('#settings').classList.contains('hidden') && camPreview && stopCamPreview()).observe($('#settings'), { attributes: true, attributeFilter: ['class'] });
 $('#btn-camera').addEventListener('click', toggleCamera);
+// Bilgisayarda kamera yoksa kamera düğmeleri pasif kalır (takılınca kendiliğinden açılır)
+async function checkCamera() {
+  try {
+    const list = await navigator.mediaDevices.enumerateDevices();
+    const has = list.some((d) => d.kind === 'videoinput');
+    if (has !== S.hasCam) {
+      S.hasCam = has;
+      renderSelfShare();
+    }
+  } catch {}
+}
+navigator.mediaDevices?.addEventListener?.('devicechange', checkCamera);
+setTimeout(checkCamera, 500);
 
 // =====================================================================
 //  Sahne alt çubuğu (Discord'daki arama kontrolleri) ve sohbeti gizle/göster
@@ -4402,7 +4415,8 @@ function renderCallBar() {
     b.title = title;
     b.className = `cb-btn ${cls || ''}`;
   };
-  set('#cb-camera', cam ? ICON.camera : ICON.cameraOff, cam ? 'Kamerayı kapat' : 'Kamerayı aç', cam ? 'on' : '');
+  set('#cb-camera', cam ? ICON.camera : ICON.cameraOff, cam ? 'Kamerayı kapat' : S.hasCam === false ? 'Bu bilgisayarda kamera bulunamadı' : 'Kamerayı aç', cam ? 'on' : '');
+  $('#cb-camera').disabled = !cam && S.hasCam === false;
   set('#cb-share', ICON.screen, screens ? 'Bir ekran daha paylaş' : 'Ekranını paylaş', screens ? 'on' : '');
   if (!S.channelId) $('#sfx-pop').classList.add('hidden');
   set('#cb-sfx', ICON_SFX, 'Ses efektleri', $('#sfx-pop').classList.contains('hidden') ? '' : 'on');

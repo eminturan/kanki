@@ -352,7 +352,9 @@ function gateCallBar() {
   if ($('#cb-sfx')) $('#cb-sfx').disabled = !!micLock;
   // Zaman aşımında yayın, kamera ve birlikte izle açılamaz (sunucu da kapatır)
   const timed = !!myTimeout();
-  for (const id of ['#cb-camera', '#cb-watch']) if ($(id)) $(id).disabled = timed;
+  if ($('#cb-watch')) $('#cb-watch').disabled = timed;
+  // Kamera: zaman aşımında ya da bilgisayarda kamera yokken pasif
+  if ($('#cb-camera')) $('#cb-camera').disabled = timed || (S.hasCam === false && !myCamera());
   if (timed) for (const id of ['#btn-camera', '#btn-share', '#cb-share']) if ($(id)) $(id).disabled = true; // süre bitince renderSelfShare eski haline getirir
   for (const id of ['#btn-mic', '#cb-mic']) {
     const b = $(id);
