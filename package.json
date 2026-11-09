@@ -1,7 +1,7 @@
 {
   "name": "kanki",
   "productName": "Kanki",
-  "version": "1.0.41",
+  "version": "1.0.42",
   "description": "Arkadaşlarla sesli sohbet ve yüksek kaliteli ekran paylaşımı (macOS + Windows)",
   "main": "src/main/main.js",
   "author": "Kanki",
