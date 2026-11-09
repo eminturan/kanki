@@ -1607,3 +1607,15 @@ label.check.locked { opacity: .55; cursor: not-allowed; }
 /* Oyun içi katman kapalıyken alt seçenekler soluk ve pasif */
 .overlay-sub { transition: opacity .15s; }
 .overlay-sub.off { opacity: .45; pointer-events: none; }
+
+/* Güncelleme düğmesi yeri JS ile başlık satırına göre ayarlanır (placeUpdateBtn); duyuru bandı kaydırması gereksiz */
+body:has(#ann-banner:not(.hidden)) .update-btn { translate: none; }
+
+/* Müzik çubuğu: birlikte izledeki gibi tutamaç nokta */
+#music-bar .mb-progress i { position: relative; }
+#music-bar .mb-progress.seekable i::after {
+  content: ""; position: absolute; right: -6px; top: 50%; width: 12px; height: 12px; margin-top: -6px; border-radius: 50%;
+  background: var(--accent); box-shadow: 0 0 0 2px var(--bg-1), 0 1px 4px rgba(0, 0, 0, .4); scale: .75; transition: scale .12s;
+}
+#music-bar .mb-progress.seekable:hover i::after, #music-bar .mb-progress[data-drag] i::after { scale: 1.1; }
+#music-bar .mb-progress { overflow: visible; }

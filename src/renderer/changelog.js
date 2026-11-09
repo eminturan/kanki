@@ -6,6 +6,13 @@
  */
 const CHANGELOG = [
   {
+    version: '1.0.22',
+    date: '2026-11-09',
+    title: 'Küçük düzeltmeler',
+    added: ['Müzik çubuğunda tutamaç nokta: sararken nerede olduğun belli (birlikte izledeki gibi).'],
+    fixed: ['Güncelleme düğmesi yeni tasarımda panelin köşesine kaymıştı; artık başlık satırının sağında duruyor.'],
+  },
+  {
     version: '1.0.21',
     date: '2026-11-09',
     title: 'Oyun ve şarkı birlikte, video kalitesi, düzenlemeler',

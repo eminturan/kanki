@@ -3231,6 +3231,7 @@ function renderUpdate(u) {
   const active = u && (u.state === 'downloading' || u.state === 'ready');
   btn.classList.toggle('hidden', !active);
   document.body.classList.toggle('has-update', !!active); // sağ üstte ona yer açılır
+  requestAnimationFrame(placeUpdateBtn);
   if (!active) {
     $('#launch-update').classList.add('hidden');
     return;
@@ -3268,6 +3269,23 @@ function renderUpdate(u) {
 }
 kanki.onUpdate(renderUpdate);
 kanki.updateState().then(renderUpdate);
+// Güncelleme düğmesi görünen başlık satırının (sohbet ya da sahne) sağ ucuna, dikeyde ortalı yerleşir
+// (yüzen paneller, bitişik paneller, Mac başlık çubuğu ve duyuru bandı fark etmeksizin)
+function placeUpdateBtn() {
+  const btn = $('#update-btn');
+  if (btn.classList.contains('hidden')) return;
+  const heads = [...document.querySelectorAll('#app .chat-head, #app .stage-head')].filter((x) => x.offsetParent);
+  const head = heads.sort((a, b) => b.getBoundingClientRect().right - a.getBoundingClientRect().right)[0];
+  if (!head || $('#app').classList.contains('hidden')) {
+    btn.style.top = btn.style.right = '';
+    return;
+  }
+  const r = head.getBoundingClientRect();
+  btn.style.top = `${Math.round(r.top + (r.height - 32) / 2)}px`;
+  btn.style.right = `${Math.round(innerWidth - r.right + 12)}px`;
+}
+addEventListener('resize', placeUpdateBtn);
+setInterval(placeUpdateBtn, 500);
 $('#update-btn').addEventListener('click', () => {
   const btn = $('#update-btn');
   if (!btn.classList.contains('ready')) return;
