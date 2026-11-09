@@ -710,7 +710,7 @@ function voteItems(u) {
   if (others < 2) return [];
   return [
     '-',
-    { label: '🗳️ Oylamayla 10 dakika sustur', run: () => send({ t: 'voteStart', to: u.id, action: 'mute' }) },
+    { label: '🗳️ Oylamayla 1 dakika sustur', run: () => send({ t: 'voteStart', to: u.id, action: 'mute' }) },
     S.afk?.channelId && S.channelId !== S.afk.channelId && { label: "🗳️ Oylamayla AFK'ya gönder", run: () => send({ t: 'voteStart', to: u.id, action: 'afk' }) },
   ];
 }
@@ -725,7 +725,7 @@ function onVoteEnd(m) {
   S.votes.delete(m.id);
   S.myVotes.delete(m.id);
   renderVotes();
-  const what = m.action === 'mute' ? '10 dakika susturuldu' : "AFK kanalına gönderildi";
+  const what = m.action === 'mute' ? '1 dakika susturuldu' : "AFK kanalına gönderildi";
   toast(m.passed ? `🗳️ ${m.targetName} ${what}` : `🗳️ Oylama reddedildi`, m.passed ? 'Kanal oylaması kabul edildi.' : `${m.targetName} için yeterli oy çıkmadı.`);
 }
 function castVote(v, yes) {
@@ -738,7 +738,7 @@ function renderVotes() {
   box.replaceChildren();
   for (const v of S.votes.values()) {
     const target = v.targetId === S.myId;
-    const what = v.action === 'mute' ? '10 dakika susturmak' : "AFK kanalına göndermek";
+    const what = v.action === 'mute' ? '1 dakika susturmak' : "AFK kanalına göndermek";
     const left = Math.max(0, Math.ceil((v.until - Date.now()) / 1000));
     const my = S.myVotes.get(v.id);
     const card = h(

@@ -171,7 +171,7 @@ Kalkan düğmesi ya da sunucu menüsü › Sunucu ayarları. Sekmeler: Genel Bak
 - **Genel Bakış:** sunucu adı, açıklama, şifre, hoş geldin mesajı, duyuru bandı, AFK kanalı ve süresi, GIF anahtarı, bağlantı önizlemeleri.
 - **Yasak:** cihaz ve (internetten bağlanıyorsa) IP adresi yasaklanır. Yasaklılar sekmesinden kaldırılır.
 - **AFK:** hem hareketsiz hem sessiz kalan kişi kendiliğinden AFK kanalına geçer (varsayılan 15 dk, 0 = kapalı); yayın izleyen ya da açan taşınmaz.
-- **Oylamayla susturma / AFK:** kişiye sağ tık. Kanaldakilerin %75'i (en az 2 kişi) evet derse 10 dakika susturulur ya da AFK'ya taşınır. Oylama cihaz başına sayılır.
+- **Oylamayla susturma / AFK:** kişiye sağ tık. Kanaldakilerin %75'i (en az 2 kişi) evet derse 1 dakika susturulur ya da AFK'ya taşınır. Oylama cihaz başına sayılır.
 - **Denetim kaydı:** kim, kime, ne yaptı; kişiye ve işleme göre süzülür (son 500 kayıt).
 - Bu ayarlar (roller, üyelerin rolleri, yasaklar, AFK, GIF anahtarı, duyuru) Kanki Admin'in veri klasöründe `server-config.json` içinde saklanır; mesajlar saklanmaz.
 

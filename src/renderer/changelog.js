@@ -6,6 +6,12 @@
  */
 const CHANGELOG = [
   {
+    version: '1.0.27',
+    date: '2026-11-09',
+    title: 'Oylamayla susturma 1 dakika',
+    changed: ['Oylamayla susturma artık 10 dakika değil 1 dakika sürüyor.'],
+  },
+  {
     version: '1.0.26',
     date: '2026-11-09',
     title: 'Tarayıcıdan katılma ayarı',

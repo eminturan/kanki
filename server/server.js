@@ -657,7 +657,7 @@ function startServer(opts = {}) {
     const target = users.get(v.targetId);
     if (!passed || !target || target.channelId !== v.channelId) return;
     if (v.action === 'mute') {
-      const until = Date.now() + 10 * 60 * 1000;
+      const until = Date.now() + 60 * 1000;
       if (voteMutes.size > 5000) for (const [k, t] of voteMutes) if (t <= Date.now()) voteMutes.delete(k);
       voteMutes.set(target.clientKey, until);
       // Aynı cihazın bütün bağlantıları susar (yeniden bağlanınca da sürer)
@@ -665,7 +665,7 @@ function startServer(opts = {}) {
         u.muted = true;
         send(u.ws, { t: 'forceMute', by: 'Kanal oylaması', until });
       }
-      setTimeout(() => broadcastState(), 10 * 60 * 1000 + 500).unref?.();
+      setTimeout(() => broadcastState(), 60 * 1000 + 500).unref?.();
       broadcastState();
     } else if (afkId()) {
       send(target.ws, { t: 'moved', by: 'Kanal oylaması' });
