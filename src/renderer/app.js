@@ -1812,6 +1812,7 @@ function onMessage(m) {
       const prevUsers = S.users;
       S.afk = m.afk || null;
       S.serverName = m.serverName;
+      if (typeof m.flashCooldown === 'number') S.flashCd = m.flashCooldown;
       if (m.iconV !== S.iconV) syncServerIcon(m.iconV);
       S.channels = m.channels;
       S.users = new Map(m.users.map((u) => [u.id, u]));
@@ -1966,6 +1967,9 @@ function onMessage(m) {
       break;
     case 'flash':
       onFlashed(m);
+      break;
+    case 'flashSent':
+      onFlashSent(m);
       break;
     case 'poke':
       if (effectivePresence() === 'dnd') {
@@ -2650,7 +2654,7 @@ function userMenu(e, u) {
       run: () =>
         pokeUser(u),
     },
-    canFlash(u) && { label: '💥 Flash at', run: () => flashUser(u) },
+    flashMenuItem(u),
     !sameChannel && { label: 'Kanalına git', run: () => joinChannel(u.channelId) },
     ...voteItems(u),
     ...(mod.length ? ['-', { html: '<div class="ctx-label">Moderasyon</div>' }, ...mod] : []),
@@ -2716,8 +2720,9 @@ function showCtx(e, items) {
         h(
           'div',
           {
-            class: `ctx-item ${it.danger ? 'danger' : ''}`,
+            class: `ctx-item ${it.danger ? 'danger' : ''} ${it.disabled ? 'disabled' : ''}`,
             onclick: () => {
+              if (it.disabled) return;
               hideCtx();
               it.run();
             },
@@ -4531,9 +4536,20 @@ const sfxSupported = () => !!S.features?.has('sfx');
 //  Flash (CS gibi): yetkisi olan kişiye sağ tıklayıp atar, karşı tarafın bütün ekranları beyaz olur
 // =====================================================================
 const canFlash = (u) => !!u && !u.bot && u.id !== S.myId && feat('flash') && can('flash');
+// Bekleme süresi (Sunucu Ayarları › Genel Bakış › Flash): kalan saniye, menüde gösterilir
+const flashLeft = () => Math.max(0, Math.ceil(((S.flashAt || 0) + (S.flashCd || 0) * 1000 - Date.now()) / 1000));
+function flashMenuItem(u) {
+  if (!canFlash(u)) return null;
+  const left = flashLeft();
+  return left ? { label: `💥 Flash at (${left} sn)`, disabled: true } : { label: '💥 Flash at', run: () => flashUser(u) };
+}
 function flashUser(u) {
   send({ t: 'flash', to: u.id });
-  toast(`💥 ${u.name} kişisine flash attın`, '', '', 2500);
+}
+function onFlashSent(m) {
+  S.flashAt = Date.now();
+  if (typeof m.cooldown === 'number') S.flashCd = m.cooldown;
+  toast(`💥 ${userName(m.to)} kişisine flash attın`, S.flashCd ? `Tekrar atmak için ${S.flashCd} saniye bekle.` : '', '', 2500);
 }
 function onFlashed(m) {
   logEvent('💥', `${m.name} sana flash attı`, { hot: true });

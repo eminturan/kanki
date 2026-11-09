@@ -483,7 +483,14 @@ function startServer(opts = {}) {
       description: conf.description || '',
       announcement: conf.announcement || null,
       iconV: iconV(),
+      flashCooldown: flashCooldown(),
     });
+  }
+  // Flash bekleme süresi (saniye, 0 = sınırsız). Ayarlanmadıysa 30 sn.
+  const flashAt = new Map();
+  function flashCooldown() {
+    const v = Number(conf.flashCooldown);
+    return Number.isFinite(v) && v >= 0 ? Math.min(3600, Math.floor(v)) : 30;
   }
   // Sunucu resmi: sadece sürüm numarası mesajlarla gider, resmin kendisi /icon adresinden bir kez indirilir (ngrok kotası)
   function iconV() {
@@ -1229,7 +1236,7 @@ function startServer(opts = {}) {
           admin: isAdmin,
           mod: isModUser(me),
           token: me.token,
-          features: ['sfx', 'activity', 'log', 'pins', 'polls', 'votes', 'files', 'preview', 'gif', 'roles', 'chpass', 'afk', 'bans', 'marks', 'watch', 'perms', 'audit', 'timeout', 'serverDeafen', 'moveAll', 'purge', 'slowmode', 'readOnly', 'announce', 'welcomeMessage', 'headers', 'afkMic', 'webClient', 'info', 'leaveVoice', 'icon', 'flash'],
+          features: ['sfx', 'activity', 'log', 'pins', 'polls', 'votes', 'files', 'preview', 'gif', 'roles', 'chpass', 'afk', 'bans', 'marks', 'watch', 'perms', 'audit', 'timeout', 'serverDeafen', 'moveAll', 'purge', 'slowmode', 'readOnly', 'announce', 'welcomeMessage', 'headers', 'afkMic', 'webClient', 'info', 'leaveVoice', 'icon', 'flash', 'flashCooldown'],
           // Roller ve yetkiler
           perms: [...permsOf(me)],
           roles: userRoleIds(me),
@@ -1766,7 +1773,18 @@ function startServer(opts = {}) {
           // Flash (CS gibi): sadece hedefe gider, karşı tarafın bütün ekranları kısa süre beyaz olur
           const target = users.get(m.to);
           if (!target || target.bot || target === me) break;
+          // Sıklık Sunucu Ayarları'ndaki bekleme süresine göre (kişi başı; yeniden bağlanınca sıfırlanmasın diye cihaz anahtarıyla)
+          const cd = flashCooldown() * 1000;
+          const now = Date.now();
+          const last = flashAt.get(me.clientKey || me.id) || 0;
+          if (cd && now - last < cd) {
+            const left = Math.ceil((cd - (now - last)) / 1000);
+            errorTo(me, `Tekrar flash atmak için ${left} saniye bekle.`, 'info', { flashLeft: left });
+            break;
+          }
+          flashAt.set(me.clientKey || me.id, now);
           send(target.ws, { t: 'flash', from: me.id, name: me.name });
+          send(ws, { t: 'flashSent', to: target.id, cooldown: flashCooldown() });
           break;
         }
         case 'sfx': {
@@ -2254,6 +2272,7 @@ function startServer(opts = {}) {
           if (typeof m.turnUrl === 'string') set('turnUrl', m.turnUrl.trim().slice(0, 400), 'TURN adresi');
           if (typeof m.turnUser === 'string') set('turnUser', m.turnUser.trim().slice(0, 200), 'TURN kullanıcı adı');
           if (typeof m.turnPass === 'string') set('turnPass', m.turnPass.slice(0, 200), 'TURN şifresi');
+          if ('flashCooldown' in m) set('flashCooldown', Math.max(0, Math.min(3600, Math.floor(Number(m.flashCooldown) || 0))), 'flash bekleme süresi');
           if (typeof m.icon === 'string') {
             // Sunucu resmi: küçültülmüş PNG/JPEG/WebP/GIF (en fazla ~256 KB), boş metin kaldırır
             const ok = m.icon === '' || (m.icon.length <= 350000 && /^data:image\/(?:png|jpeg|webp|gif);base64,[A-Za-z0-9+/=]+$/.test(m.icon));
@@ -2367,6 +2386,7 @@ function startServer(opts = {}) {
             turnUser: conf.turnUser || '',
             turnSet: !!conf.turnPass,
             webClient: conf.webClient === true,
+            flashCooldown: flashCooldown(),
             announcement: conf.announcement || null,
             audit: can(me, 'viewAudit') ? auditLog.slice(-100).reverse() : [],
           });

@@ -6,6 +6,15 @@
  */
 const CHANGELOG = [
   {
+    version: '1.0.37',
+    date: '2026-11-09',
+    title: 'Flash bekleme süresi',
+    added: [
+      'Sunucu Ayarları › Genel Bakış › 💥 Flash: bir kişinin ne sıklıkta flash atabileceği saniye olarak ayarlanır (başta 30 sn, 0 = sınırsız). Sunucu sahibi dahil herkese uygulanır.',
+      'Bekleme sürerken sağ tık menüsünde "Flash at (12 sn)" gibi kalan süre görünür.',
+    ],
+  },
+  {
     version: '1.0.36',
     date: '2026-11-09',
     title: 'Flash (CS gibi)',

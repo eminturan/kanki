@@ -187,3 +187,7 @@ body.has-rail .rail { padding-bottom: calc(var(--dock-h, 58px) + 18px); }
 /* Flash: tarayıcıdan girenlerde sayfanın üstünde (masaüstünde bütün monitörlerde ayrı pencere) */
 .flash-page { position: fixed; inset: 0; z-index: 2147483647; background: #fff; pointer-events: none; animation: flash-fade 3s cubic-bezier(.55,0,.85,.4) forwards; }
 @keyframes flash-fade { 0%, 18% { opacity: 1; } 100% { opacity: 0; } }
+
+/* Bağlam menüsünde şu an kullanılamayan seçenek (ör. flash bekleme süresi) */
+.ctx-item.disabled { opacity: .45; cursor: default; pointer-events: auto; }
+.ctx-item.disabled:hover { background: transparent; }

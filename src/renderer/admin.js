@@ -967,7 +967,7 @@ function ssRenderStats() {
   const n = m?.bans?.length || 0;
   $('#ss-n-bans').textContent = n ? String(n) : '';
 }
-const OV_FIELDS = ['#adm-name', '#adm-desc', '#adm-password', '#adm-nopass', '#adm-welcome', '#adm-afk-ch', '#adm-afk-min', '#adm-gif-prov', '#adm-gif-key', '#adm-previews'];
+const OV_FIELDS = ['#adm-name', '#adm-desc', '#adm-password', '#adm-nopass', '#adm-welcome', '#adm-afk-ch', '#adm-afk-min', '#adm-gif-prov', '#adm-gif-key', '#adm-previews', '#adm-flash-cd'];
 function ssFillOverview(force) {
   if (SS.ovDirty && !force) return;
   const m = SS.info;
@@ -998,6 +998,8 @@ function ssFillOverview(force) {
   set('#adm-gif-prov', m?.gifProvider || 'klipy');
   set('#adm-gif-key', '');
   set('#adm-previews', m ? m.linkPreviews !== false : true);
+  set('#adm-flash-cd', m?.flashCooldown ?? S.flashCd ?? 30);
+  $('#adm-flash-card').classList.toggle('hidden', !feat('flashCooldown'));
   $('#adm-gif-state').textContent = m ? (m.hasGifKey ? '(kayıtlı)' : '(girilmedi)') : '';
   ssFillAnnouncement();
 }
@@ -1044,6 +1046,7 @@ $('#ss-save').addEventListener('click', () => {
     cfg.welcomeMessage = $('#adm-welcome').value;
     cfg.linkPreviews = $('#adm-previews').checked;
   }
+  if (feat('flashCooldown')) cfg.flashCooldown = Math.max(0, Math.min(3600, Math.floor(Number($('#adm-flash-cd').value) || 0)));
   void m;
   send(cfg);
   SS.ovDirty = false;
