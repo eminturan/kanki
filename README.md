@@ -158,6 +158,8 @@ Kalkan düğmesi ya da sunucu menüsü › Sunucu ayarları. Sekmeler: Genel Bak
 - **Moderatör:** yeni sunucularda hazır gelen rol. Eski sürümdeki moderatörler otomatik bu rolü alır.
 - **Moderasyon** (kişiye sağ tık): rol ver, taşı, sesten çıkar, sunucuda sustur/sağırlaştır, zaman aşımı (60 sn – 1 hafta; bu sürede yazamaz, konuşamaz, paylaşamaz), at, yasakla.
 - **Kanallar:** şifre, kişi sınırı, yavaş mod, salt okunur, konu; herkesi başka kanala taşı, sohbeti temizle.
+- **Başlık kanalı:** içine kimse giremez, altındaki ses kanallarını gruplar (ör. "Oyun Kanalları"). Kanal oluştururken tür olarak "Başlık" seçilir ya da kanal ayarlarından açılır.
+- **AFK kanalında** mikrofon açılamaz.
 - **Genel Bakış:** sunucu adı, açıklama, şifre, hoş geldin mesajı, duyuru bandı, AFK kanalı ve süresi, GIF anahtarı, bağlantı önizlemeleri.
 - **Yasak:** cihaz ve (internetten bağlanıyorsa) IP adresi yasaklanır. Yasaklılar sekmesinden kaldırılır.
 - **AFK:** hem hareketsiz hem sessiz kalan kişi kendiliğinden AFK kanalına geçer (varsayılan 15 dk, 0 = kapalı); yayın izleyen ya da açan taşınmaz.

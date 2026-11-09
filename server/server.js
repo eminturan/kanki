@@ -164,7 +164,9 @@ function startServer(opts = {}) {
     fs.writeFileSync(textMarker, '1');
   } catch {}
   const isText = (cid) => channels.find((c) => c.id === cid)?.type === 'text';
-  const lobbyId = () => channels.find((c) => c.type !== 'text' && !c.pwHash)?.id || channels.find((c) => c.type !== 'text')?.id;
+// Başlık kanalı (header): sadece altındaki kanalları gruplar, içine kimse giremez
+  const joinable = (c) => !!c && c.type !== 'text' && !c.header;
+  const lobbyId = () => channels.find((c) => joinable(c) && !c.pwHash)?.id || channels.find(joinable)?.id;
 
   // ---------- Kalıcı sunucu ayarları (sohbet değil): roller, üyeler, yasaklar, AFK, GIF anahtarı, duyuru ----------
   // Sohbet mesajları burada ASLA tutulmaz.
@@ -182,7 +184,9 @@ function startServer(opts = {}) {
       log('Ayarlar kaydedilemedi:', e.message);
     }
   }
-  const afkId = () => (channels.find((c) => c.id === conf.afkChannelId && c.type !== 'text') || channels.find((c) => c.type !== 'text' && /^afk$/i.test(c.name)))?.id || null;
+  const afkId = () => (channels.find((c) => c.id === conf.afkChannelId && joinable(c)) || channels.find((c) => joinable(c) && /^afk$/i.test(c.name)))?.id || null;
+  // AFK kanalında mikrofon açılamaz
+  const inAfk = (u) => !!u && !u.bot && !!u.channelId && u.channelId === afkId();
   const hashPw = (salt, pw) => crypto.scryptSync(String(pw), String(salt), 32).toString('hex');
   // Kanal şifresinin özeti kimseye gönderilmez; sadece "kilitli" bilgisi gider
   const publicChannel = (c) => {
@@ -521,12 +525,16 @@ function startServer(opts = {}) {
       return;
     }
     const target = channels.find((c) => c.id === channelId);
-    if (!target || target.type === 'text') return; // yazı kanalına katılınmaz, sadece okunur
+    if (!joinable(target)) return; // yazı kanalına ve başlık kanalına girilmez
     const old = u.channelId;
     if (old === channelId) return;
     u.channelId = channelId;
     u.sharing = false;
     u.shares = [];
+    if (inAfk(u) && !u.muted) {
+      u.muted = true;
+      send(u.ws, { t: 'forceMute', by: 'Sunucu', server: true, afk: true });
+    }
     // Giriş/çıkış sohbete yazılmaz; uygulamadaki "Geçmiş" sekmesine düşer
     activity({ kind: 'move', id: u.id, name: u.name, from: old || null, to: channelId });
     for (const v of votes.values()) if (v.targetId === u.id) endVote(v, false);
@@ -1104,7 +1112,7 @@ function startServer(opts = {}) {
           admin: isAdmin,
           mod: isModUser(me),
           token: me.token,
-          features: ['sfx', 'activity', 'log', 'pins', 'polls', 'votes', 'files', 'preview', 'gif', 'roles', 'chpass', 'afk', 'bans', 'marks', 'watch', 'perms', 'audit', 'timeout', 'serverDeafen', 'moveAll', 'purge', 'slowmode', 'readOnly', 'announce', 'welcomeMessage'],
+          features: ['sfx', 'activity', 'log', 'pins', 'polls', 'votes', 'files', 'preview', 'gif', 'roles', 'chpass', 'afk', 'bans', 'marks', 'watch', 'perms', 'audit', 'timeout', 'serverDeafen', 'moveAll', 'purge', 'slowmode', 'readOnly', 'announce', 'welcomeMessage', 'headers', 'afkMic'],
           // Roller ve yetkiler
           perms: [...permsOf(me)],
           roles: userRoleIds(me),
@@ -1130,7 +1138,7 @@ function startServer(opts = {}) {
           return;
         }
         send(ws, { t: 'botState', state: botState });
-        const wch = channels.find((c) => c.id === m.channelId && c.type !== 'text');
+        const wch = channels.find((c) => c.id === m.channelId && joinable(c));
         // Şifreli ya da dolu kanala yeniden bağlanırken Lobi'ye düşülür
         const bypass = can(me, 'moveMembers') || can(me, 'manageChannels');
         const wanted = wch && (bypass || (!wch.pwHash && !(wch.limit && voiceCount(wch.id) >= wch.limit))) ? wch.id : lobbyId();
@@ -1174,6 +1182,10 @@ function startServer(opts = {}) {
         case 'join': {
           const ch = channels.find((c) => c.id === m.channelId);
           if (!ch || ch.type === 'text' || ch.id === me.channelId) break;
+          if (ch.header) {
+            errorTo(me, `${ch.name} bir başlık; içine girilemez, altındaki kanallardan birini seç.`, 'header_channel');
+            break;
+          }
           if (!can(me, 'moveMembers') && !can(me, 'manageChannels')) {
             if (ch.limit && voiceCount(ch.id) >= ch.limit) {
               errorTo(me, `${ch.name} dolu (en fazla ${ch.limit} kişi).`, 'channel_full');
@@ -1195,7 +1207,8 @@ function startServer(opts = {}) {
           // Sunucu susturması / zaman aşımı / sağırlaştırma kişinin kendisi tarafından kaldırılamaz
           const forcedMute = serverMuted(me) || timedOut(me);
           if ('muted' in m) {
-            me.muted = !!m.muted || voteMutedUntil(me) > Date.now() || forcedMute;
+            me.muted = !!m.muted || voteMutedUntil(me) > Date.now() || forcedMute || inAfk(me);
+            if (!m.muted && !forcedMute && inAfk(me)) send(ws, { t: 'forceMute', by: 'Sunucu', server: true, afk: true });
             if (!m.muted && forcedMute && !me.bot) send(ws, { t: 'forceMute', by: timedOut(me) ? timeouts.get(me.clientKey)?.by || 'Sunucu' : 'Sunucu', server: true, until: timeoutUntil(me) || undefined });
           }
           if ('deafened' in m) me.deafened = !!m.deafened || serverDeafened(me);
@@ -1653,6 +1666,7 @@ function startServer(opts = {}) {
           const slow = clampSlow(m.slowmode);
           if (slow) ch.slowmode = slow;
           if (m.readOnly) ch.readOnly = true;
+          if (m.header && !text) ch.header = true;
           channels.push(ch);
           saveChannels();
           broadcastState();
@@ -1710,7 +1724,7 @@ function startServer(opts = {}) {
           // channelId: null → sesten çıkar
           const target = users.get(m.to);
           const out = m.channelId === null || m.channelId === '';
-          const dest = !out && channels.find((c) => c.id === m.channelId && c.type !== 'text');
+          const dest = !out && channels.find((c) => c.id === m.channelId && joinable(c));
           if (!target || (!out && !dest)) break;
           if (target.id !== me.id && !outranks(me, target)) {
             hierErr(me);
@@ -1734,7 +1748,7 @@ function startServer(opts = {}) {
           // Bir ses kanalındaki herkesi başka kanala taşı (channelId: null → hepsini sesten çıkar)
           const from = channels.find((c) => c.id === m.from && c.type !== 'text');
           const out = m.channelId === null || m.channelId === '';
-          const dest = !out && channels.find((c) => c.id === m.channelId && c.type !== 'text');
+          const dest = !out && channels.find((c) => c.id === m.channelId && joinable(c));
           if (!from || (!out && !dest) || from.id === dest?.id) break;
           let moved = 0;
           let skipped = 0;
@@ -2049,6 +2063,13 @@ function startServer(opts = {}) {
             if (s) ch.slowmode = s;
             else delete ch.slowmode;
           }
+          if (voice && 'header' in m) {
+            if (!!m.header !== !!ch.header) changes.push(m.header ? 'başlık kanalı (girilemez)' : 'normal ses kanalı');
+            if (m.header) {
+              ch.header = true;
+              if (ch.id === conf.afkChannelId) (conf.afkChannelId = null), saveConf();
+            } else delete ch.header;
+          }
           if ('readOnly' in m) {
             if (!!m.readOnly !== !!ch.readOnly) changes.push(m.readOnly ? 'salt okunur' : 'herkes yazabilir');
             if (m.readOnly) ch.readOnly = true;
@@ -2066,6 +2087,11 @@ function startServer(opts = {}) {
               ch.name = n;
             }
           }
+          // Başlık yapılan kanaldakiler Lobi'ye taşınır
+          if (ch.header) for (const u of [...users.values()]) if (u.channelId === ch.id) {
+            send(u.ws, { t: 'moved', by: me.name, channelId: lobbyId() });
+            moveUser(u, lobbyId());
+          }
           saveChannels();
           broadcastState();
           send(ws, { t: 'adminNotice', message: `${ch.name} kanalının ayarları kaydedildi.` });
@@ -2080,7 +2106,7 @@ function startServer(opts = {}) {
             changes.push(label);
           };
           if ('afkMinutes' in m) set('afkMinutes', Math.max(0, Math.min(240, Math.floor(Number(m.afkMinutes) || 0))), 'AFK süresi');
-          if ('afkChannelId' in m) set('afkChannelId', channels.find((c) => c.id === m.afkChannelId && c.type !== 'text') ? m.afkChannelId : null, 'AFK kanalı');
+          if ('afkChannelId' in m) set('afkChannelId', channels.find((c) => c.id === m.afkChannelId && joinable(c)) ? m.afkChannelId : null, 'AFK kanalı');
           if (typeof m.gifKey === 'string') set('gifKey', m.gifKey.trim().slice(0, 200), 'GIF anahtarı');
           if (['klipy', 'giphy'].includes(m.gifProvider)) set('gifProvider', m.gifProvider, 'GIF sağlayıcısı');
           if (typeof m.description === 'string') set('description', m.description.trim().slice(0, 300), 'açıklama');

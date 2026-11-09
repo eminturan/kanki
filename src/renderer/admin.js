@@ -95,6 +95,7 @@ function fmtLeft(ms) {
   return `${d} gün${hr % 24 ? ` ${hr % 24} sa` : ''}`;
 }
 function micLockReason() {
+  if (S.afk?.channelId && S.channelId === S.afk.channelId && feat('afkMic')) return 'AFK kanalında mikrofon açılamaz. Başka bir kanala geçince açabilirsin.';
   if (S.modState.serverMuted) return 'Bir yetkili seni sunucuda susturdu. Kaldırılana kadar mikrofonunu açamazsın.';
   if (myTimeout()) return `Zaman aşımındasın; ${fmtLeft(myTimeout())} sonra tekrar konuşabilirsin.`;
   return '';
@@ -627,11 +628,11 @@ function legacyModItems(t) {
 // Ses kanalı menüsü
 function channelMenuItems(ch) {
   const n = [...S.users.values()].filter((u) => u.channelId === ch.id).length;
-  const others = S.channels.filter((c) => c.type !== 'text' && c.id !== ch.id);
+  const others = S.channels.filter((c) => c.type !== 'text' && c.id !== ch.id && !c.header);
   return cleanItems([
-    ch.id !== S.channelId && { label: 'Kanala katıl', run: () => joinChannel(ch.id) },
+    ch.id !== S.channelId && !ch.header && { label: 'Kanala katıl', run: () => joinChannel(ch.id) },
     '-',
-    can('manageChannels') && { label: 'Alt kanal oluştur', run: () => promptChannel(ch.id) },
+    can('manageChannels') && { label: ch.header ? 'Bu başlığa kanal ekle' : 'Alt kanal oluştur', run: () => promptChannel(ch.id) },
     can('manageChannels') && { label: 'Yeniden adlandır', run: () => renameChannel(ch) },
     can('manageChannels') && { label: 'Kanal ayarları…', run: () => channelSettings(ch) },
     can('moveMembers') &&
@@ -693,8 +694,9 @@ function channelSettings(ch) {
     fields: [
       { key: 'name', label: 'Kanal adı', value: ch.name, max: 40 },
       { key: 'topic', label: 'Konu (isteğe bağlı)', value: ch.topic || '', max: 200, placeholder: 'Bu kanal ne için?' },
-      !text && feat('chpass') && { key: 'limit', label: 'Kişi sınırı (0 = sınırsız)', type: 'number', value: ch.limit || 0, min: 0, maxNum: 99 },
-      !text && feat('chpass') && { key: 'password', label: ch.locked ? 'Yeni şifre (boş bırakırsan değişmez)' : 'Şifre (boş bırakırsan şifresiz)', type: 'password', max: 100 },
+      !text && feat('headers') && { key: 'header', label: 'Başlık kanalı (kimse giremez, altındaki kanalları gruplar)', type: 'check', value: !!ch.header },
+      !text && feat('chpass') && { key: 'limit', label: 'Kişi sınırı (0 = sınırsız)', type: 'number', value: ch.limit || 0, min: 0, maxNum: 99, showIf: (v) => !v.header },
+      !text && feat('chpass') && { key: 'password', label: ch.locked ? 'Yeni şifre (boş bırakırsan değişmez)' : 'Şifre (boş bırakırsan şifresiz)', type: 'password', max: 100, showIf: (v) => !v.header },
       !text && feat('chpass') && ch.locked && { key: 'clear', label: 'Şifreyi kaldır', type: 'check' },
       feat('slowmode') && { key: 'slow', label: 'Yavaş mod', type: 'select', value: String(ch.slowmode || 0), options: slowOpts.map(([v, l]) => [String(v), l]) },
       text && feat('readOnly') && { key: 'ro', label: 'Salt okunur (sadece yetkililer yazabilir)', type: 'check', value: !!ch.readOnly },
@@ -709,6 +711,7 @@ function channelSettings(ch) {
       else if (v.password) msg.password = v.password;
       if ('slow' in v) msg.slowmode = Number(v.slow) || 0;
       if ('ro' in v) msg.readOnly = !!v.ro;
+      if ('header' in v && !!v.header !== !!ch.header) msg.header = !!v.header;
       send(msg);
     },
   });
@@ -750,10 +753,11 @@ function createChannelForm(type = 'voice') {
         options: [
           ['voice', '🔊 Ses kanalı — konuşma, ekran paylaşımı'],
           ['text', '# Yazı kanalı — sese katılmadan herkes yazar'],
+          ...(feat('headers') ? [['header', '📁 Başlık — kimse giremez, altına kanal eklenir (ör. Oyun Kanalları)']] : []),
         ],
       },
       { key: 'name', label: 'Kanal adı', max: 40, placeholder: 'yeni-kanal' },
-      { key: 'parent', label: 'Üst kanal', type: 'select', value: '', options: [['', '— yok (en üstte) —'], ...voice.map((c) => [c.id, c.name])], showIf: (v) => v.type === 'voice' },
+      { key: 'parent', label: 'Üst kanal ya da başlık', type: 'select', value: '', options: [['', '— yok (en üstte) —'], ...voice.map((c) => [c.id, c.header ? `📁 ${c.name}` : c.name])], showIf: (v) => v.type !== 'text' },
       feat('slowmode') && { key: 'slow', label: 'Yavaş mod', type: 'select', value: '0', options: SLOW_OPTIONS.map(([v, l]) => [String(v), l]), showIf: (v) => v.type === 'text' },
       feat('readOnly') && { key: 'ro', label: 'Salt okunur (sadece yetkililer yazabilir)', type: 'check', showIf: (v) => v.type === 'text' },
     ],
@@ -764,7 +768,7 @@ function createChannelForm(type = 'voice') {
         return false;
       }
       const text = v.type === 'text';
-      send({ t: 'createChannel', name: v.name.trim(), type: text ? 'text' : undefined, parent: text ? null : v.parent || null, slowmode: text ? Number(v.slow) || 0 : undefined, readOnly: text ? !!v.ro : undefined });
+      send({ t: 'createChannel', name: v.name.trim(), type: text ? 'text' : undefined, header: v.type === 'header' || undefined, parent: text ? null : v.parent || null, slowmode: text ? Number(v.slow) || 0 : undefined, readOnly: text ? !!v.ro : undefined });
     },
   });
 }
@@ -940,7 +944,7 @@ function ssFillOverview(force) {
   set('#adm-welcome', m?.welcomeMessage || '');
   const afk = $('#adm-afk-ch');
   if (document.activeElement !== afk || force) {
-    afk.replaceChildren(h('option', { value: '' }, '— yok —'), ...S.channels.filter((c) => c.type !== 'text').map((c) => h('option', { value: c.id }, c.name)));
+    afk.replaceChildren(h('option', { value: '' }, '— yok —'), ...S.channels.filter((c) => c.type !== 'text' && !c.header).map((c) => h('option', { value: c.id }, c.name)));
     afk.value = m?.afkChannelId || S.afk?.channelId || '';
   }
   set('#adm-afk-min', m?.afkMinutes ?? S.afk?.minutes ?? 15);
@@ -1388,6 +1392,7 @@ function renderChannelsPane(force = false) {
     if (ch.limit) tags.push(h('span', { class: 'ss-tag' }, `👥 en fazla ${ch.limit}`));
     if (ch.slowmode) tags.push(h('span', { class: 'ss-tag' }, `🐢 yavaş mod ${fmtLeft(ch.slowmode * 1000)}`));
     if (ch.readOnly) tags.push(h('span', { class: 'ss-tag' }, '👁 salt okunur'));
+    if (ch.header) tags.push(h('span', { class: 'ss-tag' }, '📁 başlık · girilemez'));
     if (S.afk?.channelId === ch.id) tags.push(h('span', { class: 'ss-tag' }, '💤 AFK'));
     const ico = h('span', { class: 'ss-ch-ico' });
     ico.innerHTML = text ? ICON_HASH : ICON.channel;

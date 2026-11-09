@@ -6,6 +6,15 @@
  */
 const CHANGELOG = [
   {
+    version: '1.0.23',
+    date: '2026-11-09',
+    title: 'Başlık kanalları, AFK’da mikrofon kapalı',
+    added: [
+      'Başlık kanalı: kimsenin giremediği, altındaki kanalları gruplayan kanal (ör. “Oyun Kanalları” altında Oyun kanalı 1, 2…). Kanal oluştururken türü “Başlık” seç ya da var olan kanalın ayarlarında “Başlık kanalı”nı aç. Başlığa tıklayınca altı açılıp kapanır.',
+      'AFK kanalında mikrofon açılamaz; kanala girince kapanır, başka kanala geçince tekrar açabilirsin. Kanal listesinde AFK kanalının yanında 💤 görünür.',
+    ],
+  },
+  {
     version: '1.0.22',
     date: '2026-11-09',
     title: 'Küçük düzeltmeler',

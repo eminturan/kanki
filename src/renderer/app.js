@@ -1969,7 +1969,8 @@ function onMessage(m) {
       break;
     case 'forceMute':
       if (m.server) {
-        // Sunucu susturması / zaman aşımı: kilit admin.js'de, bildirimi modState gösterir
+        // Sunucu susturması / zaman aşımı / AFK kanalı: kilit admin.js'de, bildirimi modState gösterir
+        if (m.afk) toast('💤 AFK kanalındasın', 'Burada mikrofon açılamaz. Başka bir kanala geçince açabilirsin.', '', 4500);
         if (!S.muted) toggleMute(true);
         renderControls();
         break;
@@ -2037,7 +2038,40 @@ function renderTree() {
   tree.innerHTML = '';
   const walk = (parent, depth) => {
     for (const ch of childrenOf(parent)) {
+      // Başlık kanalı: kimse giremez; altındaki kanalları gruplar, tıklayınca açılır/kapanır
+      if (ch.header) {
+        const closed = !!settings.closedHeaders?.[ch.id];
+        const hrow = h(
+          'div',
+          {
+            class: `ch ch-header ${closed ? 'closed' : ''}`,
+            title: closed ? 'Başlık — açmak için tıkla' : 'Başlık — içine girilmez; kapatmak için tıkla',
+            onclick: () => {
+              settings.closedHeaders = { ...(settings.closedHeaders || {}), [ch.id]: !closed };
+              if (closed) delete settings.closedHeaders[ch.id];
+              saveSettings();
+              renderTree();
+            },
+            oncontextmenu: (e) => channelMenu(e, ch),
+          },
+          h('span', { class: 'ch-caret' }, '▾'),
+          h('span', { class: 'ch-name' }, ch.name)
+        );
+        hrow.style.paddingLeft = 8 + depth * 16 + 'px';
+        tree.append(hrow);
+        // Kapalı başlıkta sadece benim olduğum kanal görünür (Discord gibi)
+        if (!closed) walk(ch.id, depth + 1);
+        else {
+          const mine = (function find(p) {
+            for (const c of childrenOf(p)) if (c.id === S.channelId || find(c.id)) return true;
+            return false;
+          })(ch.id);
+          if (mine) walk(ch.id, depth + 1);
+        }
+        continue;
+      }
       const members = [...S.users.values()].filter((u) => u.channelId === ch.id).sort((a, b) => a.name.localeCompare(b.name, 'tr'));
+      const isAfk = S.afk?.channelId === ch.id;
       const row = h(
         'div',
         {
@@ -2059,6 +2093,7 @@ function renderTree() {
         },
         h('span', { class: 'ch-ico' }),
         h('span', { class: 'ch-name' }, ch.name),
+        isAfk ? h('span', { class: 'ch-afk', title: 'AFK kanalı: burada mikrofon açılamaz' }, '💤') : null,
         ch.locked ? h('span', { class: 'ch-lock', title: 'Şifreli kanal' }, '🔒') : null,
         members.length || ch.limit ? h('span', { class: 'ch-count', title: ch.limit ? `En fazla ${ch.limit} kişi` : '' }, ch.limit ? `${members.length}/${ch.limit}` : String(members.length)) : null
       );
