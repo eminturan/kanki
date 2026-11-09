@@ -6,6 +6,12 @@
  */
 const CHANGELOG = [
   {
+    version: '1.0.34',
+    date: '2026-11-09',
+    title: 'Sunucudan çıkınca ses kartı düzeltmesi',
+    fixed: ['Bağlantıyı kesince sol alttaki kartta "Ses bağlı" yazısı ve kanal adı kalıyordu; artık çıkınca hemen kayboluyor.'],
+  },
+  {
     version: '1.0.33',
     date: '2026-11-09',
     title: 'Sunucu resmi',

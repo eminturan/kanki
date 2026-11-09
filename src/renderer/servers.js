@@ -121,6 +121,7 @@ function svShow(which) {
   if (which === 'home') renderHome();
   renderRail();
   renderMeBar();
+  syncVoicePanel();
 }
 function showHome() {
   svShow('home');

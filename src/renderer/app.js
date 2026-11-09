@@ -1725,6 +1725,7 @@ function onDisconnected() {
   S.lastChannelId = S.channelId || S.lastChannelId;
   S.channelId = null;
   S.myId = null;
+  syncVoicePanel();
   if (S.intentionalClose) return;
   setConnText('Bağlantı koptu', 'bad');
   $('#reconnect-banner').classList.remove('hidden');
@@ -1734,15 +1735,22 @@ function onDisconnected() {
   }, 2000);
 }
 
+// Sol alttaki ses kartı sadece bir ses kanalındayken görünür (çıkınca eski "Ses bağlı" yazısı kalmasın)
+function syncVoicePanel() {
+  $('.voice-panel')?.classList.toggle('hidden', !(S.myId && S.channelId));
+}
 // Telefon düğmesi: sunucudan tamamen çıkar, ana sayfaya döner
 function disconnect() {
   S.intentionalClose = true;
   clearTimeout(S.reconnectTimer);
-  stopRcHost(true);
-  releaseControl(true);
-  stopAllShares();
-  closeAllPeers();
-  closeAllPopouts();
+  // Temizlikte bir adım hata verse bile çıkış yarım kalmasın, ekran yenilensin
+  for (const step of [() => stopRcHost(true), () => releaseControl(true), () => stopAllShares(), closeAllPeers, closeAllPopouts]) {
+    try {
+      step();
+    } catch (e) {
+      console.warn('disconnect:', e);
+    }
+  }
   S.knownShares = new Set();
   S.layout.clear();
   S.layoutCustom = false;
@@ -1755,6 +1763,7 @@ function disconnect() {
   hideModal('admin-panel');
   S.users.clear();
   S.chat.clear();
+  syncVoicePanel();
   $('#reconnect-banner').classList.add('hidden');
   $('#app').classList.add('hidden');
   if (!S.web && typeof showHome === 'function') return showHome(); // sol çubuklu ana sayfa (servers.js)
@@ -2234,7 +2243,7 @@ function renderStage() {
   $('#stage-sub').textContent = S.channelId ? `${members.length} kişi` : `${[...S.users.values()].filter((u) => !u.bot).length} kişi çevrimiçi`;
   if (!S.channelId && S.myId) $('#stage-title').textContent = S.serverName || '';
   // Ses kanalında değilken ses paneli gizli; sohbet ilk yazı kanalını gösterir
-  $('.voice-panel')?.classList.toggle('hidden', !S.channelId);
+  syncVoicePanel();
   if (S.myId && !S.channelId && !S.chatView) {
     const t = S.channels.find((c) => c.type === 'text');
     if (t)
