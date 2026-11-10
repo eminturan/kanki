@@ -226,6 +226,7 @@
 :root.bg-paused body::before { animation-play-state: paused; }
 /* Performans modu: Kanki arkadayken (oyun oynarken) süs animasyonları da durur: CANLI parıltısı, isim efektleri, yıldırımlar… */
 :root.perf.bg-paused *, :root.perf.bg-paused *::before, :root.perf.bg-paused *::after { animation-play-state: paused !important; }
+:root.perf.bg-paused .pg, :root.perf.bg-paused .pg * { animation-play-state: running !important; } /* ping dalgası pencere arkadayken de oynasın */
 :root.reduce-motion *, :root.reduce-motion *::before, :root.reduce-motion *::after {
   animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important;
 }

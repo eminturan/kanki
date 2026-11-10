@@ -1601,6 +1601,38 @@ body.has-update .layout.chat-hidden .stage-head { padding-right: 56px; }
 .mk-name { font: 700 13px system-ui, sans-serif; fill: #fff; paint-order: stroke; stroke: #000; stroke-width: 3px; }
 .tile.marking video { cursor: crosshair; }
 .tile-btn.mark-btn.on { color: var(--accent); background: var(--accent-soft); }
+
+/* Ping: dalga dalga yayılan halkalar, ortada atanın renginde nokta ve adı */
+.pg { position: absolute; width: 0; height: 0; pointer-events: none; z-index: 4; transition: opacity .6s; }
+.pg.f { opacity: 0; }
+.pg .w {
+  position: absolute; left: -70px; top: -70px; width: 140px; height: 140px; box-sizing: border-box; border-radius: 50%;
+  border: 3px solid var(--c); box-shadow: 0 0 14px var(--c), inset 0 0 14px var(--c); opacity: 0; transform: scale(.06);
+  animation: pg-wave 1.5s cubic-bezier(.2,.6,.35,1) 2;
+}
+.pg .w:nth-child(2) { animation-delay: .3s; }
+.pg .w:nth-child(3) { animation-delay: .6s; }
+@keyframes pg-wave { 0% { opacity: 1; transform: scale(.06); } 70% { opacity: .55; } 100% { opacity: 0; transform: scale(1); } }
+.pg .d {
+  position: absolute; left: -8px; top: -8px; width: 16px; height: 16px; box-sizing: border-box; border-radius: 50%;
+  background: var(--c); border: 2px solid #fff; box-shadow: 0 0 0 2px rgba(0,0,0,.35), 0 0 18px 4px var(--c);
+  animation: pg-dot .5s ease-in-out 6 alternate;
+}
+@keyframes pg-dot { to { transform: scale(1.35); } }
+.pg .n {
+  position: absolute; left: 16px; top: -34px; white-space: nowrap; font: 700 14px var(--font); color: #fff;
+  padding: 3px 9px 3px 8px; border-radius: 10px; background: rgba(8,10,11,.72); border-left: 4px solid var(--c); text-shadow: 0 1px 2px #000;
+}
+.pg .n.fx { left: auto; right: 16px; }
+.pg .n.fy { top: 14px; }
+#ping-page { position: fixed; inset: 0; pointer-events: none; z-index: 9998; overflow: hidden; }
+.ping-pick { position: fixed; inset: 0; z-index: 9999; background: rgba(0,0,0,.14); cursor: crosshair; }
+.ping-pick-hint {
+  position: absolute; left: 50%; top: 28px; transform: translateX(-50%); font: 600 14px var(--font); color: #fff; white-space: pre;
+  background: rgba(8,10,11,.8); padding: 8px 16px; border-radius: 12px; box-shadow: 0 4px 18px rgba(0,0,0,.4);
+}
+.ping-pick-hint b { color: #22d47e; }
+@media (prefers-reduced-motion: reduce) { .pg .w { animation-iteration-count: 1; } .pg .d { animation: none; } }
 .watch-bar {
   position: absolute; left: 10px; right: 10px; bottom: 44px; z-index: 4; display: flex; align-items: center; gap: 8px; padding: 6px 10px;
   border-radius: 8px; background: rgba(0, 0, 0, .72); opacity: 0; transition: opacity .15s;

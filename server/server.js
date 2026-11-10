@@ -68,6 +68,7 @@ const PERMS = [
   ['stream', 'Ekran paylaş', 'Ekranını ya da bir pencereyi yayınlar.', 'ses'],
   ['camera', 'Kamera', 'Kamerasını açar.', 'ses'],
   ['startWatch', 'Birlikte izle', 'Birlikte izlemeyi başlatır ve oynatmayı yönetir.', 'ses'],
+  ['ping', 'Ping at', 'Ping tuşuna basıp ekranda bir yere tıklar: aynı ses kanalındaki herkesin ekranında (yayının üstüne tıkladıysa izlenen yayında) o nokta adı ve rengiyle dalga dalga parlar.', 'ses'],
   ['flash', 'Flash at', 'Kişiye sağ tıklayıp flash atar: karşı tarafın bütün monitörleri birkaç saniye bembeyaz olur (CS gibi).', 'ses'],
 ];
 const PERM_KEYS = PERMS.map((p) => p[0]);
@@ -490,7 +491,14 @@ function startServer(opts = {}) {
       announcement: conf.announcement || null,
       iconV: iconV(),
       flashCooldown: flashCooldown(),
+      pingCooldown: pingCooldown(),
     });
+  }
+  // Ping bekleme süresi (saniye, 0 = sınırsız). Ayarlanmadıysa 3 sn.
+  const pingAt = new Map();
+  function pingCooldown() {
+    const v = Number(conf.pingCooldown);
+    return Number.isFinite(v) && v >= 0 ? Math.min(600, Math.floor(v)) : 3;
   }
   // Flash bekleme süresi (saniye, 0 = sınırsız). Ayarlanmadıysa 30 sn.
   const flashAt = new Map();
@@ -1242,7 +1250,7 @@ function startServer(opts = {}) {
           admin: isAdmin,
           mod: isModUser(me),
           token: me.token,
-          features: ['sfx', 'activity', 'log', 'pins', 'polls', 'votes', 'files', 'preview', 'gif', 'roles', 'chpass', 'afk', 'bans', 'marks', 'watch', 'perms', 'audit', 'timeout', 'serverDeafen', 'moveAll', 'purge', 'slowmode', 'readOnly', 'announce', 'welcomeMessage', 'headers', 'afkMic', 'webClient', 'info', 'leaveVoice', 'icon', 'flash', 'flashCooldown', 'liftVoteMute', 'storm', 'bolts'],
+          features: ['sfx', 'activity', 'log', 'pins', 'polls', 'votes', 'files', 'preview', 'gif', 'roles', 'chpass', 'afk', 'bans', 'marks', 'watch', 'perms', 'audit', 'timeout', 'serverDeafen', 'moveAll', 'purge', 'slowmode', 'readOnly', 'announce', 'welcomeMessage', 'headers', 'afkMic', 'webClient', 'info', 'leaveVoice', 'icon', 'flash', 'flashCooldown', 'liftVoteMute', 'storm', 'bolts', 'ping', 'pingCooldown'],
           // Roller ve yetkiler
           perms: [...permsOf(me)],
           roles: userRoleIds(me),
@@ -1311,6 +1319,7 @@ function startServer(opts = {}) {
         memberRole: 'manageRoles',
         audit: 'viewAudit',
         flash: 'flash',
+        spot: 'ping',
         liftVoteMute: 'muteMembers',
       };
       const need = typeof m.t === 'string' && Object.hasOwn(NEED, m.t) ? NEED[m.t] : null;
@@ -1784,6 +1793,30 @@ function startServer(opts = {}) {
           for (const u of usersByKey(target.clientKey)) send(u.ws, { t: 'voteMuteLifted', by: me.name });
           audit(me, 'liftVoteMute', target.name);
           broadcastState();
+          break;
+        }
+        case 'spot': {
+          // Ping: tıklanan nokta aynı ses kanalındaki herkesin ekranında (ya da izlenen yayının üstünde) dalga dalga parlar
+          if (!me.channelId || timedOut(me)) break;
+          const clamp = (x) => Math.max(0, Math.min(1, Number(x) || 0));
+          let owner = null;
+          let share = '';
+          if (m.owner) {
+            owner = users.get(m.owner);
+            share = String(m.share || '').slice(0, 40);
+            if (!owner || owner.channelId !== me.channelId || !share || !owner.shares.some((x) => x.id === share)) break;
+          }
+          const cd = pingCooldown() * 1000;
+          const now = Date.now();
+          const last = pingAt.get(me.clientKey || me.id) || 0;
+          if (cd && now - last < cd) {
+            const left = Math.ceil((cd - (now - last)) / 1000);
+            errorTo(me, `Tekrar ping atmak için ${left} saniye bekle.`, 'info', { pingLeft: left });
+            break;
+          }
+          pingAt.set(me.clientKey || me.id, now);
+          broadcast({ t: 'spot', from: me.id, name: me.name, x: clamp(m.x), y: clamp(m.y), owner: owner ? owner.id : '', share }, (u) => u.channelId === me.channelId && !u.bot);
+          send(ws, { t: 'spotSent', cooldown: pingCooldown() });
           break;
         }
         case 'flash': {
@@ -2289,6 +2322,7 @@ function startServer(opts = {}) {
           if (typeof m.turnUrl === 'string') set('turnUrl', m.turnUrl.trim().slice(0, 400), 'TURN adresi');
           if (typeof m.turnUser === 'string') set('turnUser', m.turnUser.trim().slice(0, 200), 'TURN kullanıcı adı');
           if (typeof m.turnPass === 'string') set('turnPass', m.turnPass.slice(0, 200), 'TURN şifresi');
+          if ('pingCooldown' in m) set('pingCooldown', Math.max(0, Math.min(600, Math.floor(Number(m.pingCooldown) || 0))), 'ping bekleme süresi');
           if ('flashCooldown' in m) set('flashCooldown', Math.max(0, Math.min(3600, Math.floor(Number(m.flashCooldown) || 0))), 'flash bekleme süresi');
           if (typeof m.icon === 'string') {
             // Sunucu resmi: küçültülmüş PNG/JPEG/WebP/GIF (en fazla ~256 KB), boş metin kaldırır
@@ -2404,6 +2438,7 @@ function startServer(opts = {}) {
             turnSet: !!conf.turnPass,
             webClient: conf.webClient === true,
             flashCooldown: flashCooldown(),
+            pingCooldown: pingCooldown(),
             announcement: conf.announcement || null,
             audit: can(me, 'viewAudit') ? auditLog.slice(-100).reverse() : [],
           });

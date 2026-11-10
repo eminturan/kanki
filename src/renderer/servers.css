@@ -166,7 +166,7 @@ body.has-rail #connect-tabs, body.has-rail #connect-screen .field:has(#in-nick),
 }
 #me-bar .voice-panel.hidden { display: none; }
 #me-bar .me-panel { margin: 0; border: 0; border-radius: 0; box-shadow: none; background: transparent; height: 56px; padding: 0 8px 0 10px; }
-#me-bar .voice-actions { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+#me-bar .voice-actions { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 6px; } /* kaç düğme görünürse tek sırada eşit böl (Ping eklenince 5) */
 #me-bar .voice-actions .btn.share { height: 34px; padding: 0; justify-content: center; }
 #me-bar .voice-actions .btn.share span { display: none; }
 #me-bar .voice-actions .btn.share svg { width: 18px; height: 18px; fill: currentColor; }

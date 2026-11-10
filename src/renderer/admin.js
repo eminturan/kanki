@@ -238,6 +238,7 @@ function afterPermsChange() {
   applyAdminUi();
   if (typeof renderNameStyleUi === "function") renderNameStyleUi(); // süslü mesaj ve Yıldırım yetkisi
   if (typeof renderMeName === "function") renderMeName();
+  if (typeof renderPingBtn === "function") renderPingBtn(); // Ping at yetkisi
   renderAll();
   renderTextChannels();
   renderComposerLock();
@@ -971,7 +972,7 @@ function ssRenderStats() {
   const n = m?.bans?.length || 0;
   $('#ss-n-bans').textContent = n ? String(n) : '';
 }
-const OV_FIELDS = ['#adm-name', '#adm-desc', '#adm-password', '#adm-nopass', '#adm-welcome', '#adm-afk-ch', '#adm-afk-min', '#adm-gif-prov', '#adm-gif-key', '#adm-previews', '#adm-flash-cd'];
+const OV_FIELDS = ['#adm-name', '#adm-desc', '#adm-password', '#adm-nopass', '#adm-welcome', '#adm-afk-ch', '#adm-afk-min', '#adm-gif-prov', '#adm-gif-key', '#adm-previews', '#adm-flash-cd', '#adm-ping-cd'];
 function ssFillOverview(force) {
   if (SS.ovDirty && !force) return;
   const m = SS.info;
@@ -1004,6 +1005,8 @@ function ssFillOverview(force) {
   set('#adm-previews', m ? m.linkPreviews !== false : true);
   set('#adm-flash-cd', m?.flashCooldown ?? S.flashCd ?? 30);
   $('#adm-flash-card').classList.toggle('hidden', !feat('flashCooldown'));
+  set('#adm-ping-cd', m?.pingCooldown ?? S.pingCd ?? 3);
+  $('#adm-ping-card').classList.toggle('hidden', !feat('pingCooldown'));
   $('#adm-gif-state').textContent = m ? (m.hasGifKey ? '(kayıtlı)' : '(girilmedi)') : '';
   ssFillAnnouncement();
 }
@@ -1050,6 +1053,7 @@ $('#ss-save').addEventListener('click', () => {
     cfg.welcomeMessage = $('#adm-welcome').value;
     cfg.linkPreviews = $('#adm-previews').checked;
   }
+  if (feat('pingCooldown')) cfg.pingCooldown = Math.max(0, Math.min(600, Math.floor(Number($('#adm-ping-cd').value) || 0)));
   if (feat('flashCooldown')) cfg.flashCooldown = Math.max(0, Math.min(3600, Math.floor(Number($('#adm-flash-cd').value) || 0)));
   void m;
   send(cfg);

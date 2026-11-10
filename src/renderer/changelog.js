@@ -6,6 +6,16 @@
  */
 const CHANGELOG = [
   {
+    version: '1.0.45',
+    date: '2026-11-10',
+    title: 'Ping',
+    added: [
+      '📍 Ping: ses panelindeki konum düğmesine (ya da Ayarlar › Kısayollar\'dan atayacağın tuşa) bas, ekranda bir yere tıkla; aynı ses kanalındaki herkesin ekranında o nokta senin adın ve rengiyle dalga dalga parlar. Ekran paylaşmadan "şuraya bak" diyebilirsin; oyunun da üstünde görünür (kenarlıksız pencere modunda).',
+      'Kanki\'de izlediğin bir yayının üstüne tıklarsan ping o yayına gider: izleyen herkes yayında, yayıncı da kendi ekranında görür. Yayına işaret de artık aynı dalgayla görünüyor.',
+      'Yeni "Ping at" yetkisi (Roller › Ses ve görüntü, başta sadece sunucu sahibinde) ve Sunucu Ayarları › Genel Bakış › 📍 Ping\'den bekleme süresi (başta 3 sn, 0 = sınırsız).',
+    ],
+  },
+  {
     version: '1.0.44',
     date: '2026-11-10',
     title: 'Performans modu',

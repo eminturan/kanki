@@ -167,6 +167,13 @@ function onExtraMessage(m) {
     case 'mark':
       onMark(m);
       break;
+    case 'spot':
+      onPing(m);
+      break;
+    case 'spotSent':
+      S.pingAt = Date.now();
+      if (typeof m.cooldown === 'number') S.pingCd = m.cooldown;
+      break;
     case 'watchCtl':
       onWatchCtl(m);
       break;
@@ -913,6 +920,7 @@ const KB_ACTIONS = [
   ['mute', 'Mikrofonu kapat / aç'],
   ['deafen', 'Sesi kapat / aç'],
   ['watch', 'Birlikte izle: durdur / oynat'],
+  ['ping', '📍 Ping at'],
 ];
 function accelFrom(e) {
   const mods = [];
@@ -1067,6 +1075,9 @@ kanki.onKeybind?.((id) => {
       break;
     case 'deafen':
       toggleDeafen();
+      break;
+    case 'ping':
+      startPing();
       break;
     case 'watch': {
       const id = myWatchShare();
@@ -1227,6 +1238,106 @@ function stopRnnoise() {
 }
 
 // =====================================================================
+//  Ping: Ping tuşuna (ya da kısayola) basıp ekranda bir yere tıklanır; aynı ses kanalındaki herkesin
+//  ekranında o nokta atanın adı ve rengiyle dalga dalga parlar. Yayının üstüne tıklanırsa izlenen yayında görünür.
+// =====================================================================
+const canPing = () => feat('ping') && can('ping');
+const pingLeft = () => Math.max(0, Math.ceil(((S.pingAt || 0) + (S.pingCd ?? 3) * 1000 - Date.now()) / 1000));
+function pingWave(host, x, y, name, color, flipX, flipY) {
+  const g = h('div', { class: 'pg', style: `left:${x}px;top:${y}px;--c:${color}` }, h('div', { class: 'w' }), h('div', { class: 'w' }), h('div', { class: 'w' }), h('div', { class: 'd' }), h('div', { class: `n${flipX ? ' fx' : ''}${flipY ? ' fy' : ''}` }, name));
+  host.append(g);
+  setTimeout(() => g.classList.add('f'), 3000);
+  setTimeout(() => g.remove(), 3700);
+}
+function renderPingBtn() {
+  const b = $('#btn-ping');
+  if (!b) return;
+  b.classList.toggle('hidden', !canPing());
+  b.disabled = !S.channelId;
+  b.classList.toggle('on', !!S.pinging);
+  b.title = S.pinging ? 'Ping seçiliyor: bir yere tıkla (Esc: vazgeç)' : 'Ping at: tıkladığın yer kanaldaki herkesin ekranında parlar';
+}
+// Tarayıcıdan girenler: ekranın geneline katman açılamaz, sayfanın içinde seçilir ve gösterilir
+function pagePick() {
+  return new Promise((resolve) => {
+    const cover = h('div', { class: 'ping-pick' }, h('div', { class: 'ping-pick-hint' }, h('b', {}, '📍 Ping'), ' · Bir yere tıkla  ·  Esc ya da sağ tık: vazgeç'));
+    const done = (r) => {
+      cover.remove();
+      removeEventListener('keydown', key, true);
+      resolve(r);
+    };
+    const key = (e) => e.key === 'Escape' && (e.preventDefault(), done(null));
+    cover.addEventListener('contextmenu', (e) => e.preventDefault());
+    cover.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      done(e.button === 0 ? { x: e.clientX / innerWidth, y: e.clientY / innerHeight, inWin: { x: e.clientX, y: e.clientY } } : null);
+    });
+    addEventListener('keydown', key, true);
+    document.body.append(cover);
+  });
+}
+async function startPing() {
+  if (!S.myId || !canPing()) return;
+  if (!S.channelId) return toast('📍 Ping için bir ses kanalında ol', '', '', 2500);
+  if (S.pinging) return kanki.pingPick?.(); // ikinci basış seçimi iptal eder
+  const left = pingLeft();
+  if (left) return toast(`📍 Tekrar ping atmak için ${left} saniye bekle`, '', '', 2000);
+  S.pinging = true;
+  renderPingBtn();
+  let r = null;
+  try {
+    r = kanki.pingPick ? await kanki.pingPick() : await pagePick();
+  } catch {}
+  S.pinging = false;
+  renderPingBtn();
+  if (!r || !S.channelId) return;
+  // Kanki'nin içinde izlenen bir yayının üstüne tıklandıysa ping o yayına gider
+  if (r.inWin) {
+    const tile = document.elementFromPoint(r.inWin.x, r.inWin.y)?.closest('.tile[data-key]');
+    const video = tile?.querySelector('video');
+    const key = tile?.dataset.key;
+    if (video && feat('marks') && !isCamKey(key) && !isOwnKey(key)) {
+      const vr = videoRect(video);
+      const x = (r.inWin.x - vr.x) / vr.w;
+      const y = (r.inWin.y - vr.y) / vr.h;
+      if (x >= 0 && x <= 1 && y >= 0 && y <= 1) {
+        const [owner, share] = splitKey(key);
+        return send({ t: 'spot', owner, share, x, y });
+      }
+    }
+  }
+  send({ t: 'spot', x: r.x, y: r.y });
+}
+function onPing(m) {
+  const color = colorFor(m.name);
+  if (m.owner) onMark({ ...m, kind: 'ping', pts: [[m.x, m.y]] });
+  else if (kanki.screenPing) kanki.screenPing({ x: m.x, y: m.y, name: m.name, color });
+  else pingWave($('#ping-page') || document.body.appendChild(h('div', { id: 'ping-page' })), m.x * innerWidth, m.y * innerHeight, m.name, color, m.x > 0.85, m.y < 0.06);
+  pingSound();
+}
+function pingSound() {
+  if (S.deafened) return;
+  try {
+    const ctx = sfxCtx();
+    const t = ctx.currentTime + 0.01;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(Math.max(0.05, (settings.sfxVolume ?? 50) / 260), t + 0.015);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.45);
+    g.connect(ctx.destination);
+    for (const [f, d] of [[1320, 0], [1760, 0.09]]) {
+      const o = ctx.createOscillator();
+      o.type = 'sine';
+      o.frequency.setValueAtTime(f, t + d);
+      o.connect(g);
+      o.start(t + d);
+      o.stop(t + 0.46);
+    }
+  } catch {}
+}
+$('#btn-ping')?.addEventListener('click', startPing);
+
+// =====================================================================
 //  Yayına işaret koyma: izleyen tıklar ya da çizer, herkeste (ve yayıncının ekranında) kısa süre görünür
 // =====================================================================
 function videoRect(video) {
@@ -1308,21 +1419,8 @@ function drawMark(layer, video, m) {
   svg.setAttribute('height', tr.height);
   if (m.kind === 'ping') {
     const [x, y] = m.pts[0];
-    for (const cls of ['ring', 'dot']) {
-      const c = document.createElementNS(NS, 'circle');
-      c.setAttribute('cx', X(x));
-      c.setAttribute('cy', Y(y));
-      c.setAttribute('r', cls === 'dot' ? 7 : 18);
-      c.setAttribute('class', `mk-${cls}`);
-      c.setAttribute('style', `--c:${color}`);
-      svg.append(c);
-    }
-    const t = document.createElementNS(NS, 'text');
-    t.setAttribute('x', X(x) + 14);
-    t.setAttribute('y', Y(y) - 12);
-    t.setAttribute('class', 'mk-name');
-    t.textContent = m.name;
-    svg.append(t);
+    pingWave(layer, X(x), Y(y), m.name, color, x > 0.85, y < 0.06);
+    return;
   } else {
     const pl = document.createElementNS(NS, 'polyline');
     pl.setAttribute('points', m.pts.map(([x, y]) => `${X(x)},${Y(y)}`).join(' '));

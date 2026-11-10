@@ -929,6 +929,22 @@ ipcMain.on('overlay:update', (_e, p) => {
   if (overlayReady) overlayWin.webContents.executeJavaScript(`upd(${JSON.stringify(p)})`).catch(() => {});
 });
 
+// Ping: tıklanan nokta herkesin ekranında, atanın adı ve rengiyle dalga dalga parlar
+const PING_CSS = `.pg{position:absolute;width:0;height:0;pointer-events:none}
+.pg .w{position:absolute;left:-70px;top:-70px;width:140px;height:140px;box-sizing:border-box;border-radius:50%;border:3px solid var(--c);box-shadow:0 0 14px var(--c),inset 0 0 14px var(--c);opacity:0;transform:scale(.06);animation:pgw 1.5s cubic-bezier(.2,.6,.35,1) 2}
+.pg .w:nth-child(2){animation-delay:.3s}.pg .w:nth-child(3){animation-delay:.6s}
+@keyframes pgw{0%{opacity:1;transform:scale(.06)}70%{opacity:.55}100%{opacity:0;transform:scale(1)}}
+.pg .d{position:absolute;left:-8px;top:-8px;width:16px;height:16px;box-sizing:border-box;border-radius:50%;background:var(--c);border:2px solid #fff;box-shadow:0 0 0 2px rgba(0,0,0,.35),0 0 18px 4px var(--c);animation:pgd .5s ease-in-out 6 alternate}
+@keyframes pgd{to{transform:scale(1.35)}}
+.pg .n{position:absolute;left:16px;top:-34px;white-space:nowrap;font:700 14px -apple-system,"Segoe UI",sans-serif;color:#fff;padding:3px 9px 3px 8px;border-radius:10px;background:rgba(8,10,11,.72);border-left:4px solid var(--c);text-shadow:0 1px 2px #000}
+.pg{transition:opacity .6s}.pg.f{opacity:0}`;
+const PING_JS = `function ping(m,host){host=host||document.body;var g=document.createElement('div');g.className='pg';g.style.left=(m.x*innerWidth)+'px';g.style.top=(m.y*innerHeight)+'px';g.style.setProperty('--c',m.color);
+for(var i=0;i<3;i++){var w=document.createElement('div');w.className='w';g.appendChild(w);}var d=document.createElement('div');d.className='d';g.appendChild(d);
+var n=document.createElement('div');n.className='n';n.textContent=m.name;g.appendChild(n);host.appendChild(g);
+if(m.x>.85){n.style.left='auto';n.style.right='16px';}if(m.y<.06)n.style.top='14px';
+setTimeout(function(){g.className='pg f'},3000);setTimeout(function(){g.remove()},3700);}`;
+const cleanColor = (c) => (/^#[0-9a-f]{3,8}$|^hsl\([\d.,% ]+\)$/i.test(c) ? c : '#22d47e');
+
 // Yayına işaret: yayıncının ekranının üstünde şeffaf, tıklanamaz bir katman
 const markWins = new Map(); // display id -> { win, timer, ready, queue }
 const MARK_HTML = `<!doctype html><meta charset="utf-8"><style>
@@ -936,15 +952,11 @@ html,body{margin:0;height:100%;background:transparent;overflow:hidden}
 svg{position:absolute;inset:0;width:100%;height:100%}
 .f{transition:opacity .7s;opacity:0}
 text{font:700 15px -apple-system,"Segoe UI",sans-serif;fill:#fff;paint-order:stroke;stroke:#000;stroke-width:3px}
-@keyframes r{from{r:10;opacity:1}to{r:46;opacity:0}}
-.ring{fill:none;stroke-width:4;animation:r 1s ease-out 3}
-</style><body><svg id="s"></svg><script>
+${PING_CSS}
+</style><body><svg id="s"></svg><script>${PING_JS}
 var NS='http://www.w3.org/2000/svg';
 function draw(m){var s=document.getElementById('s'),W=innerWidth,H=innerHeight,g=document.createElementNS(NS,'g');
-if(m.kind==='ping'){var x=m.pts[0][0]*W,y=m.pts[0][1]*H;
-var r=document.createElementNS(NS,'circle');r.setAttribute('cx',x);r.setAttribute('cy',y);r.setAttribute('r',10);r.setAttribute('class','ring');r.setAttribute('stroke',m.color);g.appendChild(r);
-var d=document.createElementNS(NS,'circle');d.setAttribute('cx',x);d.setAttribute('cy',y);d.setAttribute('r',9);d.setAttribute('fill',m.color);d.setAttribute('stroke','#000');d.setAttribute('stroke-width','2');g.appendChild(d);
-var t=document.createElementNS(NS,'text');t.setAttribute('x',x+16);t.setAttribute('y',y-14);t.textContent=m.name;g.appendChild(t);}
+if(m.kind==='ping'){ping({x:m.pts[0][0],y:m.pts[0][1],name:m.name,color:m.color});return;}
 else{var p=document.createElementNS(NS,'polyline');p.setAttribute('points',m.pts.map(function(q){return q[0]*W+','+q[1]*H}).join(' '));
 p.setAttribute('fill','none');p.setAttribute('stroke',m.color);p.setAttribute('stroke-width','5');p.setAttribute('stroke-linecap','round');p.setAttribute('stroke-linejoin','round');g.appendChild(p);}
 s.appendChild(g);setTimeout(function(){g.setAttribute('class','f')},2600);setTimeout(function(){g.remove()},3400);}
@@ -986,7 +998,7 @@ ipcMain.handle('mark:show', async (_e, m) => {
       for (const q of mw.queue.splice(0)) w.webContents.executeJavaScript(`draw(${JSON.stringify(q)})`).catch(() => {});
     });
   }
-  const msg = { kind: m.kind === 'line' ? 'line' : 'ping', pts: (m.pts || []).slice(0, 80), name: String(m.name || '').slice(0, 40), color: /^#[0-9a-f]{3,8}$|^hsl\([\d.,% ]+\)$/i.test(m.color) ? m.color : '#22d47e' };
+  const msg = { kind: m.kind === 'line' ? 'line' : 'ping', pts: (m.pts || []).slice(0, 80), name: String(m.name || '').slice(0, 40), color: cleanColor(m.color) };
   if (mw.ready) mw.win.webContents.executeJavaScript(`draw(${JSON.stringify(msg)})`).catch(() => {});
   else mw.queue.push(msg);
   clearTimeout(mw.timer);
@@ -995,6 +1007,154 @@ ipcMain.handle('mark:show', async (_e, m) => {
     markWins.delete(display.id);
   }, 6000);
   return true;
+});
+
+// Herkesin ekranında: imlecin bulunduğu monitörde, her şeyin üstünde, tıklanamaz katman
+const PING_HTML = `<!doctype html><meta charset="utf-8"><style>html,body{margin:0;height:100%;background:transparent;overflow:hidden}${PING_CSS}</style><body><script>${PING_JS}</script>`;
+const pingWins = new Map(); // display id -> { win, timer, ready, queue }
+function overlayFor(map, display, html, protect) {
+  let mw = map.get(display.id);
+  if (mw && !mw.win.isDestroyed()) return mw;
+  const b = display.bounds;
+  const w = new BrowserWindow({
+    x: b.x,
+    y: b.y,
+    width: b.width,
+    height: b.height,
+    frame: false,
+    transparent: true,
+    resizable: false,
+    movable: false,
+    skipTaskbar: true,
+    focusable: false,
+    alwaysOnTop: true,
+    hasShadow: false,
+    enableLargerThanScreen: true,
+    show: false,
+    webPreferences: { sandbox: true, contextIsolation: true },
+  });
+  w.setAlwaysOnTop(true, 'screen-saver');
+  w.setVisibleOnAllWorkspaces?.(true, { visibleOnFullScreen: true });
+  w.setIgnoreMouseEvents(true);
+  if (protect) w.setContentProtection(true);
+  w.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  w.webContents.on('will-navigate', (e) => e.preventDefault());
+  mw = { win: w, ready: false, queue: [], timer: null };
+  map.set(display.id, mw);
+  w.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
+  w.webContents.once('did-finish-load', () => {
+    if (w.isDestroyed()) return;
+    mw.ready = true;
+    w.setBounds(b);
+    w.showInactive();
+    for (const q of mw.queue.splice(0)) w.webContents.executeJavaScript(q).catch(() => {});
+  });
+  return mw;
+}
+function overlayRun(map, display, mw, js, ms) {
+  if (mw.ready) mw.win.webContents.executeJavaScript(js).catch(() => {});
+  else mw.queue.push(js);
+  clearTimeout(mw.timer);
+  mw.timer = setTimeout(() => {
+    if (!mw.win.isDestroyed()) mw.win.destroy();
+    map.delete(display.id);
+  }, ms);
+}
+ipcMain.handle('ping:show', (_e, p) => {
+  const display = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
+  if (!display) return false;
+  const clamp = (x) => Math.max(0, Math.min(1, Number(x) || 0));
+  const msg = { x: clamp(p?.x), y: clamp(p?.y), name: String(p?.name || '').slice(0, 40), color: cleanColor(p?.color) };
+  const mw = overlayFor(pingWins, display, PING_HTML, true);
+  overlayRun(pingWins, display, mw, `ping(${JSON.stringify(msg)})`, 5000);
+  if (process.env.KANKI_PING_SHOT) setTimeout(async () => !mw.win.isDestroyed() && fs.writeFileSync(process.env.KANKI_PING_SHOT, (await mw.win.webContents.capturePage()).toPNG()), 700);
+  return true;
+});
+
+// Ping seçici: her monitöre hafif karartılmış, tıklanabilir bir katman; tıklanan nokta döner (Esc / sağ tık: vazgeç)
+const PICK_HTML = `<!doctype html><meta charset="utf-8"><style>
+html,body{margin:0;height:100%;overflow:hidden;background:rgba(0,0,0,.14);cursor:crosshair;user-select:none}
+#h{position:fixed;left:50%;top:28px;transform:translateX(-50%);font:600 14px -apple-system,"Segoe UI",sans-serif;color:#fff;background:rgba(8,10,11,.8);padding:8px 16px;border-radius:12px;box-shadow:0 4px 18px rgba(0,0,0,.4);white-space:nowrap}
+#h b{color:#22d47e}
+</style><body><div id="h"><b>📍 Ping</b> · Bir yere tıkla &nbsp;·&nbsp; Esc ya da sağ tık: vazgeç</div><script>
+var done=false;function out(t){if(done)return;done=true;document.title=t;}
+addEventListener('mousedown',function(e){if(e.button===0)out('P'+(e.clientX/innerWidth)+','+(e.clientY/innerHeight));else out('X');});
+addEventListener('contextmenu',function(e){e.preventDefault();});
+addEventListener('keydown',function(e){if(e.key==='Escape')out('X');});
+</script>`;
+let pickCancel = null;
+ipcMain.handle('ping:pick', () => {
+  if (pickCancel) {
+    pickCancel();
+    return null;
+  }
+  const wasFocused = !!win && !win.isDestroyed() && win.isFocused() && !win.isMinimized() && win.isVisible();
+  return new Promise((resolve) => {
+    const cursor = screen.getCursorScreenPoint();
+    const here = screen.getDisplayNearestPoint(cursor);
+    const wins = [];
+    let timer = null;
+    const finish = (r) => {
+      if (!pickCancel) return;
+      pickCancel = null;
+      clearTimeout(timer);
+      for (const w of wins) if (!w.isDestroyed()) w.destroy();
+      resolve(r);
+    };
+    pickCancel = () => finish(null);
+    timer = setTimeout(pickCancel, 15000);
+    for (const d of screen.getAllDisplays()) {
+      const w = new BrowserWindow({
+        ...d.bounds,
+        frame: false,
+        transparent: true,
+        resizable: false,
+        movable: false,
+        skipTaskbar: true,
+        alwaysOnTop: true,
+        hasShadow: false,
+        enableLargerThanScreen: true,
+        show: false,
+        webPreferences: { sandbox: true, contextIsolation: true },
+      });
+      wins.push(w);
+      w.setAlwaysOnTop(true, 'screen-saver');
+      w.setVisibleOnAllWorkspaces?.(true, { visibleOnFullScreen: true });
+      w.setContentProtection(true); // seçici yayına girmesin
+      w.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+      w.webContents.on('will-navigate', (e) => e.preventDefault());
+      w.on('page-title-updated', (e, title) => {
+        e.preventDefault();
+        const m = /^P([\d.e-]+),([\d.e-]+)$/.exec(title);
+        if (!m) return finish(null);
+        const nx = Math.max(0, Math.min(1, Number(m[1]) || 0));
+        const ny = Math.max(0, Math.min(1, Number(m[2]) || 0));
+        const sx = d.bounds.x + nx * d.bounds.width;
+        const sy = d.bounds.y + ny * d.bounds.height;
+        // Kanki penceresinin içine tıkladıysa (izlenen yayının üstüne ping için) pencere içindeki konum da gider
+        let inWin = null;
+        if (wasFocused && win && !win.isDestroyed()) {
+          const cb = win.getContentBounds();
+          if (sx >= cb.x && sy >= cb.y && sx < cb.x + cb.width && sy < cb.y + cb.height) {
+            const zf = win.webContents.getZoomFactor() || 1;
+            inWin = { x: (sx - cb.x) / zf, y: (sy - cb.y) / zf };
+          }
+        }
+        finish({ x: nx, y: ny, inWin });
+      });
+      w.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(PICK_HTML));
+      w.webContents.once('did-finish-load', () => {
+        if (w.isDestroyed()) return;
+        w.setBounds(d.bounds);
+        w.show();
+        if (d.id === here.id) w.focus();
+        if (process.env.KANKI_PICK_AT && d.id === here.id) {
+          const [px, py] = process.env.KANKI_PICK_AT.split(',').map(Number);
+          setTimeout(() => !w.isDestroyed() && w.webContents.sendInputEvent({ type: 'mouseDown', x: Math.round(px * d.bounds.width), y: Math.round(py * d.bounds.height), button: 'left', clickCount: 1 }), 400);
+        }
+      });
+    }
+  });
 });
 
 // Birlikte izle: YouTube videosunun görüntü ve ses adresleri (yt-dlp)

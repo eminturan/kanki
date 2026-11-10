@@ -1135,6 +1135,7 @@ function renderSelfShare() {
     cam.disabled = !S.channelId || (S.hasCam === false && !myCamera());
     cam.title = S.hasCam === false && !myCamera() ? 'Bu bilgisayarda kamera bulunamadı' : myCamera() ? 'Kamerayı kapat' : 'Kamerayı aç';
   }
+  if (typeof renderPingBtn === 'function') renderPingBtn();
   renderCallBar();
   const existing = new Map([...box.children].map((el) => [el.dataset.id, el]));
   for (const [id, el] of existing) {
@@ -1814,6 +1815,7 @@ function onMessage(m) {
       S.afk = m.afk || null;
       S.serverName = m.serverName;
       if (typeof m.flashCooldown === 'number') S.flashCd = m.flashCooldown;
+      if (typeof m.pingCooldown === 'number') S.pingCd = m.pingCooldown;
       if (m.iconV !== S.iconV) syncServerIcon(m.iconV);
       S.channels = m.channels;
       S.users = new Map(m.users.map((u) => [u.id, u]));

@@ -39,6 +39,8 @@ contextBridge.exposeInMainWorld('kanki', {
   onKeybind: (cb) => ipcRenderer.on('keybind', (_e, id) => cb(id)),
   overlay: (p) => ipcRenderer.send('overlay:update', p),
   showMark: (m) => ipcRenderer.invoke('mark:show', m),
+  pingPick: () => ipcRenderer.invoke('ping:pick'),
+  screenPing: (p) => ipcRenderer.invoke('ping:show', p),
   watchResolve: (url, maxHeight) => ipcRenderer.invoke('watch:resolve', url, maxHeight),
   readAsset: (name) => ipcRenderer.invoke('asset:read', name),
   memUsage: () => ipcRenderer.invoke('app:mem'),

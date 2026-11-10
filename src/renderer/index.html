@@ -180,6 +180,10 @@
                 <svg viewBox="0 0 24 24"><path d="M3 5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-6v2h3a1 1 0 1 1 0 2H8a1 1 0 1 1 0-2h3v-2H5a2 2 0 0 1-2-2V5Zm2 0v10h14V5H5Zm7 1.5 3.5 3.5H13v3h-2v-3H8.5L12 6.5Z"/></svg>
                 <span>Ekran</span>
               </button>
+              <button class="btn share hidden" id="btn-ping" title="Ping at">
+                <svg viewBox="0 0 24 24"><path d="M12 2a7 7 0 0 0-7 7c0 5.2 7 13 7 13s7-7.8 7-13a7 7 0 0 0-7-7Zm0 9.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5Z"/></svg>
+                <span>Ping</span>
+              </button>
           </div>
         </div>
 
@@ -728,6 +732,11 @@
               <h3>💥 Flash</h3>
               <p class="hint">Bir kişi en fazla bu sıklıkta flash atabilir (sunucu sahibi dahil). 0 yazarsan sınır olmaz. Kimlerin atabileceği Roller › "Flash at" yetkisinden ayarlanır.</p>
               <label class="field"><span>Bekleme süresi <em>(saniye, 0 = sınırsız)</em></span><input id="adm-flash-cd" type="number" min="0" max="3600" /></label>
+            </div>
+            <div class="ss-card" data-ov id="adm-ping-card">
+              <h3>📍 Ping</h3>
+              <p class="hint">Bir kişi en fazla bu sıklıkta ping atabilir (sunucu sahibi dahil). 0 yazarsan sınır olmaz. Kimlerin atabileceği Roller › "Ping at" yetkisinden ayarlanır.</p>
+              <label class="field"><span>Bekleme süresi <em>(saniye, 0 = sınırsız)</em></span><input id="adm-ping-cd" type="number" min="0" max="600" /></label>
             </div>
             <div class="ss-card" data-ov>
               <h3>Sohbet</h3>
