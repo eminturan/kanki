@@ -25,6 +25,18 @@ const fs = require('fs');
 const crypto = require('crypto');
 const pkg = require('../../package.json');
 
+// --- Kilit: kurulu sürümde test kancaları, geliştirici araçları ve dışarıdan hata ayıklama kapalı ---
+// (KANKI_EXEC gibi test değişkenleri sayfaya kod çalıştırabildiği için sadece geliştirirken çalışır)
+const LOCKED = app.isPackaged;
+if (LOCKED) {
+  for (const k of Object.keys(process.env)) if (k.startsWith('KANKI_')) delete process.env[k];
+  const DEBUG_SWITCHES = ['remote-debugging-port', 'remote-debugging-pipe', 'remote-debugging-address', 'inspect', 'inspect-brk', 'inspect-port', 'js-flags'];
+  if (DEBUG_SWITCHES.some((s) => app.commandLine.hasSwitch(s)) || process.argv.some((a) => /^--(inspect|remote-debugging|js-flags)/.test(a))) app.exit(0);
+  app.on('web-contents-created', (_e, wc) => {
+    wc.on('devtools-opened', () => wc.closeDevTools());
+  });
+}
+
 // Sürüm: "admin" (sunucu kurabilir, yönetim paneli var) ya da "client" (sadece bağlanır)
 const VARIANT = process.env.KANKI_VARIANT || pkg.kankiVariant || 'admin';
 const IS_ADMIN_BUILD = VARIANT === 'admin';
@@ -112,6 +124,7 @@ function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       backgroundThrottling: false,
+      devTools: !LOCKED,
     },
   });
   const showWin = () => win && !win.isDestroyed() && !win.isVisible() && win.show();
@@ -135,7 +148,7 @@ function createWindow() {
           autoHideMenuBar: true,
           title: 'Kanki — Yayın',
           icon: path.join(__dirname, '..', '..', 'build', IS_ADMIN_BUILD ? 'icon-admin.png' : 'icon.png'),
-          webPreferences: { backgroundThrottling: false },
+          webPreferences: { backgroundThrottling: false, devTools: !LOCKED },
         },
       };
     }
@@ -395,6 +408,7 @@ function startMusicBot() {
       backgroundThrottling: false,
       autoplayPolicy: 'no-user-gesture-required',
       webSecurity: false, // farklı kaynaktan gelen müziğin WebRTC'ye aktarılabilmesi için (sadece botun kendi sayfası yüklenir)
+      devTools: !LOCKED,
     },
   });
   botWin.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));

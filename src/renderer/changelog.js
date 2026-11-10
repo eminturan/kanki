@@ -6,6 +6,12 @@
  */
 const CHANGELOG = [
   {
+    version: '1.0.47',
+    date: '2026-11-11',
+    title: 'Güvenlik güncellemesi',
+    changed: ['Güvenlik iyileştirmeleri.'],
+  },
+  {
     version: '1.0.46',
     date: '2026-11-11',
     title: 'Ping rengi',

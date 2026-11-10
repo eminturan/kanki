@@ -9,9 +9,32 @@
     "kankiDefaultServer": ""
   },
   "npmRebuild": false,
+  "beforePack": "scripts/harden.js",
+  "electronFuses": {
+    "runAsNode": true,
+    "enableCookieEncryption": false,
+    "enableNodeOptionsEnvironmentVariable": false,
+    "enableNodeCliInspectArguments": false,
+    "enableEmbeddedAsarIntegrityValidation": false,
+    "onlyLoadAppFromAsar": true,
+    "loadBrowserProcessSpecificV8Snapshot": false,
+    "grantFileProtocolExtraPrivileges": true
+  },
   "files": [
-    "src/**/*",
-    "server/**/*",
+    {
+      "from": "build/min/src",
+      "to": "src",
+      "filter": [
+        "**/*"
+      ]
+    },
+    {
+      "from": "build/min/server",
+      "to": "server",
+      "filter": [
+        "**/*"
+      ]
+    },
     "build/icon-admin.png",
     "package.json",
     "!node_modules/uiohook-napi/build/**",

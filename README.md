@@ -240,6 +240,7 @@ npm run dist            # 4 paketin hepsi (Mac + Windows, Kanki + Kanki Admin)
 npm run dist:client:mac # tek tek de üretilebilir: dist:client:win, dist:admin:mac, dist:admin:win
 ```
 - Sürüm ayarları `electron-builder.client.json` ve `electron-builder.admin.json` dosyalarında.
+- Kurulum dosyalarına küçültülmüş kod girer (`scripts/harden.js`, derlerken kendiliğinden çalışır). Test değişkenleri (`KANKI_*`) ve geliştirici araçları sadece `npm start` ile kaynaktan çalışırken açıktır.
 - Arkadaş sürümünde sunucu adresinin hazır yazılı gelmesini istersen `electron-builder.client.json` içindeki `kankiDefaultServer` alanına adresi yaz (ör. `bizim-kanki.ngrok-free.app`) ve yeniden derle.
 - `.github/workflows/build.yml` GitHub Actions üzerinde iki sürümü iki platform için de paketler.
 
