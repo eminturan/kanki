@@ -246,7 +246,10 @@ function startServer(opts = {}) {
     serverDeafened: serverDeafened(u),
     timeoutUntil: timeoutUntil(u),
     prio: isPrio(u),
+    pingColor: pingColorOf(u),
   });
+  // Ping ve yayına çizim rengi: yetkilinin kişiye seçtiği renk, seçilmediyse beyaz
+  const pingColorOf = (u) => (u && !u.bot && memberOf(u.clientKey)?.pingColor) || '#ffffff';
   const findBot = () => [...users.values()].find((u) => u.bot);
   // Sadece botun anladığı komutlar iletilir ("!!!" gibi mesajlar bota gitmesin)
   const BOT_WORDS = new Set(
@@ -347,6 +350,7 @@ function startServer(opts = {}) {
       }
       m.name = String(m.name || '').slice(0, 32);
       m.roles = [...new Set((Array.isArray(m.roles) ? m.roles : []).filter((id) => id !== 'everyone' && roleById(id)))];
+      if ('pingColor' in m && !(m.pingColor = hex(m.pingColor))) delete m.pingColor;
     }
     sortRoles();
     if (changed) saveConf();
@@ -434,7 +438,7 @@ function startServer(opts = {}) {
   // Boş kalan üye kaydını sil (rolü ve susturması yoksa saklamaya gerek yok)
   const cleanupMember = (ck) => {
     const m = memberOf(ck);
-    if (m && !m.roles.length && !m.mute && !m.deaf) delete conf.members[ck];
+    if (m && !m.roles.length && !m.mute && !m.deaf && !m.pingColor) delete conf.members[ck];
   };
   const fmtLeft = (ms) => {
     const s = Math.max(1, Math.ceil(ms / 1000));
@@ -1250,7 +1254,7 @@ function startServer(opts = {}) {
           admin: isAdmin,
           mod: isModUser(me),
           token: me.token,
-          features: ['sfx', 'activity', 'log', 'pins', 'polls', 'votes', 'files', 'preview', 'gif', 'roles', 'chpass', 'afk', 'bans', 'marks', 'watch', 'perms', 'audit', 'timeout', 'serverDeafen', 'moveAll', 'purge', 'slowmode', 'readOnly', 'announce', 'welcomeMessage', 'headers', 'afkMic', 'webClient', 'info', 'leaveVoice', 'icon', 'flash', 'flashCooldown', 'liftVoteMute', 'storm', 'bolts', 'ping', 'pingCooldown'],
+          features: ['sfx', 'activity', 'log', 'pins', 'polls', 'votes', 'files', 'preview', 'gif', 'roles', 'chpass', 'afk', 'bans', 'marks', 'watch', 'perms', 'audit', 'timeout', 'serverDeafen', 'moveAll', 'purge', 'slowmode', 'readOnly', 'announce', 'welcomeMessage', 'headers', 'afkMic', 'webClient', 'info', 'leaveVoice', 'icon', 'flash', 'flashCooldown', 'liftVoteMute', 'storm', 'bolts', 'ping', 'pingCooldown', 'pingColor'],
           // Roller ve yetkiler
           perms: [...permsOf(me)],
           roles: userRoleIds(me),
@@ -1317,6 +1321,7 @@ function startServer(opts = {}) {
         roleMove: 'manageRoles',
         memberRoles: 'manageRoles',
         memberRole: 'manageRoles',
+        memberPingColor: 'manageRoles',
         audit: 'viewAudit',
         flash: 'flash',
         spot: 'ping',
@@ -1740,7 +1745,7 @@ function startServer(opts = {}) {
           me.markAt = now;
           const clamp = (x) => Math.max(0, Math.min(1, Number(x) || 0));
           const pts = (Array.isArray(m.pts) ? m.pts : [[m.x, m.y]]).slice(0, 80).map((p) => [clamp(p?.[0]), clamp(p?.[1])]);
-          broadcast({ t: 'mark', from: me.id, name: me.name, owner: owner.id, share: String(m.share || '').slice(0, 40), kind: m.kind === 'line' ? 'line' : 'ping', pts, stroke: String(m.stroke || '').slice(0, 40) }, (u) => u.channelId === me.channelId && !u.bot);
+          broadcast({ t: 'mark', from: me.id, name: me.name, color: pingColorOf(me), owner: owner.id, share: String(m.share || '').slice(0, 40), kind: m.kind === 'line' ? 'line' : 'ping', pts, stroke: String(m.stroke || '').slice(0, 40) }, (u) => u.channelId === me.channelId && !u.bot);
           break;
         }
         case 'watchCtl': {
@@ -1815,7 +1820,7 @@ function startServer(opts = {}) {
             break;
           }
           pingAt.set(me.clientKey || me.id, now);
-          broadcast({ t: 'spot', from: me.id, name: me.name, x: clamp(m.x), y: clamp(m.y), owner: owner ? owner.id : '', share }, (u) => u.channelId === me.channelId && !u.bot);
+          broadcast({ t: 'spot', from: me.id, name: me.name, color: pingColorOf(me), x: clamp(m.x), y: clamp(m.y), owner: owner ? owner.id : '', share }, (u) => u.channelId === me.channelId && !u.bot);
           send(ws, { t: 'spotSent', cooldown: pingCooldown() });
           break;
         }
@@ -2073,6 +2078,27 @@ function startServer(opts = {}) {
           // Kişinin bütün rol listesini ver: { to | mid, roles: [rolId] }
           const t = resolveTarget(m);
           if (t && Array.isArray(m.roles)) setMemberRoles(me, t, m.roles.slice(0, MAX_ROLES + 1));
+          break;
+        }
+        case 'memberPingColor': {
+          // Kişinin ping/çizim rengi: { to | mid, color } ('' = varsayılan beyaz)
+          const t = resolveTarget(m);
+          if (!t) break;
+          if (t.key !== me.clientKey && !outranksT(me, t)) {
+            hierErr(me);
+            break;
+          }
+          const c = hex(m.color);
+          const cur = memberOf(t.key);
+          if ((cur?.pingColor || '') === (c === '#ffffff' ? '' : c)) break;
+          const mem = cur || (conf.members[t.key] = { name: t.name, roles: [] });
+          if (c && c !== '#ffffff') mem.pingColor = c;
+          else delete mem.pingColor;
+          if (t.user) mem.name = t.user.name;
+          cleanupMember(t.key);
+          saveConf();
+          audit(me, 'pingColor', t.name, c && c !== '#ffffff' ? c : 'beyaz');
+          broadcastState();
           break;
         }
         case 'memberRole': {
@@ -2402,6 +2428,7 @@ function startServer(opts = {}) {
               owner: !!on?.admin,
               serverMuted: !!mem?.mute,
               serverDeafened: !!mem?.deaf,
+              pingColor: mem?.pingColor || '#ffffff',
               timeoutUntil: to && to.until > Date.now() ? to.until : 0,
             };
           };

@@ -6,6 +6,14 @@
  */
 const CHANGELOG = [
   {
+    version: '1.0.46',
+    date: '2026-11-11',
+    title: 'Ping rengi',
+    changed: [
+      'Ping ve yayına çizim rengi artık addan otomatik seçilmiyor: herkeste başta beyaz. Rolleri yönet yetkisi olan, Sunucu Ayarları › Üyeler\'de adın yanındaki renk noktasından (ya da kişiye sağ tık › 📍 Ping rengi) her kişinin rengini seçer; "Beyaza döndür" ile sıfırlar.',
+    ],
+  },
+  {
     version: '1.0.45',
     date: '2026-11-10',
     title: 'Ping',

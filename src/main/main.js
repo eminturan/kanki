@@ -931,7 +931,7 @@ ipcMain.on('overlay:update', (_e, p) => {
 
 // Ping: tıklanan nokta herkesin ekranında, atanın adı ve rengiyle dalga dalga parlar
 const PING_CSS = `.pg{position:absolute;width:0;height:0;pointer-events:none}
-.pg .w{position:absolute;left:-70px;top:-70px;width:140px;height:140px;box-sizing:border-box;border-radius:50%;border:3px solid var(--c);box-shadow:0 0 14px var(--c),inset 0 0 14px var(--c);opacity:0;transform:scale(.06);animation:pgw 1.5s cubic-bezier(.2,.6,.35,1) 2}
+.pg .w{position:absolute;left:-70px;top:-70px;width:140px;height:140px;box-sizing:border-box;border-radius:50%;border:3px solid var(--c);box-shadow:0 0 0 1px rgba(0,0,0,.4),0 0 14px var(--c),inset 0 0 0 1px rgba(0,0,0,.4),inset 0 0 14px var(--c);opacity:0;transform:scale(.06);animation:pgw 1.5s cubic-bezier(.2,.6,.35,1) 2}
 .pg .w:nth-child(2){animation-delay:.3s}.pg .w:nth-child(3){animation-delay:.6s}
 @keyframes pgw{0%{opacity:1;transform:scale(.06)}70%{opacity:.55}100%{opacity:0;transform:scale(1)}}
 .pg .d{position:absolute;left:-8px;top:-8px;width:16px;height:16px;box-sizing:border-box;border-radius:50%;background:var(--c);border:2px solid #fff;box-shadow:0 0 0 2px rgba(0,0,0,.35),0 0 18px 4px var(--c);animation:pgd .5s ease-in-out 6 alternate}

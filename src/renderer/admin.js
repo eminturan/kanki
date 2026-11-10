@@ -536,6 +536,23 @@ function subjectOf(u) {
   };
 }
 const targetOf = (t) => (t.userId ? { to: t.userId } : { mid: t.mid });
+// Ping / yayına çizim rengi (menüden): renk seçici açılır; beyaz değilse "Beyaza döndür" de çıkar
+function pingColorItems(t) {
+  const cur = (t.userId && S.users.get(t.userId)?.pingColor) || t.pingColor || '#ffffff';
+  const pick = () => {
+    const inp = h('input', { type: 'color', value: cur, style: 'position:fixed;left:-40px;top:0;width:1px;height:1px;opacity:0' });
+    inp.addEventListener('change', () => {
+      send({ t: 'memberPingColor', ...targetOf(t), color: inp.value });
+      inp.remove();
+    });
+    inp.addEventListener('blur', () => setTimeout(() => inp.remove(), 500));
+    document.body.append(inp);
+    inp.click();
+  };
+  const items = [{ label: '📍 Ping rengi…', run: pick }];
+  if (cur !== '#ffffff') items.push({ label: '📍 Ping rengini beyaza döndür', run: () => send({ t: 'memberPingColor', ...targetOf(t), color: '' }) });
+  return items;
+}
 function roleToggleItems(t) {
   const roles = S.roles.filter((r) => r.id !== 'everyone' && canEditRole(r));
   if (!roles.length) return [{ html: '<div class="ctx-note">Verebileceğin bir rol yok. Roller, senin en üst rolünün altında olmalı.</div>' }];
@@ -568,6 +585,7 @@ function modMenuItems(t) {
   if (!self && t.online && feat('liftVoteMute') && can('muteMembers') && S.users.get(t.userId)?.voteMuted)
     items.push({ label: 'Oylama susturmasını kaldır', run: () => send({ t: 'liftVoteMute', to: t.userId }) });
   if (can('manageRoles') && (self || reach)) items.push({ label: 'Roller', submenu: roleToggleItems(t) });
+  if (feat('pingColor') && can('manageRoles') && (self || reach)) items.push(...pingColorItems(t));
   if (self) return cleanItems(items);
   const any = MEMBER_PERMS.some(can);
   if (!reach) {
@@ -1338,6 +1356,7 @@ function memberRowsData() {
       ip: u?.ip || '',
       connectedAt: u?.connectedAt || 0,
       color: live?.color || userRoles(x).find((r) => r.color)?.color || '',
+      pingColor: live?.pingColor || x.pingColor || '#ffffff',
     };
   });
 }
@@ -1353,7 +1372,7 @@ function renderMembersPane(force = false) {
   if (SS.memberFilter === 'punished') rows = rows.filter((x) => x.serverMuted || x.serverDeafened || x.timeoutUntil > now);
   rows.sort((a, b) => b.online - a.online || rankOfUser(b) - rankOfUser(a) || a.name.localeCompare(b.name, 'tr'));
   const showIp = S.isAdmin || can('administrator');
-  const sig = [rows.map((x) => [x.mid, x.name, x.roles, x.online, x.channelId, x.serverMuted, x.serverDeafened, Math.ceil((x.timeoutUntil - now) / 60000), x.ip]), S.roles.map((r) => [r.id, r.name, r.color, r.position]), Math.floor(now / 60000), myRank(), document.documentElement.dataset.scheme];
+  const sig = [rows.map((x) => [x.mid, x.name, x.roles, x.online, x.channelId, x.serverMuted, x.serverDeafened, Math.ceil((x.timeoutUntil - now) / 60000), x.ip, x.pingColor]), S.roles.map((r) => [r.id, r.name, r.color, r.position]), Math.floor(now / 60000), myRank(), document.documentElement.dataset.scheme];
   if (!force && !ssChanged('members', sig, box)) return;
   SS.sigs.members = JSON.stringify(sig);
   const total = SS.info.members?.length ?? rows.length;
@@ -1371,9 +1390,17 @@ function renderMembersPane(force = false) {
     const av = avatar(x.name);
     if (x.online) withDot(av, S.users.get(x.userId));
     const sub = x.online ? (me ? 'sen' : 'çevrimiçi') : 'çevrimdışı';
-    const cell1 = h('div', { class: 'ss-mcell' }, av, h('div', { class: 'ss-mtext' }, h('div', { class: 'ss-mline' }, nm, ...flags), h('div', { class: 'ss-msub' }, sub)));
-    // Roller
     const manage = feat('perms') && can('manageRoles') && (me || outranks(x));
+    // Ping / yayına çizim rengi (başta beyaz); Rolleri yönet yetkisi olan seçer
+    let pc = null;
+    if (feat('pingColor')) {
+      if (manage && (x.mid || x.userId)) {
+        pc = h('input', { type: 'color', class: 'ss-pcolor', title: `📍 ${x.name} kişisinin ping rengi (ping ve yayına çizim)`, value: x.pingColor });
+        pc.addEventListener('change', () => send({ t: 'memberPingColor', ...targetOf(x), color: pc.value }));
+      } else pc = h('span', { class: 'ss-pcolor ro', title: `📍 Ping rengi`, style: `background:${x.pingColor}` });
+    }
+    const cell1 = h('div', { class: 'ss-mcell' }, av, h('div', { class: 'ss-mtext' }, h('div', { class: 'ss-mline' }, nm, ...flags, pc), h('div', { class: 'ss-msub' }, sub)));
+    // Roller
     const rc = h('div', { class: 'ss-rolecell' });
     for (const r of userRoles(x)) rc.append(roleChip(r, manage && canEditRole(r) ? () => send({ t: 'memberRole', ...targetOf(x), roleId: r.id, on: false }) : null));
     if (manage) {
@@ -1551,6 +1578,7 @@ const AUDIT = {
   roleDelete: ['🛡️', 'rolü sildi', 'red'],
   roleOrder: ['↕️', 'rollerin sırasını değiştirdi', ''],
   memberRoles: ['🏷️', 'rollerini değiştirdi', ''],
+  pingColor: ['📍', 'ping rengini değiştirdi', ''],
   channelCreate: ['➕', 'kanal oluşturdu', 'green'],
   channelRename: ['✏️', 'kanalı yeniden adlandırdı', ''],
   channelUpdate: ['⚙️', 'kanal ayarlarını değiştirdi', ''],

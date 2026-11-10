@@ -1242,6 +1242,9 @@ function stopRnnoise() {
 //  ekranında o nokta atanın adı ve rengiyle dalga dalga parlar. Yayının üstüne tıklanırsa izlenen yayında görünür.
 // =====================================================================
 const canPing = () => feat('ping') && can('ping');
+// Ping / çizim rengi: yetkilinin kişiye seçtiği renk (Sunucu Ayarları › Üyeler), seçilmediyse beyaz.
+// Eski sunucular renk göndermez: orada adına göre renk.
+const markColor = (m) => (/^#[0-9a-f]{6}$/i.test(m.color || '') ? m.color : feat('pingColor') ? S.users.get(m.from)?.pingColor || '#ffffff' : colorFor(m.name));
 const pingLeft = () => Math.max(0, Math.ceil(((S.pingAt || 0) + (S.pingCd ?? 3) * 1000 - Date.now()) / 1000));
 function pingWave(host, x, y, name, color, flipX, flipY) {
   const g = h('div', { class: 'pg', style: `left:${x}px;top:${y}px;--c:${color}` }, h('div', { class: 'w' }), h('div', { class: 'w' }), h('div', { class: 'w' }), h('div', { class: 'd' }), h('div', { class: `n${flipX ? ' fx' : ''}${flipY ? ' fy' : ''}` }, name));
@@ -1309,7 +1312,7 @@ async function startPing() {
   send({ t: 'spot', x: r.x, y: r.y });
 }
 function onPing(m) {
-  const color = colorFor(m.name);
+  const color = markColor(m);
   if (m.owner) onMark({ ...m, kind: 'ping', pts: [[m.x, m.y]] });
   else if (kanki.screenPing) kanki.screenPing({ x: m.x, y: m.y, name: m.name, color });
   else pingWave($('#ping-page') || document.body.appendChild(h('div', { id: 'ping-page' })), m.x * innerWidth, m.y * innerHeight, m.name, color, m.x > 0.85, m.y < 0.06);
@@ -1411,7 +1414,7 @@ function drawMark(layer, video, m) {
   const r = videoRect(video);
   const X = (x) => r.x - tr.x + x * r.w;
   const Y = (y) => r.y - tr.y + y * r.h;
-  const color = colorFor(m.name);
+  const color = markColor(m);
   const NS = 'http://www.w3.org/2000/svg';
   const svg = document.createElementNS(NS, 'svg');
   svg.setAttribute('class', 'mark');
@@ -1438,7 +1441,7 @@ function onMark(m) {
   if (tile) drawMark(tile.querySelector('.mark-layer'), tile.querySelector('video'), m);
   if (m.owner === S.myId) {
     const sh = S.myShares.get(m.share);
-    if (sh?.opts?.sourceId && kanki.showMark) kanki.showMark({ sourceId: sh.opts.sourceId, kind: m.kind, pts: m.pts, name: m.name, color: colorFor(m.name) });
+    if (sh?.opts?.sourceId && kanki.showMark) kanki.showMark({ sourceId: sh.opts.sourceId, kind: m.kind, pts: m.pts, name: m.name, color: markColor(m) });
     if (m.from !== S.myId && m.stroke !== 'part' && Date.now() - (S.lastMarkLog || 0) > 4000) {
       S.lastMarkLog = Date.now();
       logEvent('📍', `${m.name} yayınına işaret koydu`, { dim: true });

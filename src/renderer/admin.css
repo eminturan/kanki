@@ -408,3 +408,9 @@ button.role-chip.add:hover { border-color: var(--accent); color: var(--accent); 
 
 /* Bağlantı › tarayıcıdan katılma anahtarı */
 .adm-web-row { margin-top: 12px; }
+
+/* Üyeler: ping / yayına çizim rengi */
+.ss-pcolor { width: 18px; height: 18px; padding: 0; margin-left: 6px; border: 1px solid var(--line); border-radius: 50%; background: none; cursor: pointer; flex: none; overflow: hidden; vertical-align: middle; }
+.ss-pcolor::-webkit-color-swatch-wrapper { padding: 0; }
+.ss-pcolor::-webkit-color-swatch { border: 0; border-radius: 50%; }
+.ss-pcolor.ro { display: inline-block; cursor: default; box-sizing: border-box; }
