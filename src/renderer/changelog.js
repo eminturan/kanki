@@ -6,6 +6,16 @@
  */
 const CHANGELOG = [
   {
+    version: '1.0.48',
+    date: '2026-11-11',
+    title: 'Doğrudan dosya gönderme',
+    added: [
+      '📁 Birine sağ tıkla › Dosya gönder: karşı taraf kabul edince dosya iki bilgisayar arasında doğrudan gider, sunucudan geçmez. Boyut sınırı yok (GB\'larca dosya da olur), birden fazla dosya seçilebilir.',
+      'Sağ altta ilerleme, hız ve kalan süre görünür; iki taraf da istediği an iptal edebilir, yarım kalan dosya silinir. Bitince dosyanın sağlam geldiği kontrol edilir (SHA-256).',
+      'Doğrudan bağlantı kurulamazsa (bazı internet ve iş yeri ağları) aktarım durur; dosya sunucu üzerinden gönderilmez. Alanın da 1.0.48 olması gerekir.',
+    ],
+  },
+  {
     version: '1.0.47',
     date: '2026-11-11',
     title: 'Güvenlik güncellemesi',

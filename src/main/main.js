@@ -847,6 +847,156 @@ ipcMain.handle('file:download', async (_e, { url, name }) => {
 });
 ipcMain.handle('activity:scan', (_e, o) => activity.scan(o || {}).catch(() => ({ game: '', music: '' })));
 
+// Doğrudan dosya aktarımı (P2P): dosya diskten parça parça okunur / diske parça parça yazılır.
+// Arayüz yollarla değil, burada verilen anahtarlarla çalışır (seçilmemiş bir dosyayı okuyamaz).
+const xferSrc = new Map(); // anahtar -> { path, size, fd, pos, hash }
+const xferDst = new Map(); // anahtar -> { dir | file, multi }
+const xferOut = new Map(); // yazma anahtarı -> { part, final, fd, hash, size, written }
+const xferDone = new Set(); // bitmiş dosyalar (Klasörde göster / Aç sadece bunlar için)
+const xkey = () => crypto.randomBytes(12).toString('hex');
+const safeName = (n) => String(n || 'dosya').replace(/[\\/:*?"<>|\u0000-\u001f]/g, '_').replace(/^\.+/, '_').trim().slice(0, 200) || 'dosya';
+ipcMain.handle('xfer:pick', async () => {
+  const test = process.env.KANKI_AUTOTEST && process.env.KANKI_XFER_PICK; // test: seçme penceresi açılmaz
+  const r = test ? { filePaths: process.env.KANKI_XFER_PICK.split('|') } : await dialog.showOpenDialog(win, { title: 'Gönderilecek dosyaları seç', properties: ['openFile', 'multiSelections'] });
+  if (r.canceled || !r.filePaths?.length) return null;
+  const out = [];
+  for (const p of r.filePaths.slice(0, 50)) {
+    try {
+      const st = fs.statSync(p);
+      if (!st.isFile()) continue;
+      const key = xkey();
+      xferSrc.set(key, { path: p, size: st.size, fd: null, pos: 0, hash: null });
+      out.push({ key, name: path.basename(p), size: st.size });
+    } catch {}
+  }
+  return out;
+});
+// Sırayla okunur; okurken SHA-256 hesaplanır, son parçada özet döner
+ipcMain.handle('xfer:read', async (_e, key, len) => {
+  const s = xferSrc.get(key);
+  if (!s) return { error: 'gone' };
+  try {
+    if (!s.fd) {
+      s.fd = await fs.promises.open(s.path, 'r');
+      s.hash = crypto.createHash('sha256');
+      s.pos = 0;
+    }
+    const n = Math.max(0, Math.min(Number(len) || 0, 4 * 1024 * 1024, s.size - s.pos));
+    const buf = Buffer.allocUnsafe(n);
+    const { bytesRead } = n ? await s.fd.read(buf, 0, n, s.pos) : { bytesRead: 0 };
+    const chunk = buf.subarray(0, bytesRead);
+    s.pos += bytesRead;
+    s.hash.update(chunk);
+    let sha = null;
+    if (s.pos >= s.size || !bytesRead) {
+      sha = s.hash.digest('hex');
+      await s.fd.close().catch(() => {});
+      xferSrc.delete(key);
+    }
+    return { data: chunk, sha };
+  } catch (e) {
+    return { error: e.message };
+  }
+});
+ipcMain.handle('xfer:release', async (_e, key) => {
+  const s = xferSrc.get(key);
+  if (s?.fd) await s.fd.close().catch(() => {});
+  xferSrc.delete(key);
+});
+// Alıcı: tek dosyada kayıt yeri, birden çok dosyada klasör seçilir
+ipcMain.handle('xfer:dest', async (_e, files) => {
+  const list = Array.isArray(files) ? files : [];
+  const multi = list.length > 1;
+  const testDir = process.env.KANKI_AUTOTEST && process.env.KANKI_DL_DIR;
+  let r;
+  if (testDir) r = multi ? { filePaths: [testDir] } : { filePath: path.join(testDir, safeName(list[0]?.name)) };
+  else if (multi) r = await dialog.showOpenDialog(win, { title: `${list.length} dosyanın kaydedileceği klasörü seç`, defaultPath: app.getPath('downloads'), properties: ['openDirectory', 'createDirectory'] });
+  else r = await dialog.showSaveDialog(win, { defaultPath: path.join(app.getPath('downloads'), safeName(list[0]?.name)) });
+  if (r.canceled) return null;
+  const key = xkey();
+  if (multi) {
+    if (!r.filePaths?.[0]) return null;
+    xferDst.set(key, { dir: r.filePaths[0], multi: true });
+  } else {
+    if (!r.filePath) return null;
+    xferDst.set(key, { file: r.filePath, multi: false });
+  }
+  return key;
+});
+// Aynı adda dosya varsa "ad (2).uzantı"
+function freePath(p) {
+  if (!fs.existsSync(p)) return p;
+  const ext = path.extname(p);
+  const base = p.slice(0, p.length - ext.length);
+  for (let i = 2; i < 1000; i++) if (!fs.existsSync(`${base} (${i})${ext}`)) return `${base} (${i})${ext}`;
+  return `${base} (${Date.now()})${ext}`;
+}
+ipcMain.handle('xfer:open', async (_e, destKey, name, size) => {
+  const d = xferDst.get(destKey);
+  if (!d) return { error: 'gone' };
+  try {
+    const final = d.multi ? freePath(path.join(d.dir, safeName(name))) : d.file;
+    const part = final + '.kanki-part';
+    const fd = await fs.promises.open(part, 'w');
+    const key = xkey();
+    xferOut.set(key, { part, final, fd, hash: crypto.createHash('sha256'), size: Math.max(0, Number(size) || 0), written: 0 });
+    return { key };
+  } catch (e) {
+    return { error: e.code === 'ENOSPC' ? 'Diskte yer yok' : e.message };
+  }
+});
+ipcMain.handle('xfer:write', async (_e, key, data) => {
+  const o = xferOut.get(key);
+  if (!o) return { error: 'gone' };
+  try {
+    const buf = Buffer.from(data);
+    if (o.written + buf.length > o.size) return { error: 'Beklenenden fazla veri geldi' };
+    await o.fd.write(buf, 0, buf.length, o.written);
+    o.written += buf.length;
+    o.hash.update(buf);
+    return { ok: true, written: o.written };
+  } catch (e) {
+    return { error: e.code === 'ENOSPC' ? 'Diskte yer yok' : e.message };
+  }
+});
+ipcMain.handle('xfer:finish', async (_e, key) => {
+  const o = xferOut.get(key);
+  if (!o) return { error: 'gone' };
+  xferOut.delete(key);
+  try {
+    await o.fd.close();
+    if (o.written !== o.size) throw new Error('Dosya eksik geldi');
+    const final = o.final; // tek dosyada kayıt penceresi üzerine yazmayı zaten sordu; çok dosyada ad boştu
+    await fs.promises.rename(o.part, final);
+    xferDone.add(final);
+    return { sha: o.hash.digest('hex'), path: final };
+  } catch (e) {
+    await fs.promises.unlink(o.part).catch(() => {});
+    return { error: e.message };
+  }
+});
+ipcMain.handle('xfer:abort', async (_e, key) => {
+  const o = xferOut.get(key);
+  if (!o) return;
+  xferOut.delete(key);
+  await o.fd.close().catch(() => {});
+  await fs.promises.unlink(o.part).catch(() => {});
+});
+ipcMain.handle('xfer:forget', (_e, destKey) => xferDst.delete(destKey));
+ipcMain.handle('xfer:reveal', (_e, p) => xferDone.has(p) && shell.showItemInFolder(p));
+ipcMain.handle('xfer:openFile', (_e, p) => (xferDone.has(p) ? shell.openPath(p) : 'izin yok'));
+// Kapanırken yarım kalan dosyaları sil
+app.on('will-quit', () => {
+  for (const o of xferOut.values()) {
+    try {
+      fs.closeSync(o.fd.fd);
+    } catch {}
+    try {
+      fs.unlinkSync(o.part);
+    } catch {}
+  }
+});
+
 // Kendi kısayolların (global: oyundayken de çalışır)
 let userKeybinds = [];
 ipcMain.handle('keys:set', (_e, list) => {

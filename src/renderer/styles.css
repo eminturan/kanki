@@ -1720,3 +1720,57 @@ label.check.locked { opacity: .55; cursor: not-allowed; }
 .rs-text small { font-size: 11.5px; color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mp-radio-empty { padding: 12px 4px; font-size: 12.5px; }
 .mp-radio-note { margin-top: 6px; font-size: 11.5px; color: var(--text-3); }
+
+/* =====================================================================
+   Doğrudan dosya gönderme kartları (xfer.js) — sağ altta, bildirimlerin altında
+   ===================================================================== */
+#xfer-stack { order: 99; display: flex; flex-direction: column; gap: 8px; width: 360px; max-width: calc(100vw - 36px); }
+#xfer-stack:empty { display: none; }
+.xf-card, .xf-mini {
+  background: color-mix(in srgb, var(--bg-2) 94%, transparent); border: 1px solid var(--line); border-radius: 14px;
+  box-shadow: 0 14px 40px rgba(0,0,0,.5); backdrop-filter: blur(14px); color: var(--text); font-size: 13.5px;
+}
+.xf-card { padding: 14px 14px 12px; }
+.xf-mini { padding: 10px 12px; cursor: pointer; }
+.xf-hdr { display: flex; align-items: center; gap: 8px; font: 600 11.5px var(--mono); color: var(--text-3, var(--text-2)); text-transform: uppercase; letter-spacing: .05em; }
+.xf-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 8px var(--accent); flex: none; }
+.xf-dot.amber { background: #f0b232; box-shadow: 0 0 8px #f0b232; }
+.xf-x { margin-left: auto; cursor: pointer; font-size: 15px; padding: 0 4px; color: var(--text-2); text-transform: none; }
+.xf-x:hover { color: var(--text); }
+.xf-top { display: flex; gap: 11px; align-items: center; }
+.xf-top .avatar.xf-av { width: 34px; height: 34px; font-size: 15px; flex: none; }
+.xf-who { color: var(--text-2); font-size: 13px; }
+.xf-who b { color: var(--text); }
+.xf-file { display: flex; gap: 11px; align-items: center; margin-top: 12px; padding: 10px; border-radius: 10px; background: var(--bg-1); border: 1px solid var(--line); }
+.xf-icon { width: 30px; height: 36px; flex: none; border-radius: 5px; background: var(--bg-3); border: 1px solid var(--line); display: grid; place-items: center; font: 700 9px var(--mono); color: var(--accent); }
+.xf-t { flex: 1; min-width: 0; }
+.xf-fn { font-weight: 600; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.xf-sub { font: 12px var(--mono); color: var(--text-2); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.xf-btns { display: flex; gap: 8px; margin-top: 12px; }
+.xf-sp { flex: 1; }
+.xf-b { flex: 1; height: 34px; border-radius: 9px; border: 1px solid var(--line); background: var(--bg-3); color: var(--text); font: 600 13px var(--font); cursor: pointer; padding: 0 10px; }
+.xf-b:hover { border-color: color-mix(in srgb, var(--accent) 40%, transparent); }
+.xf-b.pri { background: var(--accent); color: var(--accent-ink, #04120a); border-color: transparent; }
+.xf-b.pri:hover { filter: brightness(1.08); }
+.xf-b.red { color: var(--red); }
+.xf-b.sm { flex: none; height: 30px; font-size: 12.5px; }
+.xf-note { font-size: 12px; color: var(--text-2); margin-top: 9px; }
+.xf-lock { color: var(--accent); }
+.xf-timer { height: 3px; border-radius: 2px; background: var(--bg-3); margin-top: 12px; overflow: hidden; }
+.xf-timer i { display: block; height: 100%; background: #f0b232; border-radius: 2px; transition: width 1s linear; }
+.xf-bar { height: 8px; border-radius: 5px; background: var(--bg-3); margin-top: 12px; overflow: hidden; }
+.xf-bar.sm { height: 5px; margin-top: 8px; }
+.xf-bar i { display: block; height: 100%; border-radius: 5px; background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 70%, #000), var(--accent)); transition: width .25s linear; }
+.xf-bar i.out { background: linear-gradient(90deg, #3d8bfd, #7cc4ff); }
+.xf-stats { display: flex; justify-content: space-between; gap: 8px; font: 12px var(--mono); color: var(--text-2); margin-top: 7px; }
+.xf-stats b { color: var(--text); font-weight: 600; }
+.xf-ok { color: var(--accent); font-weight: 600; font-size: 14px; margin-top: 11px; }
+.xf-dim { color: var(--text-2); font: 400 12px var(--mono); }
+.xf-err { display: flex; gap: 9px; align-items: flex-start; font-size: 13.5px; margin-top: 11px; line-height: 1.45; }
+.xf-err .xf-ic { color: var(--red); font-size: 16px; line-height: 1.2; }
+.xf-err small { display: block; color: var(--text-2); font-size: 12.5px; margin-top: 2px; }
+.xf-r1 { display: flex; gap: 8px; align-items: center; font-size: 13px; }
+.xf-nm { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600; }
+.xf-pc { font: 12px var(--mono); color: var(--text-2); flex: none; }
+.xf-arrow.out { color: #7cc4ff; }
+.xf-arrow.in { color: var(--accent); }

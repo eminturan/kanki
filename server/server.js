@@ -247,6 +247,7 @@ function startServer(opts = {}) {
     timeoutUntil: timeoutUntil(u),
     prio: isPrio(u),
     pingColor: pingColorOf(u),
+    xfer: !!u.xfer,
   });
   // Ping ve yayına çizim rengi: yetkilinin kişiye seçtiği renk, seçilmediyse beyaz
   const pingColorOf = (u) => (u && !u.bot && memberOf(u.clientKey)?.pingColor) || '#ffffff';
@@ -1213,6 +1214,7 @@ function startServer(opts = {}) {
           clientKey: String(m.clientKey || '').slice(0, 64) || crypto.randomUUID(), // mesaj düzenleme/silme yetkisi için
           admin: isAdmin,
           bot: isBot,
+          xfer: !isBot && Array.isArray(m.caps) && m.caps.includes('xfer'), // doğrudan (P2P) dosya alabilir
           token: crypto.randomBytes(18).toString('base64url'), // dosya yükleme/indirme için
           ip,
           connectedAt: Date.now(),
@@ -1254,7 +1256,7 @@ function startServer(opts = {}) {
           admin: isAdmin,
           mod: isModUser(me),
           token: me.token,
-          features: ['sfx', 'activity', 'log', 'pins', 'polls', 'votes', 'files', 'preview', 'gif', 'roles', 'chpass', 'afk', 'bans', 'marks', 'watch', 'perms', 'audit', 'timeout', 'serverDeafen', 'moveAll', 'purge', 'slowmode', 'readOnly', 'announce', 'welcomeMessage', 'headers', 'afkMic', 'webClient', 'info', 'leaveVoice', 'icon', 'flash', 'flashCooldown', 'liftVoteMute', 'storm', 'bolts', 'ping', 'pingCooldown', 'pingColor'],
+          features: ['sfx', 'activity', 'log', 'pins', 'polls', 'votes', 'files', 'preview', 'gif', 'roles', 'chpass', 'afk', 'bans', 'marks', 'watch', 'perms', 'audit', 'timeout', 'serverDeafen', 'moveAll', 'purge', 'slowmode', 'readOnly', 'announce', 'welcomeMessage', 'headers', 'afkMic', 'webClient', 'info', 'leaveVoice', 'icon', 'flash', 'flashCooldown', 'liftVoteMute', 'storm', 'bolts', 'ping', 'pingCooldown', 'pingColor', 'p2pFiles'],
           // Roller ve yetkiler
           perms: [...permsOf(me)],
           roles: userRoleIds(me),
@@ -1798,6 +1800,50 @@ function startServer(opts = {}) {
           for (const u of usersByKey(target.clientKey)) send(u.ws, { t: 'voteMuteLifted', by: me.name });
           audit(me, 'liftVoteMute', target.name);
           broadcastState();
+          break;
+        }
+        case 'xfer': {
+          // Doğrudan dosya aktarımı: sunucu sadece el sıkışmayı hedef kişiye iletir (dosya WebRTC ile doğrudan gider)
+          const target = users.get(m.to);
+          if (!target || target.bot || target === me) break;
+          const now = Date.now();
+          // Sıklık sınırı: 5 saniyede en fazla 120 mesaj (bağlantı kurulurken ICE adayları art arda gelir)
+          if (now - (me.xferWin || 0) > 5000) {
+            me.xferWin = now;
+            me.xferN = 0;
+          }
+          if (++me.xferN > 120) break;
+          const id = String(m.id || '').slice(0, 40);
+          if (!/^[A-Za-z0-9_-]{6,40}$/.test(id)) break;
+          const kind = String(m.kind || '');
+          const out = { t: 'xfer', kind, id, from: me.id, name: me.name };
+          if (kind === 'offer') {
+            if (!can(me, 'attachFiles')) {
+              deny(me, 'attachFiles');
+              break;
+            }
+            if (timedOut(me)) {
+              timeoutErr(me);
+              break;
+            }
+            if (now - (me.xferOfferAt || 0) < 1500) break;
+            me.xferOfferAt = now;
+            if (!target.xfer) {
+              errorTo(me, `${target.name} doğrudan dosya alamıyor (eski sürüm ya da tarayıcıdan bağlı).`, 'info');
+              break;
+            }
+            const files = (Array.isArray(m.files) ? m.files : []).slice(0, 50).map((f) => ({ name: cleanFileName(f?.name), size: Math.max(0, Math.floor(Number(f?.size) || 0)) }));
+            if (!files.length) break;
+            out.files = files;
+          } else if (kind === 'answer') out.accept = !!m.accept;
+          else if (kind === 'sig') {
+            const sig = m.sig && typeof m.sig === 'object' ? m.sig : null;
+            const str = sig ? JSON.stringify(sig) : '';
+            if (!str || str.length > 16000) break;
+            out.sig = sig;
+          } else if (kind === 'cancel') out.reason = String(m.reason || '').slice(0, 20);
+          else break;
+          send(target.ws, out);
           break;
         }
         case 'spot': {

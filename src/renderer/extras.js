@@ -170,6 +170,9 @@ function onExtraMessage(m) {
     case 'spot':
       onPing(m);
       break;
+    case 'xfer':
+      if (typeof onXfer === 'function') onXfer(m);
+      break;
     case 'spotSent':
       S.pingAt = Date.now();
       if (typeof m.cooldown === 'number') S.pingCd = m.cooldown;

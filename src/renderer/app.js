@@ -1691,6 +1691,7 @@ function connect(url, password) {
           nameStyle: settings.nameStyle || undefined,
           avatar: settings.avatar || undefined,
           clientKey: CLIENT_KEY,
+          caps: kanki.xferPick ? ['xfer'] : [], // doğrudan dosya alabilir (xfer.js)
         })
       );
     };
@@ -2663,6 +2664,7 @@ function userMenu(e, u) {
         pokeUser(u),
     },
     flashMenuItem(u),
+    typeof xferMenuItem === 'function' && xferMenuItem(u),
     !sameChannel && { label: 'Kanalına git', run: () => joinChannel(u.channelId) },
     ...voteItems(u),
     ...(mod.length ? ['-', { html: '<div class="ctx-label">Moderasyon</div>' }, ...mod] : []),
