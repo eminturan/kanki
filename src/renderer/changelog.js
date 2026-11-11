@@ -6,6 +6,14 @@
  */
 const CHANGELOG = [
   {
+    version: '1.0.49',
+    date: '2026-11-12',
+    title: 'Yayını yakınlaştır',
+    added: [
+      '🔍 İzlediğin ekran paylaşımının üstünde fare tekerleğini çevir: görüntü imlecin olduğu yere doğru 5 kata kadar büyür (Mac\'te iki parmakla sıkıştırma da olur). Yakınken sürükleyerek kaydır, köşedeki "Sıfırla" ile geri dön. Sadece senin ekranında olur.',
+    ],
+  },
+  {
     version: '1.0.48',
     date: '2026-11-11',
     title: 'Doğrudan dosya gönderme',

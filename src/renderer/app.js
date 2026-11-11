@@ -1353,6 +1353,75 @@ function bringFront(el, key) {
   S.activeTile = key;
 }
 
+// Yayını yakınlaştır: tekerlek imlecin olduğu yere doğru 1×–5× (Mac'te sıkıştırma da), yakınken sürükleyerek kaydır.
+// Sadece izleyenin ekranında; işaret/ping konumu ekrandaki kutudan hesaplandığı için yakınken de doğru düşer.
+function attachZoom(video, el, key) {
+  if (isCamKey(key)) return;
+  let s = 1;
+  let x = 0;
+  let y = 0;
+  let drag = null;
+  const badge = h('button', { class: 'tile-zoom hidden', title: 'Yakınlaştırmayı sıfırla' });
+  el.append(badge);
+  const apply = () => {
+    // Görüntü kutunun dışına kaçmasın
+    x = Math.min(0, Math.max(video.offsetWidth * (1 - s), x));
+    y = Math.min(0, Math.max(video.offsetHeight * (1 - s), y));
+    video.style.transform = s === 1 ? '' : `translate(${x}px, ${y}px) scale(${s})`;
+    badge.textContent = `${s.toFixed(1).replace('.', ',')}× · Sıfırla`;
+    badge.classList.toggle('hidden', s === 1);
+    el.classList.toggle('zoomed', s > 1);
+  };
+  video.addEventListener(
+    'wheel',
+    (e) => {
+      // Uzaktan kontrolde tekerlek karşıya gider; 1×'te uzaklaştırma sahneyi kaydırsın
+      if (isControlling(key) || (s === 1 && e.deltaY >= 0)) return;
+      e.preventDefault();
+      const r = video.getBoundingClientRect();
+      const ox = e.clientX - r.left;
+      const oy = e.clientY - r.top;
+      const dy = e.deltaY * (e.deltaMode === 1 ? 40 : e.deltaMode === 2 ? 800 : 1);
+      const ns = Math.min(5, Math.max(1, s * Math.exp(-dy * (e.ctrlKey ? 0.01 : 0.002))));
+      // İmlecin altındaki nokta yerinde kalsın
+      x += ox - (ox / s) * ns;
+      y += oy - (oy / s) * ns;
+      s = ns < 1.02 ? 1 : ns;
+      if (s === 1) x = y = 0;
+      apply();
+    },
+    { passive: false }
+  );
+  video.addEventListener('pointerdown', (e) => {
+    if (s === 1 || e.button !== 0 || e.altKey || el.classList.contains('marking') || isControlling(key)) return;
+    e.preventDefault();
+    drag = { id: e.pointerId, sx: e.clientX - x, sy: e.clientY - y };
+    try {
+      video.setPointerCapture(e.pointerId);
+    } catch {}
+    el.classList.add('panning');
+  });
+  video.addEventListener('pointermove', (e) => {
+    if (!drag || e.pointerId !== drag.id) return;
+    x = e.clientX - drag.sx;
+    y = e.clientY - drag.sy;
+    apply();
+  });
+  const end = (e) => {
+    if (!drag || e.pointerId !== drag.id) return;
+    drag = null;
+    el.classList.remove('panning');
+  };
+  video.addEventListener('pointerup', end);
+  video.addEventListener('pointercancel', end);
+  badge.addEventListener('click', (e) => {
+    e.stopPropagation();
+    s = 1;
+    x = y = 0;
+    apply();
+  });
+  new ResizeObserver(() => s > 1 && apply()).observe(el); // kutu küçülünce görüntü yine kutuyu doldursun
+}
 function buildTile(key) {
   const sc = S.remoteScreens.get(key);
   const vol = h('input', { type: 'range', min: 0, max: 100, value: Math.round((sc?.volume ?? 1) * 100), title: 'Yayın sesi' });
@@ -1413,6 +1482,7 @@ function buildTile(key) {
   );
   const el = h('div', { class: 'tile', 'data-key': key }, video, h('div', { class: 'tile-waiting' }, 'Bağlanıyor…'), rcBadge, bar, h('div', { class: 'tile-resize', title: 'Boyutlandır' }));
   attachRcInput(video, el, key);
+  attachZoom(video, el, key);
   bar.addEventListener('pointerdown', (e) => startDrag(e, key, el, 'move'));
   el.querySelector('.tile-resize').addEventListener('pointerdown', (e) => startDrag(e, key, el, 'resize'));
   el.addEventListener('pointerdown', () => bringFront(el, key), true);

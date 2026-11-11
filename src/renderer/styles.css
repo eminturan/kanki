@@ -293,7 +293,14 @@ body.mac .titlebar { padding-left: 84px; }
 /* Serbest yerleşimli yayın pencereleri */
 .tiles { position: absolute; inset: 12px 16px 14px; }
 .tile { position: absolute; border-radius: 8px; overflow: hidden; background: #000; transition: box-shadow .15s; }
-.tile video { width: 100%; height: 100%; object-fit: contain; display: block; background: #000; }
+.tile video { width: 100%; height: 100%; object-fit: contain; display: block; background: #000; transform-origin: 0 0; }
+.tile.zoomed video { cursor: grab; }
+.tile.panning video { cursor: grabbing; }
+.tile-zoom {
+  position: absolute; left: 10px; bottom: 10px; z-index: 4; border: 0; cursor: pointer; padding: 4px 10px; border-radius: 8px;
+  font: 600 12px var(--mono); color: #fff; background: rgba(8, 10, 11, .72); backdrop-filter: blur(6px);
+}
+.tile-zoom:hover { background: rgba(8, 10, 11, .9); color: var(--accent); }
 .tile-bar {
   position: absolute; top: 0; left: 0; right: 0; display: flex; align-items: center; gap: 8px;
   padding: 8px 8px 18px 10px; background: linear-gradient(rgba(0, 0, 0, .7), transparent);
