@@ -2526,7 +2526,7 @@ function startServer(opts = {}) {
           break;
         }
         case 'ping':
-          send(ws, { t: 'pong', ts: typeof m.ts === 'number' ? m.ts : 0 });
+          send(ws, { t: 'pong', ts: typeof m.ts === 'number' ? m.ts : 0, now: Date.now() }); // now: oyun odasında herkes aynı saati kullansın
           break;
       }
     };

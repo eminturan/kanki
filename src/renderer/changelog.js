@@ -6,6 +6,15 @@
  */
 const CHANGELOG = [
   {
+    version: '1.1.3',
+    date: '2026-11-12',
+    title: 'Oyun odası: herkeste aynı sahne',
+    changed: [
+      'Oyun odasında herkes aynı sahneyi görür: kim koltukta, kim atari başında, kim nerede yürüyor her ekranda aynı. Odayı sonradan açan da aynı anı görür.',
+      'Boşta kalan ya da oyuna giren arkadaşın karakteri herkesin ekranında aynı anda yerine yürür.',
+    ],
+  },
+  {
     version: '1.1.2',
     date: '2026-11-12',
     title: 'Daha az internet kotası',

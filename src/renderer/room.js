@@ -584,7 +584,7 @@ function roomMakeChar(u) {
   tag.className = 'rm-tag';
   tag.innerHTML = '<div class="rm-n"><span class="rm-name"></span><span class="rm-ic"></span></div><div class="rm-a"></div>';
   room.tags.append(tag);
-  return { id: u.id, g, bodyM, legs, arms, head, facePiv, face, rim, ring, waves, zz, tag, phase: Math.random() * 6, speaking: false, debug: { speaking: false } };
+  return { id: u.id, g, bodyM, legs, arms, head, facePiv, face, rim, ring, waves, zz, tag, phase: (rmHash(u.id) % 1000) / 160, speaking: false, debug: { speaking: false } };
 }
 
 function roomSync(members) {
@@ -608,7 +608,11 @@ function roomSync(members) {
     n.style.color = u.pingColor || '#ffffff'; // isim, adminin seçtiği ping renginde
     c.tag.querySelector('.rm-ic').innerHTML = (u.muted ? ICON.micOff : '') + (u.deafened ? ICON.headOff : '') + (icons.includes('live') ? '<b class="live">CANLI</b>' : '');
     Object.assign(c.debug, { name, body, icons });
-    roomPlan(c);
+    const mode = roomMode(u);
+    if (mode !== c.mode) {
+      c.mode = mode;
+      c.zz.forEach((z) => (z.visible = mode === 'idle'));
+    }
   }
   for (const [id, c] of room.chars) {
     if (seen.has(id)) continue;
@@ -622,9 +626,10 @@ function roomSync(members) {
       }
     });
     c.tag.remove();
-    roomFree(c);
     room.chars.delete(id);
   }
+  const as = roomAssign(Math.floor(roomNow() / RM_SLOT));
+  for (const [id, c] of room.chars) Object.assign(c.debug, { goal: as.get(id).goal, label: as.get(id).label });
 }
 
 // Her kare: yüz diski kameraya dönsün, etiketler karakterin üstünde dursun
@@ -634,7 +639,7 @@ let roomTick = (now, dt) => {
   const cam = room.camera, W = room.el.clientWidth, H = room.el.clientHeight;
   const r = room.el.getBoundingClientRect();
   for (const c of room.chars.values()) {
-    roomMove(c, now, dt);
+    roomMove(c);
     c.head.getWorldQuaternion(rmQ);
     c.facePiv.quaternion.copy(rmQ.invert()).multiply(cam.quaternion);
     const p = c.g.position;
@@ -663,38 +668,6 @@ function roomZTex() {
       })
     );
   return rmZ;
-}
-const roomTaken = () => new Set([...room.chars.values()].map((c) => c.spot).filter(Boolean));
-function roomFree(c) {
-  c.spot = null;
-}
-// Varınca bakılacak yön [x, z] (null = kendi konumu)
-const RM_FACE = { tv: [0, -10], desk: [-20, null], arcade: [20, null], foos: [null, 3.6], puf: [0, -10] };
-function roomGo(c, goal, label, stay) {
-  roomFree(c);
-  c.goal = goal;
-  c.label = label;
-  c.until = performance.now() + stay;
-  c.arrived = false;
-  let i = 0;
-  if (goal === 'walk') {
-    c.sit = false;
-    c.look = null;
-  } else {
-    const taken = roomTaken();
-    i = ROOM_SPOTS[goal].findIndex((_, j) => !taken.has(goal + j));
-    const [x, z] = ROOM_SPOTS[goal][i];
-    c.spot = goal + i;
-    c.sit = goal === 'tv' || goal === 'desk' || goal === 'puf';
-    const [fx, fz] = RM_FACE[goal];
-    c.look = new THREE.Vector3(fx ?? x, 0, fz ?? z);
-  }
-  // eşyaların etrafından dolaşan yol (oturduğu yerden kalkarken önce öne çıkar)
-  const p = c.g.position;
-  c.leaving = roomInObst(p.x, p.z, RM_R);
-  c.path = roomPath([p.x, p.z], goal, i).map(([x, z]) => new THREE.Vector3(x, 0, z));
-  c.target = c.path[0];
-  Object.assign(c.debug, { goal, label });
 }
 // ---------- Engeller ve yol bulma ----------
 // Eşyaların zemindeki kutuları [x0, x1, z0, z1]; ilki koltuk
@@ -734,8 +707,8 @@ const rmClear = (a, b) => {
   for (let k = 1; k < n; k++) if (!roomFreeAt(a[0] + ((b[0] - a[0]) * k) / n, a[1] + ((b[1] - a[1]) * k) / n)) return false;
   return true;
 };
-// from'dan goal'ün i. yerine (walk: rastgele boş noktaya) yol: [[x, z], ...], son nokta hedefin kendisi
-function roomPath(from, goal, i = 0) {
+// from'dan goal'ün i. yerine (walk: walkTo'ya, verilmezse rastgele boş noktaya) yol: [[x, z], ...], son nokta hedefin kendisi
+function roomPath(from, goal, i = 0, walkTo = null) {
   const head = [];
   let start = from;
   // bir yerde oturuyorsa önce o yerin önüne çık
@@ -748,6 +721,7 @@ function roomPath(from, goal, i = 0) {
   }
   let end, tail;
   if (goal === 'walk') {
+    end = walkTo;
     for (let k = 0; k < 50 && !end; k++) {
       const p = [(Math.random() - 0.5) * (RW - 6), (Math.random() - 0.5) * (RD - 6)];
       if (roomFreeAt(...p)) end = p;
@@ -794,28 +768,136 @@ function roomPath(from, goal, i = 0) {
   }
   return [...head, ...out.slice(0, -1), ...tail];
 }
-const roomHasFree = (goal) => ROOM_SPOTS[goal].length > [...roomTaken()].filter((k) => k.startsWith(goal)).length;
-// Kişinin durumuna göre ne yapacağını seç (durum değişmediyse dokunma)
-function roomPlan(c) {
-  const u = c.u;
-  const game = u.activity?.game || '';
-  const mode = presenceOf(u) === 'idle' ? 'idle' : game ? 'game:' + game : 'free';
-  if (mode === c.mode) return;
-  c.mode = mode;
-  c.zz.forEach((z) => (z.visible = mode === 'idle'));
-  if (mode === 'idle') return roomGo(c, roomHasFree('puf') ? 'puf' : 'walk', '💤 Boşta', 1e12);
-  if (game) return roomGo(c, roomHasFree('desk') ? 'desk' : 'walk', '🎮 ' + game, 1e12);
-  roomWander(c);
+// ---------- Davranış: herkeste aynı sahne ----------
+// Zaman 12 sn'lik dilimlere bölünür. Her dilimde kimin nereye gideceği kişinin kimliği ve dilim
+// numarasından türeyen sabit bir "zar"la seçilir; yer, dilim başından geçen süreden hesaplanır.
+// Böylece ağdan konum göndermeden her bilgisayar aynı sahneyi çizer (saat: sunucu saati).
+const RM_SLOT = 12000;
+const RM_SPEED = 2.2; // birim/sn
+const roomNow = () => Date.now() + (S.clockOffset || 0);
+function rmHash(s) {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619);
+  return h >>> 0;
 }
-function roomWander(c) {
-  const opts = [
-    ['tv', ''], // etiket TV'nin durumuna göre roomMove'da yazılır
-    ['arcade', '🕹️ Atari oynuyor'],
-    ['foos', '⚽ Langırt oynuyor'],
-    ['walk', '🚶 Geziniyor'],
-  ].filter(([g]) => g === 'walk' || roomHasFree(g));
-  const [goal, label] = opts[Math.floor(Math.random() * opts.length)];
-  roomGo(c, goal, label, 6000 + Math.random() * 6000);
+// (tohum, n) → [0, 1) her yerde aynı
+function rmRand(seed, n) {
+  let t = (seed + Math.imul(n | 0, 0x9e3779b9)) >>> 0;
+  t = Math.imul(t ^ (t >>> 15), t | 1);
+  t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+}
+// Kişinin durumu: boşta → puf, oyunda → masa, diğerleri serbest
+function roomMode(u) {
+  // sunucunun gönderdiği durum (presenceOf kendin için yerel ayarı okur; herkes aynı veriyi kullansın)
+  if ((u.presence || (u.away ? 'idle' : 'online')) === 'idle') return 'idle';
+  return u.activity?.game ? 'game:' + u.activity.game : 'free';
+}
+const RM_LABEL = { arcade: '🕹️ Atari oynuyor', foos: '⚽ Langırt oynuyor', walk: '🚶 Geziniyor' };
+// k. dilimde herkesin hedefi: Map(id → { goal, i, p:[x,z], label }) — kimlik sırasıyla dağıtılır
+const rmAssignCache = new Map();
+function roomAssign(k) {
+  const ids = [...room.chars.keys()].sort();
+  const key = k + '|' + ids.map((id) => id + ':' + room.chars.get(id).mode).join(',');
+  if (rmAssignCache.has(key)) return rmAssignCache.get(key);
+  const taken = new Set();
+  const out = new Map();
+  const take = (goal) => {
+    const i = ROOM_SPOTS[goal].findIndex((_, j) => !taken.has(goal + j));
+    if (i >= 0) taken.add(goal + i);
+    return i;
+  };
+  const walk = (id, label) => {
+    const seed = rmHash(id);
+    let p = [0, 4];
+    for (let n = 0; n < 40; n++) {
+      const q = [(rmRand(seed, k * 97 + n + 1) - 0.5) * (RW - 6), (rmRand(seed, k * 89 + n + 3) - 0.5) * (RD - 6)];
+      if (roomFreeAt(...q)) {
+        p = q;
+        break;
+      }
+    }
+    return { goal: 'walk', i: 0, p, label };
+  };
+  const spot = (goal, i, label) => ({ goal, i, p: ROOM_SPOTS[goal][i], label });
+  // önce duruma bağlı olanlar (yerleri her dilimde aynı kalır)
+  for (const id of ids) {
+    const m = room.chars.get(id).mode;
+    if (m === 'idle') {
+      const i = take('puf');
+      out.set(id, i >= 0 ? spot('puf', i, '💤 Boşta') : walk(id, '💤 Boşta'));
+    } else if (m.startsWith('game:')) {
+      const i = take('desk');
+      const label = '🎮 ' + m.slice(5);
+      out.set(id, i >= 0 ? spot('desk', i, label) : walk(id, label));
+    }
+  }
+  // sonra serbestler: zar
+  for (const id of ids) {
+    if (out.has(id)) continue;
+    const goal = ['tv', 'arcade', 'foos', 'walk'][Math.floor(rmRand(rmHash(id), k) * 4)];
+    const i = goal === 'walk' ? -1 : take(goal);
+    out.set(id, i >= 0 ? spot(goal, i, RM_LABEL[goal] || '') : walk(id, RM_LABEL.walk));
+  }
+  if (rmAssignCache.size > 50) rmAssignCache.clear();
+  rmAssignCache.set(key, out);
+  return out;
+}
+// Yürüyüş parçası: from'dan a hedefine, start anında yola çıkar
+function rmSeg(from, a, start, k) {
+  const path = [from, ...roomPath(from, a.goal, a.i, a.p)];
+  const lens = [0];
+  for (let i = 1; i < path.length; i++) lens.push(lens[i - 1] + Math.hypot(path[i][0] - path[i - 1][0], path[i][1] - path[i - 1][1]));
+  return { from, a, start, k, path, lens, startsInside: roomInObst(from[0], from[1], RM_R) };
+}
+const rmSameTarget = (a, b) => a && b && a.goal === b.goal && a.i === b.i && a.p[0] === b.p[0] && a.p[1] === b.p[1];
+// t anında c'nin parçası (dilim değişince yeni parça; dilim içinde hedef değişirse 2 sn'lik sınırda döner)
+function rmSegAt(c, t) {
+  const k = Math.floor(t / RM_SLOT);
+  const want = roomAssign(k).get(c.id);
+  let s = c.seg;
+  if (!s || s.k !== k) {
+    // yeni dilim: önceki hedeften (bilinmiyorsa önceki dilimin hesabından) yola çık
+    const prev = s && s.k === k - 1 ? s.a.p : roomAssign(k - 1).get(c.id)?.p || want.p;
+    s = c.seg = rmSeg(prev, want, k * RM_SLOT, k);
+    c.pendingAt = 0;
+  } else if (!rmSameTarget(s.a, want)) {
+    // durum ya da kanaldakiler değişti: herkeste aynı anda (sonraki 2 sn'lik sınırda) yeni hedefe dön
+    c.pendingAt ||= Math.ceil(t / 2000) * 2000;
+    if (t >= c.pendingAt) {
+      const e = c.pendingAt;
+      const p = rmPose(s, e);
+      s = c.seg = rmSeg([p.x, p.z], want, e, k);
+      c.pendingAt = 0;
+    }
+  }
+  return s;
+}
+// parçada t anındaki yer: { x, z, dir, arrived, seated }
+function rmPose(s, t) {
+  const d = Math.max(0, ((t - s.start) / 1000) * RM_SPEED);
+  const L = s.lens[s.lens.length - 1];
+  const sit = s.a.goal === 'tv' || s.a.goal === 'desk' || s.a.goal === 'puf';
+  if (d >= L) {
+    const e = s.path[s.path.length - 1];
+    return { x: e[0], z: e[1], dir: null, arrived: true, seated: sit, goal: s.a.goal };
+  }
+  let i = 1;
+  while (s.lens[i] < d) i++;
+  const a = s.path[i - 1], b = s.path[i];
+  const f = (d - s.lens[i - 1]) / (s.lens[i] - s.lens[i - 1] || 1);
+  const leg = i === 1 && s.startsInside; // oturduğu yerden kalkıyor
+  const last = i === s.path.length - 1 && sit; // oturacağı yere giriyor
+  return { x: a[0] + (b[0] - a[0]) * f, z: a[1] + (b[1] - a[1]) * f, dir: Math.atan2(b[0] - a[0], b[1] - a[1]), arrived: false, seated: leg || last, goal: s.a.goal };
+}
+// Test ve hata ayıklama: id'nin t anındaki yeri (herkeste aynı olmalı)
+function roomPoseAt(id, t) {
+  const c = room.chars.get(id);
+  if (!c) return null;
+  const k = Math.floor(t / RM_SLOT);
+  // şimdiki ya da gelecek an: canlı parçayı ilerlet; geçmiş an: o anın parçası (canlıya dokunmadan)
+  if (!c.seg || k > c.seg.k || (k === c.seg.k && t >= c.seg.start)) return rmPose(rmSegAt(c, t), t);
+  return rmPose(rmSeg(roomAssign(k - 1).get(id).p, roomAssign(k).get(id), k * RM_SLOT, k), t);
 }
 function roomSpeaking(id, on) {
   const c = room.chars.get(id);
@@ -830,65 +912,55 @@ function roomLerpAngle(a, b, t) {
   return a + d * t;
 }
 const RM_SIT_Y = { tv: 0.12, desk: 0.18, puf: 0.02 };
-function roomMove(c, now, dt) {
+// Varınca bakılacak yön [x, z] (null = kendi konumu)
+const RM_FACE = { tv: [0, -10], desk: [-20, null], arcade: [20, null], foos: [null, 3.6], puf: [0, -10] };
+function roomMove(c) {
+  const t = roomNow();
+  const s = rmSegAt(c, t);
+  const p = rmPose(s, t);
+  const a = s.a;
   const pos = c.g.position;
-  if (!c.target) return;
-  rmTmp.copy(c.target).sub(pos);
-  rmTmp.y = 0;
-  const d = rmTmp.length();
+  pos.x = p.x;
+  pos.z = p.z;
+  // koltuktaki: TV'de yayın varsa izliyor, yoksa takılıyor
+  const label = a.goal === 'tv' && c.mode === 'free' ? (room.tvKey ? '📺 Yayını izliyor' : '🛋️ Koltukta takılıyor') : a.label;
+  Object.assign(c.debug, { goal: a.goal, label, pos: { x: p.x, z: p.z }, seated: p.seated, t });
   const act = c.tag.querySelector('.rm-a');
-  // koltuktaki: TV'de yayın varsa izliyor, yoksa takılıyor (yayın sonradan açılabilir)
-  if (c.goal === 'tv' && c.mode === 'free') c.label = c.debug.label = room.tvKey ? '📺 Yayını izliyor' : '🛋️ Koltukta takılıyor';
-  // ara noktaya varınca sıradakine geç
-  if (!c.arrived && d <= 0.08 && c.path?.length > 1) {
-    c.path.shift();
-    c.target = c.path[0];
-    c.leaving = false;
-    return roomMove(c, now, dt);
-  }
-  c.debug.pos = { x: pos.x, z: pos.z };
-  // koltuğa/sandalyeye son adımda ya da kalkarken eşyanın içine girmesi normal
-  c.debug.seated = !!c.leaving || (c.sit && (c.arrived || c.path?.length <= 1));
-  if (!c.arrived && d > 0.08) {
-    rmTmp.normalize();
-    pos.addScaledVector(rmTmp, Math.min(d, dt * 2.2));
-    c.g.rotation.y = roomLerpAngle(c.g.rotation.y, Math.atan2(rmTmp.x, rmTmp.z), 0.2);
-    const sw = Math.sin(now * 0.012 + c.phase);
+  const text = p.arrived || a.goal === 'walk' ? label : '🚶 → ' + label;
+  if (act.textContent !== text) act.textContent = text;
+  const sit = p.arrived && (a.goal === 'tv' || a.goal === 'desk' || a.goal === 'puf');
+  if (!p.arrived) {
+    c.g.rotation.y = roomLerpAngle(c.g.rotation.y, p.dir, 0.2);
+    const sw = Math.sin(t * 0.012 + c.phase);
     c.legs[0].rotation.x = sw * 0.6;
     c.legs[1].rotation.x = -sw * 0.6;
     c.arms[0].rotation.x = -sw * 0.5;
     c.arms[1].rotation.x = sw * 0.5;
     pos.y = Math.abs(sw) * 0.06;
     c.head.rotation.z = 0;
-    act.textContent = c.goal === 'walk' ? c.label : '🚶 → ' + c.label;
   } else {
-    c.arrived = true;
-    if (c.look) {
-      rmTmp.copy(c.look).sub(pos);
-      c.g.rotation.y = roomLerpAngle(c.g.rotation.y, Math.atan2(rmTmp.x, rmTmp.z), 0.15);
-    }
-    pos.y = c.sit ? RM_SIT_Y[c.goal] || 0 : 0;
-    c.legs.forEach((l) => (l.rotation.x = c.sit ? -1.4 : 0));
-    const play = c.goal === 'arcade' || c.goal === 'foos' || c.goal === 'desk';
-    c.arms.forEach((a, j) => (a.rotation.x = play ? -1.1 + Math.sin(now * 0.02 + j * 2) * 0.12 : c.sit ? -0.3 : 0));
-    c.head.rotation.z = c.mode === 'idle' ? 0.45 : Math.sin(now * 0.001 + c.phase) * 0.05;
-    act.textContent = c.label;
-    if (now > c.until && c.mode === 'free') roomWander(c);
+    const [fx, fz] = RM_FACE[a.goal] || [null, null];
+    if (fx !== null || fz !== null) c.g.rotation.y = roomLerpAngle(c.g.rotation.y, Math.atan2((fx ?? p.x) - p.x, (fz ?? p.z) - p.z), 0.15);
+    pos.y = sit ? RM_SIT_Y[a.goal] || 0 : 0;
+    c.legs.forEach((l) => (l.rotation.x = sit ? -1.4 : 0));
+    const play = a.goal === 'arcade' || a.goal === 'foos' || a.goal === 'desk';
+    c.arms.forEach((arm, j) => (arm.rotation.x = play ? -1.1 + Math.sin(t * 0.02 + j * 2) * 0.12 : sit ? -0.3 : 0));
+    c.head.rotation.z = c.mode === 'idle' ? 0.45 : Math.sin(t * 0.001 + c.phase) * 0.05;
   }
   // konuşma halkası ve dalgalar
   const ring = c.ring.material;
-  ring.opacity += ((c.speaking ? 0.55 + Math.sin(now * 0.02) * 0.3 : 0) - ring.opacity) * 0.25;
-  c.head.position.y = 1.95 + (c.speaking ? Math.abs(Math.sin(now * 0.025)) * 0.03 : 0);
+  ring.opacity += ((c.speaking ? 0.55 + Math.sin(t * 0.02) * 0.3 : 0) - ring.opacity) * 0.25;
+  c.head.position.y = 1.95 + (c.speaking ? Math.abs(Math.sin(t * 0.025)) * 0.03 : 0);
   c.waves.forEach((w, k) => {
-    const t = (now * 0.0009 + k / 3) % 1;
-    w.scale.setScalar(1 + t * 1.6);
-    w.material.opacity = c.speaking ? (1 - t) * 0.7 : Math.max(0, w.material.opacity - 0.05);
+    const q = (t * 0.0009 + k / 3) % 1;
+    w.scale.setScalar(1 + q * 1.6);
+    w.material.opacity = c.speaking ? (1 - q) * 0.7 : Math.max(0, w.material.opacity - 0.05);
   });
   if (c.mode === 'idle')
     c.zz.forEach((z, k) => {
-      const t = (now * 0.0004 + k / 3) % 1;
-      z.position.set(0.3 + t * 0.5, 2.5 + t * 1.1, 0);
-      z.material.opacity = Math.sin(t * Math.PI);
+      const q = (t * 0.0004 + k / 3) % 1;
+      z.position.set(0.3 + q * 0.5, 2.5 + q * 1.1, 0);
+      z.material.opacity = Math.sin(q * Math.PI);
     });
 }
 

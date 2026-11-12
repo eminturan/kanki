@@ -1823,6 +1823,7 @@ function connect(url, password) {
       return done({ ok: false, error: 'Geçersiz adres.' });
     }
     S.ws = ws;
+    S.clockOffset = S.clockRtt = undefined; // yeni sunucunun saatiyle yeniden ölçülür
     const timeout = setTimeout(() => {
       if (ws.readyState !== 1) {
         ws.close();
@@ -2186,9 +2187,16 @@ function onMessage(m) {
       if (onPermError(m)) break; // yetki, zaman aşımı, salt okunur, yavaş mod (admin.js)
       toast(m.code === 'info' || m.code === 'channel_full' ? m.message : 'Hata', m.code === 'info' || m.code === 'channel_full' ? '' : m.message, 'err');
       break;
-    case 'pong':
-      updatePing(Math.round(performance.now() - m.ts));
+    case 'pong': {
+      const rtt = performance.now() - m.ts;
+      updatePing(Math.round(rtt));
+      // Sunucu saatiyle fark (oyun odası herkeste aynı sahneyi buna göre çizer); en hızlı ölçüm en doğrusu
+      if (typeof m.now === 'number' && !(rtt > (S.clockRtt ?? Infinity) + 30)) {
+        S.clockOffset = m.now + rtt / 2 - Date.now();
+        S.clockRtt = Math.min(rtt, S.clockRtt ?? Infinity);
+      }
       break;
+    }
     default:
       onExtraMessage(m);
   }
