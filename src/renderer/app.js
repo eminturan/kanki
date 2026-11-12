@@ -1651,7 +1651,7 @@ function renderTiles() {
     roomTv(
       keys
         .map((k) => ({ key: k, label: shareLabel(k), stream: isOwnKey(k) ? S.myShares.get(splitKey(k)[1])?.stream : S.remoteScreens.get(k)?.video }))
-        .filter((x) => x.stream?.getVideoTracks().length)
+        .filter((x) => x.stream?.getVideoTracks().some((t) => t.readyState === 'live'))
     );
   if (!S.layoutCustom) gridLayout();
   for (const [k, el] of tileEls) {

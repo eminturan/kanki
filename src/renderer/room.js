@@ -681,6 +681,7 @@ function roomPlan(c) {
 }
 function roomWander(c) {
   const opts = [
+    ['tv', ''], // etiket TV'nin durumuna göre roomMove'da yazılır
     ['arcade', '🕹️ Atari oynuyor'],
     ['foos', '⚽ Langırt oynuyor'],
     ['walk', '🚶 Geziniyor'],
