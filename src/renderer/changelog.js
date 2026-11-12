@@ -6,6 +6,20 @@
  */
 const CHANGELOG = [
   {
+    version: '1.1.4',
+    date: '2026-11-12',
+    title: 'Oyun odası: yeni eşyalar ve insan karakterler',
+    added: [
+      'Odaya akvaryum geldi: balıklar yüzüyor, yosunlar sallanıyor, kabarcıklar yükseliyor.',
+      'Robot süpürge: istasyonunda bekliyor, birkaç dakikada bir odayı temizleyip geri dönüyor. Herkes aynı anda aynı yerde görür.',
+      'Duvarda kitaplı raf, masaların arkasında ses yalıtım panelleri, masalarda klavye, mouse ve ışıklı mousepad.',
+    ],
+    changed: [
+      'Karakterler artık insan gibi: yüz hatları, saç, tişört (ping renginde), kot, spor ayakkabı ve ışıklı oyuncu kulaklığı. Profil fotoğrafı kafada kalır.',
+      'Zemin ahşap parke, halı petrol mavisi desenli, koltuk minderli; eşyalarda hafif yansımalar.',
+    ],
+  },
+  {
     version: '1.1.3',
     date: '2026-11-12',
     title: 'Oyun odası: herkeste aynı sahne',

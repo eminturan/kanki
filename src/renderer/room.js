@@ -77,10 +77,11 @@ function roomUnmount() {
   }
   if (room.tvVideo) room.tvVideo.srcObject = null;
   room.tvTex?.dispose();
+  room.envRT?.dispose();
   room.el?.replaceChildren();
   room.chars.clear();
   room.tags = null;
-  Object.assign(room, { mounted: false, el: null, renderer: null, scene: null, camera: null, composer: null, bloomPass: null, raf: 0, fps: 0, bloom: false, ro: null, off: null, anim: [], tvVideo: null, tvTex: null, tvKey: null, tvList: [], tvBar: null });
+  Object.assign(room, { mounted: false, el: null, renderer: null, scene: null, camera: null, composer: null, bloomPass: null, raf: 0, fps: 0, bloom: false, ro: null, off: null, anim: [], tvVideo: null, tvTex: null, tvKey: null, tvList: [], tvBar: null, envRT: null, rv: null, bubbles: null });
 }
 
 function roomFail(why) {
@@ -95,7 +96,7 @@ function roomDebug() {
   const v = room.tvVideo;
   const tv = { key: room.tvKey || null, playing: !!(v && v.srcObject && v.readyState >= 2 && !v.paused) };
   const mem = room.renderer ? { ...room.renderer.info.memory } : {};
-  return { mounted: room.mounted, fps: room.fps, bloom: room.bloom, tv, mem, follow: room.follow || null, chars: Object.fromEntries([...room.chars].map(([id, c]) => [id, c.debug || {}])) };
+  return { mounted: room.mounted, fps: room.fps, bloom: room.bloom, tv, mem, follow: room.follow || null, vac: room.rv?.pose || null, chars: Object.fromEntries([...room.chars].map(([id, c]) => [id, c.debug || {}])) };
 }
 
 // ---------- Sahne ----------
@@ -145,22 +146,38 @@ function roomBuild() {
   rmLight(0x3a6bff, 8, 3, -6);
   rmLight(0xb04dff, 0, 3.5, 6, 0.9, 14);
 
-  // zemin
+  // zemin: koyu ahşap parke
   const floorTex = new THREE.CanvasTexture(
-    rmCanvas(256, 256, (g) => {
-      g.fillStyle = '#17171c';
-      g.fillRect(0, 0, 256, 256);
-      g.strokeStyle = '#22222a';
-      g.lineWidth = 3;
-      for (let i = 0; i <= 256; i += 64) {
-        g.beginPath(); g.moveTo(i, 0); g.lineTo(i, 256); g.stroke();
-        g.beginPath(); g.moveTo(0, i); g.lineTo(256, i); g.stroke();
+    rmCanvas(512, 512, (g) => {
+      const rows = 8, h = 512 / rows;
+      for (let r = 0; r < rows; r++) {
+        for (let x = -((r * 157) % 256); x < 512; ) {
+          const w = 170 + ((r * 53 + x * 7) & 127);
+          g.fillStyle = `hsl(${22 + ((r + x) % 5)}, 34%, ${12 + ((r * 7 + x) & 7) * 0.9}%)`;
+          g.fillRect(x, r * h, w, h);
+          g.strokeStyle = 'rgba(0,0,0,0.22)';
+          g.lineWidth = 1;
+          for (let k = 0; k < 6; k++) {
+            const y = r * h + 6 + (k * (h - 12)) / 5;
+            g.beginPath();
+            g.moveTo(x, y);
+            g.bezierCurveTo(x + w / 3, y + 3, x + (2 * w) / 3, y - 3, x + w, y + 1);
+            g.stroke();
+          }
+          g.fillStyle = '#07050a';
+          g.fillRect(x, r * h, 2, h);
+          x += w;
+        }
+        g.fillStyle = '#07050a';
+        g.fillRect(0, r * h, 512, 2);
       }
     })
   );
+  floorTex.encoding = THREE.sRGBEncoding;
+  floorTex.anisotropy = 4;
   floorTex.wrapS = floorTex.wrapT = THREE.RepeatWrapping;
-  floorTex.repeat.set(W / 4, D / 4);
-  const floor = new THREE.Mesh(new THREE.PlaneGeometry(W, D), new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.32, metalness: 0.35 }));
+  floorTex.repeat.set(W / 5, D / 5);
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(W, D), new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.4, metalness: 0.1 }));
   floor.rotation.x = -Math.PI / 2;
   floor.receiveShadow = true;
   sc.add(floor);
@@ -279,20 +296,63 @@ function roomBuild() {
     dustGeo.attributes.position.needsUpdate = true;
   });
 
-  // halı, koltuk
-  const rug = new THREE.Mesh(new THREE.CircleGeometry(3.4, 48), rmMat(0x3a1020));
-  rug.rotation.x = -Math.PI / 2;
-  rug.position.set(0, 0.01, -1.5);
+  // halı: koyu petrol mavisi, halkalı desen (koltuktan ayrı dursun)
+  const rugTex = new THREE.CanvasTexture(
+    rmCanvas(512, 512, (g) => {
+      g.fillStyle = '#0f3a40';
+      g.fillRect(0, 0, 512, 512);
+      const ring = (r, c, w) => {
+        g.strokeStyle = c;
+        g.lineWidth = w;
+        g.beginPath();
+        g.arc(256, 256, r, 0, 7);
+        g.stroke();
+      };
+      ring(246, '#d8c9a8', 10);
+      ring(226, '#1d5c63', 16);
+      ring(204, '#c79a4a', 4);
+      ring(150, '#1a5258', 34);
+      ring(96, '#c79a4a', 4);
+      ring(56, '#14474d', 44);
+      for (let i = 0; i < 6000; i++) {
+        g.fillStyle = i & 1 ? 'rgba(0,0,0,0.07)' : 'rgba(255,255,255,0.05)';
+        g.fillRect(Math.random() * 512, Math.random() * 512, 2, 2);
+      }
+    })
+  );
+  rugTex.encoding = THREE.sRGBEncoding;
+  const rug = new THREE.Mesh(new THREE.CylinderGeometry(3.4, 3.4, 0.03, 64), rmMat(0xffffff, { map: rugTex, roughness: 1 }));
+  rug.position.set(0, 0.015, -1.5);
   rug.receiveShadow = true;
   sc.add(rug);
+  // koltuk: gövde, ayrı oturak ve sırt minderleri, kumaş dokusu, ayaklar
+  const fabric = new THREE.CanvasTexture(
+    rmCanvas(128, 128, (g) => {
+      g.fillStyle = '#fff';
+      g.fillRect(0, 0, 128, 128);
+      for (let i = 0; i < 3000; i++) {
+        const v = (195 + Math.random() * 60) | 0;
+        g.fillStyle = `rgb(${v},${v},${v})`;
+        g.fillRect((Math.random() * 128) | 0, (Math.random() * 128) | 0, 1, 1);
+      }
+    })
+  );
+  fabric.wrapS = fabric.wrapT = THREE.RepeatWrapping;
+  fabric.repeat.set(3, 3);
   const sofa = new THREE.Group();
   sofa.position.set(0, 0, 1.6);
   sc.add(sofa);
-  const sofaMat = rmMat(0x5a1424);
-  rmBox(5.2, 0.55, 1.3, sofaMat, 0, 0.45, 0, sofa);
-  rmBox(5.2, 1.1, 0.35, sofaMat, 0, 0.95, 0.5, sofa);
-  rmBox(0.35, 0.85, 1.3, sofaMat, -2.6, 0.7, 0, sofa);
-  rmBox(0.35, 0.85, 1.3, sofaMat, 2.6, 0.7, 0, sofa);
+  const sofaMat = rmMat(0x5a1424, { map: fabric, roughness: 0.95 });
+  const cushMat = rmMat(0x6e1a2e, { map: fabric, roughness: 0.95 });
+  rmBox(5.2, 0.35, 1.3, sofaMat, 0, 0.32, 0, sofa);
+  rmBox(5.2, 1.0, 0.25, sofaMat, 0, 0.95, 0.53, sofa);
+  rmBox(0.35, 0.8, 1.3, sofaMat, -2.6, 0.62, 0, sofa);
+  rmBox(0.35, 0.8, 1.3, sofaMat, 2.6, 0.62, 0, sofa);
+  for (const x of [-1.62, 0, 1.62]) {
+    rmBox(1.58, 0.22, 1.0, cushMat, x, 0.6, -0.1, sofa);
+    rmBox(1.58, 0.72, 0.24, cushMat, x, 1.05, 0.33, sofa).rotation.x = -0.12;
+  }
+  for (const x of [-2.55, 2.55]) for (const z of [-0.5, 0.5]) rmBox(0.1, 0.15, 0.1, rmMat(0x1a120c), x, 0.075, z, sofa);
 
   // oyun masaları
   [[-3.4, 0xff3048], [0, 0x3a6bff], [3.4, 0x22d47e]].forEach(([z, col]) => {
@@ -308,6 +368,10 @@ function roomBuild() {
     rmBox(0.6, 0.6, 0.6, rmMat(0x2a2a34), 0, 0.5, 0.95, g);
     rmBox(0.6, 0.8, 0.1, rmMat(0x2a2a34), 0, 1.1, 1.22, g);
     rmBox(0.25, 0.5, 0.45, rmGlow(col, 0.5), 0.85, 1.35, -0.2, g);
+    rmBox(1.5, 0.012, 0.6, rmGlow(col, 0.35), 0, 1.096, 0.12, g);
+    rmBox(0.9, 0.035, 0.28, rmMat(0x0c0c10, { roughness: 0.5 }), -0.15, 1.12, 0.12, g);
+    rmBox(0.84, 0.006, 0.22, rmGlow(col, 0.7), -0.15, 1.14, 0.12, g);
+    rmBox(0.1, 0.045, 0.16, rmMat(0x0c0c10, { roughness: 0.4 }), 0.5, 1.12, 0.14, g);
   });
   // atari makinesi
   const arc = new THREE.Group();
@@ -370,6 +434,169 @@ function roomBuild() {
   sc.add(room.tv);
   room.tvLight = rmLight(0xff9a70, 0, 2.2, -D / 2 + 2.4, 1.2, 11);
   room.anim.push((now) => (room.tvLight.intensity = 1.3 + Math.sin(now * 0.004) * 0.2));
+
+  // masaların arkasında ses yalıtım panelleri (sol duvara bağlı, tek çizim)
+  const foam = new THREE.CanvasTexture(
+    rmCanvas(64, 64, (g) => {
+      for (let i = 0; i < 8; i++) {
+        g.fillStyle = i & 1 ? '#bdbdbd' : '#ffffff';
+        g.fillRect(0, i * 8, 64, 8);
+      }
+    })
+  );
+  const panels = new THREE.InstancedMesh(new THREE.BoxGeometry(0.06, 0.42, 0.42), rmMat(0xffffff, { map: foam, roughness: 1 }), 27);
+  const pm4 = new THREE.Matrix4();
+  let pi = 0;
+  [[-3.4, 0xff3048], [0, 0x3a6bff], [3.4, 0x22d47e]].forEach(([z, col]) =>
+    [-0.1, 0.36, 0.82].forEach((y, r) =>
+      [-0.46, 0, 0.46].forEach((dz, c) => {
+        panels.setMatrixAt(pi, pm4.makeTranslation(0.18, y, z + dz));
+        panels.setColorAt(pi++, new THREE.Color((r + c) & 1 ? 0x24242c : col).multiplyScalar((r + c) & 1 ? 1 : 0.35));
+      })
+    )
+  );
+  panels.receiveShadow = true;
+  room.walls[1][0].add(panels);
+
+  // arka duvarda raf: kitaplar ve küçük figür
+  const back = room.walls[0][0];
+  rmBox(2.6, 0.06, 0.4, rmMat(0x3a2414), -6.6, -0.7, 0.35, back);
+  let bx = -7.8;
+  [0xb03a3a, 0x2f5fa8, 0xd8b04a, 0x2f8a5a, 0x7a3ab0, 0xdedede, 0xb06a2a].forEach((c, k) => {
+    const w = 0.09 + (k % 3) * 0.03, h = 0.3 + ((k * 5) % 4) * 0.04;
+    rmBox(w, h, 0.28, rmMat(c, { roughness: 0.6 }), bx + w / 2, -0.67 + h / 2, 0.33, back).rotation.z = k === 6 ? 0.25 : 0;
+    bx += w + 0.015;
+  });
+  const fig = new THREE.Mesh(new THREE.SphereGeometry(0.11, 16, 12), rmMat(0xffd21a, { roughness: 0.3, metalness: 0.4 }));
+  fig.position.set(-5.9, -0.45, 0.35);
+  back.add(fig);
+  rmBox(0.18, 0.12, 0.18, rmMat(0x111114), -5.9, -0.61, 0.35, back);
+
+  // akvaryum: sağ duvarda, atari ile langırt arasında
+  const aq = new THREE.Group();
+  aq.position.set(9.15, 0, -1);
+  sc.add(aq);
+  rmBox(0.95, 0.9, 2.7, rmMat(0x141418, { roughness: 0.4 }), 0, 0.45, 0, aq);
+  rmBox(0.74, 0.08, 2.44, rmMat(0xc8b48a, { roughness: 1 }), 0, 0.94, 0, aq);
+  for (const [x, z, r] of [[0.1, -0.6, 0.14], [-0.15, 0.7, 0.11], [0.15, 0.3, 0.08]]) {
+    const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(r, 0), rmMat(0x6a6a70, { roughness: 0.9 }));
+    rock.position.set(x, 0.98 + r * 0.5, z);
+    aq.add(rock);
+  }
+  const weeds = [];
+  for (let k = 0; k < 7; k++) {
+    const w = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.45 + (k % 3) * 0.12, 5), rmMat(k & 1 ? 0x2f9a4a : 0x1f7a3a));
+    w.geometry.translate(0, 0.22, 0); // dipten sallansın
+    w.position.set(((k * 37) % 5) * 0.12 - 0.24, 0.97, -1.1 + k * 0.36);
+    w.userData.live = true;
+    aq.add(w);
+    weeds.push(w);
+  }
+  const fish = [0xff7a1a, 0xffd21a, 0x3ad0ff, 0xff3a8a, 0xff7a1a, 0x9dff5a].map((c, k) => {
+    const f = new THREE.Group();
+    const m = rmMat(c, { roughness: 0.35, emissive: c, emissiveIntensity: 0.25 });
+    const body = new THREE.Mesh(new THREE.SphereGeometry(0.06, 10, 8), m);
+    body.scale.set(0.6, 0.9, 1.6);
+    const tail = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.08, 3), m);
+    tail.rotation.x = -Math.PI / 2;
+    tail.position.z = -0.12;
+    f.add(body, tail);
+    f.userData.live = true;
+    aq.add(f);
+    return { f, k, sp: 0.00035 + k * 0.00007 };
+  });
+  // su: ışıktan etkilenmeyen mavi tül (aydınlatınca beyazlaşıyordu); cam: ince kenar çizgileri
+  const water = new THREE.Mesh(new THREE.BoxGeometry(0.76, 0.86, 2.46), new THREE.MeshBasicMaterial({ color: 0x0b5f8a, transparent: true, opacity: 0.45, depthWrite: false }));
+  water.position.y = 1.35;
+  aq.add(water);
+  const glass = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(0.8, 1.0, 2.5)), new THREE.LineBasicMaterial({ color: 0xbfefff, transparent: true, opacity: 0.6 }));
+  glass.position.y = 1.4;
+  aq.add(glass);
+  rmBox(0.84, 0.06, 2.54, rmMat(0x141418, { roughness: 0.4 }), 0, 1.93, 0, aq);
+  rmBox(0.6, 0.02, 2.3, rmGlow(0x3ab8ff, 0.6), 0, 1.89, 0, aq);
+  // kabarcıklar
+  const BN = 24;
+  const bpos = new Float32Array(BN * 3);
+  for (let k = 0; k < BN; k++) bpos.set([(Math.random() - 0.5) * 0.5, 1 + Math.random() * 0.8, -1 + (k % 3) * 0.06], k * 3);
+  const bgeo = new THREE.BufferGeometry();
+  bgeo.setAttribute('position', new THREE.BufferAttribute(bpos, 3));
+  room.bubbles = new THREE.Points(bgeo, new THREE.PointsMaterial({ size: 0.04, map: dot, transparent: true, opacity: 0.8, color: 0xdff8ff, depthWrite: false }));
+  aq.add(room.bubbles);
+  room.anim.push((now) => {
+    for (const { f, k, sp } of fish) {
+      const a = now * sp + k * 1.7;
+      f.position.set(Math.sin(a * 1.3 + k) * 0.18, 1.3 + Math.sin(a * 2.1 + k) * 0.25, Math.sin(a) * 1.0);
+      f.rotation.y = roomLerpAngle(f.rotation.y, Math.cos(a) > 0 ? 0 : Math.PI, 0.12);
+    }
+    weeds.forEach((w, k) => (w.rotation.z = Math.sin(now * 0.0012 + k) * 0.15));
+    if (!room.bubbles.visible) return;
+    for (let k = 0; k < BN; k++) {
+      bpos[k * 3 + 1] += 0.008 + (k % 4) * 0.002;
+      if (bpos[k * 3 + 1] > 1.75) bpos[k * 3 + 1] = 1;
+    }
+    bgeo.attributes.position.needsUpdate = true;
+  });
+
+  // robot süpürge ve istasyonu (arka duvarın sağında); hareketi herkeste aynı (roomVacuum)
+  const white = rmMat(0xf2f2f2, { roughness: 0.35 });
+  rmBox(0.7, 0.04, 0.55, white, RV_DOCK[0], 0.02, -7.0);
+  rmBox(0.7, 0.5, 0.22, white, RV_DOCK[0], 0.25, -7.22);
+  rmBox(0.12, 0.03, 0.01, rmGlow(0x22d47e, 2), RV_DOCK[0], 0.42, -7.105);
+  const vac = new THREE.Group();
+  vac.userData.live = true;
+  const vb = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 0.09, 32), white);
+  vb.position.y = 0.065;
+  vb.castShadow = true;
+  const bump = new THREE.Mesh(new THREE.CylinderGeometry(0.325, 0.325, 0.05, 32, 1, true, -Math.PI / 2, Math.PI), rmMat(0x9a9aa0, { side: THREE.DoubleSide }));
+  bump.position.y = 0.055;
+  const lidar = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.05, 20), rmMat(0xdcdcdc, { roughness: 0.3 }));
+  lidar.position.set(0, 0.13, -0.08);
+  const ledMat2 = new THREE.MeshBasicMaterial({ color: 0x22d47e, toneMapped: false });
+  const led = new THREE.Mesh(new THREE.SphereGeometry(0.025, 8, 6), ledMat2);
+  led.position.set(0, 0.11, 0.2);
+  const brush = new THREE.Group();
+  brush.position.set(0.2, 0.02, 0.2);
+  brush.userData.live = true;
+  for (let k = 0; k < 3; k++) {
+    const b = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.005, 0.012), rmMat(0x444448));
+    b.rotation.y = (k * Math.PI * 2) / 3;
+    b.geometry.translate(0.08, 0, 0);
+    brush.add(b);
+  }
+  vac.add(vb, bump, lidar, led, brush);
+  sc.add(vac);
+  room.rv = { k: -1, route: null, pose: null };
+  room.anim.push((now) => {
+    const p = roomVacuum(roomNow());
+    vac.position.set(p.x, 0, p.z);
+    vac.rotation.y = roomLerpAngle(vac.rotation.y, p.dir, 0.25);
+    brush.rotation.y += p.cleaning ? 0.5 : 0;
+    ledMat2.color.setHex(p.cleaning ? (now % 1200 < 600 ? 0x3ad0ff : 0x1a70aa) : 0x22d47e);
+  });
+
+  // yansımalar: sahneden bir kez ortam haritası (her karede ek maliyeti yok)
+  // (odanın kendisi değil, odanın ışıklarını taklit eden küçük bir sahne: hızlı ve sorunsuz)
+  const envSc = new THREE.Scene();
+  envSc.add(new THREE.Mesh(new THREE.BoxGeometry(20, 6, 15), new THREE.MeshBasicMaterial({ color: 0x0b0a10, side: THREE.BackSide })));
+  for (const [c, x, y, z, w, h] of [[0xff3048, -6, 2, -7.4, 6, 0.6], [0xff9a70, 0, 1.5, -7.4, 6, 3.5], [0x3a6bff, 6, 2, -7.4, 6, 0.6], [0x3a6bff, -9.9, 2, 0, 0.1, 0.5], [0xb04dff, 9.9, 2, 0, 0.1, 0.5], [0xffffff, 0, 2.9, 0, 6, 0.1]]) {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, w === 0.1 ? 14 : 0.1), new THREE.MeshBasicMaterial({ color: new THREE.Color(c).multiplyScalar(3) }));
+    m.position.set(x, y, z);
+    envSc.add(m);
+  }
+  const pmrem = new THREE.PMREMGenerator(room.renderer);
+  room.envRT = pmrem.fromScene(envSc, 0.04);
+  pmrem.dispose();
+  envSc.traverse((o) => (o.geometry?.dispose(), o.material?.dispose()));
+  sc.environment = room.envRT.texture;
+
+  // sabit eşyalar: matrisleri bir kez hesapla; ışıyan ve saydam parçalar gölge atmasın (gölge çizimi azalır)
+  sc.updateMatrixWorld(true);
+  sc.traverse((o) => {
+    if (o.isMesh && (o.material.toneMapped === false || o.material.transparent)) o.castShadow = false;
+    let live = false;
+    for (let q = o; q; q = q.parent) live ||= !!q.userData.live;
+    if (!live) o.matrixAutoUpdate = false;
+  });
 }
 
 // ---------- Kamera: sürükle = döndür, tekerlek = yakınlaş ----------
@@ -431,7 +658,7 @@ function roomResize() {
   room.camera.updateProjectionMatrix();
 }
 
-// Performans modu: ışıma, toz, gölge ve ışık konileri kapalı, piksel oranı 1
+// Performans modu: ışıma, toz, gölge, ışık konileri, yansıma ve kabarcıklar kapalı, piksel oranı 1
 function roomPerf() {
   if (!room.mounted) return;
   const lite = !!settings.perfMode;
@@ -439,6 +666,8 @@ function roomPerf() {
   room.bloomPass.enabled = !lite;
   room.dust.visible = !lite;
   room.beams.forEach((b) => (b.visible = !lite));
+  room.bubbles.visible = !lite;
+  room.scene.environment = lite ? null : room.envRT.texture;
   room.renderer.shadowMap.enabled = !lite;
   room.renderer.setPixelRatio(lite ? 1 : Math.min(devicePixelRatio, 2));
   roomResize();
@@ -538,20 +767,82 @@ function roomMakeChar(u) {
     parent.add(m);
     return m;
   };
-  part(new THREE.CylinderGeometry(0.34, 0.42, 0.9, 18), bodyM, 1.05, g);
-  const limb = (x, y, r, len, mat) => {
+  // İnsan: ten ve saç rengi kimlikten (herkeste aynı), tişört ping rengi, kot, spor ayakkabı
+  const hsh = rmHash(u.id);
+  const skinM = rmMat([0xf2c9a0, 0xe0ac69, 0xc68642, 0x8d5524][hsh % 4], { roughness: 0.6 });
+  const hairM = rmMat([0x1c140f, 0x3b2516, 0x0c0c0e, 0x6b4423, 0xb8924f][(hsh >> 3) % 5], { roughness: 0.9 });
+  const jeanM = rmMat(0x2c3d5c, { roughness: 0.9 });
+  const shoeM = rmMat(0xf4f4f6, { roughness: 0.5 });
+  const phoneM = rmMat(0x2a2b33, { roughness: 0.4, metalness: 0.3 });
+  const glowM = new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false }); // kulaklık ışığı (ping rengi)
+  // gövde (tişört): kalça → bel → göğüs → omuz → boyun profili, önden arkaya basık
+  const torso = [[0, 0], [0.27, 0], [0.28, 0.1], [0.25, 0.36], [0.3, 0.62], [0.32, 0.74], [0.24, 0.84], [0.1, 0.88], [0, 0.88]].map(([x, y]) => new THREE.Vector2(x, y));
+  part(new THREE.LatheGeometry(torso, 28), bodyM, 0.66, g).scale.z = 0.72;
+  part(new THREE.CylinderGeometry(0.285, 0.29, 0.22, 28), jeanM, 0.7, g).scale.z = 0.74; // kot (kalça)
+  part(new THREE.CylinderGeometry(0.075, 0.085, 0.2, 14), skinM, 1.58, g); // boyun
+  // kol: kısa kollu tişört + çıplak ön kol + el; bacak: kot + ayakkabı
+  const limb = (x, y, parts) => {
     const piv = new THREE.Group();
     piv.position.set(x, y, 0);
-    part(new THREE.CylinderGeometry(r, r, len, 10), mat, -len / 2, piv);
+    let at = 0;
+    for (const [r0, r1, len, mat] of parts) {
+      part(new THREE.CylinderGeometry(r0, r1, len, 14), mat, at - len / 2, piv);
+      part(new THREE.SphereGeometry(r0 * 1.02, 14, 10), mat, at, piv); // eklem
+      at -= len;
+    }
     g.add(piv);
-    return piv;
+    return { piv, end: at };
   };
-  const legs = [-0.15, 0.15].map((x) => limb(x, 0.62, 0.11, 0.6, rmMat(0x1a1a20)));
-  const arms = [-0.45, 0.45].map((x) => limb(x, 1.4, 0.09, 0.62, bodyM));
+  const legs = [-0.14, 0.14].map((x) => {
+    const { piv, end } = limb(x, 0.66, [[0.12, 0.1, 0.32, jeanM], [0.1, 0.08, 0.3, jeanM]]);
+    const shoe = part(new THREE.SphereGeometry(0.1, 16, 10), shoeM, end + 0.02, piv);
+    shoe.scale.set(1, 0.6, 1.7);
+    shoe.position.z = 0.07;
+    return piv;
+  });
+  const arms = [-0.37, 0.37].map((x) => {
+    const { piv, end } = limb(x, 1.42, [[0.095, 0.085, 0.24, bodyM], [0.065, 0.055, 0.34, skinM]]);
+    const hand = part(new THREE.SphereGeometry(0.065, 12, 10), skinM, end - 0.04, piv);
+    hand.scale.set(0.8, 1.2, 1);
+    return piv;
+  });
   const head = new THREE.Group();
   head.position.y = 1.95;
   g.add(head);
-  part(new THREE.SphereGeometry(0.5, 28, 20), bodyM, 0, head);
+  const skull = part(new THREE.SphereGeometry(0.22, 32, 24), skinM, -0.12, head);
+  skull.scale.set(0.9, 1.08, 0.98);
+  // saç: kafanın üstü ve arkası
+  const hair = part(new THREE.SphereGeometry(0.235, 32, 16, 0, Math.PI * 2, 0, Math.PI * 0.55), hairM, -0.1, head);
+  hair.scale.set(0.92, 1.05, 1.0);
+  hair.rotation.x = -0.35;
+  // yüz: gözler, kaşlar, burun, kulaklar
+  for (const sx of [-1, 1]) {
+    const eye = part(new THREE.SphereGeometry(0.028, 12, 8), rmMat(0xffffff, { roughness: 0.3 }), -0.1, head);
+    eye.position.set(sx * 0.075, -0.1, 0.185);
+    const iris = part(new THREE.SphereGeometry(0.016, 10, 8), rmMat(0x2a1a10, { roughness: 0.2 }), -0.1, head);
+    iris.position.set(sx * 0.075, -0.1, 0.207);
+    const brow = part(new THREE.BoxGeometry(0.07, 0.014, 0.02), hairM, -0.055, head);
+    brow.position.set(sx * 0.075, -0.055, 0.2);
+    const ear = part(new THREE.SphereGeometry(0.045, 10, 8), skinM, -0.12, head);
+    ear.position.x = sx * 0.2;
+    ear.scale.set(0.5, 1, 0.8);
+  }
+  const nose = part(new THREE.SphereGeometry(0.03, 10, 8), skinM, -0.15, head);
+  nose.position.z = 0.215;
+  nose.scale.set(0.8, 1, 1.1);
+  const mouth = part(new THREE.BoxGeometry(0.07, 0.012, 0.01), rmMat(0x7a3030, { roughness: 0.6 }), -0.21, head);
+  mouth.position.z = 0.2;
+  // oyuncu kulaklığı: kafanın üstünden bant, iki yanda ışıklı kulaklar
+  part(new THREE.TorusGeometry(0.245, 0.022, 8, 28, Math.PI), phoneM, -0.11, head);
+  for (const sx of [-1, 1]) {
+    const cup = part(new THREE.CylinderGeometry(0.085, 0.085, 0.06, 20), phoneM, -0.12, head);
+    cup.rotation.z = Math.PI / 2;
+    cup.position.x = sx * 0.225;
+    const led = part(new THREE.CylinderGeometry(0.055, 0.055, 0.062, 20), glowM, -0.12, head);
+    led.rotation.z = Math.PI / 2;
+    led.position.x = sx * 0.228;
+    led.castShadow = false;
+  }
   const facePiv = new THREE.Group();
   head.add(facePiv);
   const face = new THREE.Mesh(new THREE.CircleGeometry(0.44, 40), new THREE.MeshBasicMaterial({ toneMapped: false }));
@@ -559,6 +850,8 @@ function roomMakeChar(u) {
   const rim = new THREE.Mesh(new THREE.TorusGeometry(0.45, 0.045, 8, 40), new THREE.MeshBasicMaterial({ toneMapped: false }));
   rim.position.z = 0.53;
   facePiv.add(face, rim);
+  facePiv.position.y = -0.12;
+  facePiv.scale.setScalar(0.55);
   const ring = new THREE.Mesh(new THREE.RingGeometry(0.55, 0.72, 40), new THREE.MeshBasicMaterial({ color: 0x22d47e, transparent: true, opacity: 0, toneMapped: false, depthWrite: false }));
   ring.rotation.x = -Math.PI / 2;
   ring.position.y = 0.02;
@@ -584,7 +877,7 @@ function roomMakeChar(u) {
   tag.className = 'rm-tag';
   tag.innerHTML = '<div class="rm-n"><span class="rm-name"></span><span class="rm-ic"></span></div><div class="rm-a"></div>';
   room.tags.append(tag);
-  return { id: u.id, g, bodyM, legs, arms, head, facePiv, face, rim, ring, waves, zz, tag, phase: (rmHash(u.id) % 1000) / 160, speaking: false, debug: { speaking: false } };
+  return { id: u.id, g, bodyM, glowM, legs, arms, head, facePiv, face, rim, ring, waves, zz, tag, phase: (rmHash(u.id) % 1000) / 160, speaking: false, debug: { speaking: false } };
 }
 
 function roomSync(members) {
@@ -598,6 +891,7 @@ function roomSync(members) {
     c.u = u;
     const body = roomBodyColor(u);
     c.bodyM.color.set(body);
+    c.glowM.color.set(body);
     const nc = roomNameColor(u);
     c.rim.material.color.set(nc);
     roomFaceTex(c, u);
@@ -643,7 +937,7 @@ let roomTick = (now, dt) => {
     c.head.getWorldQuaternion(rmQ);
     c.facePiv.quaternion.copy(rmQ.invert()).multiply(cam.quaternion);
     const p = c.g.position;
-    rmTmp.set(p.x, p.y + 2.7, p.z).project(cam);
+    rmTmp.set(p.x, p.y + 2.35, p.z).project(cam);
     const x = ((rmTmp.x + 1) / 2) * W, y = ((1 - rmTmp.y) / 2) * H;
     c.tag.style.transform = `translate(${x}px, ${y}px) translate(-50%, -100%)`;
     c.tag.style.opacity = rmTmp.z < 1 ? (room.follow && room.follow !== c.id ? 0.45 : 1) : 0;
@@ -680,6 +974,8 @@ const ROOM_OBST = [
   [3.05, 4.15, -2.05, -0.95],
   [-9.45, -8.95, -6.95, -6.45], // bitkiler
   [8.95, 9.45, 6.45, 6.95],
+  [8.65, 9.65, -2.4, 0.4], // akvaryum
+  [6.8, 7.6, -7.35, -6.65], // süpürge istasyonu
 ];
 const RM_R = 0.4; // karakterin yarıçapı
 const RM_BX = RW / 2 - 0.6, RM_BZ = RD / 2 - 0.6; // duvarlardan uzak dur
@@ -962,6 +1258,57 @@ function roomMove(c) {
       z.position.set(0.3 + q * 0.5, 2.5 + q * 1.1, 0);
       z.material.opacity = Math.sin(q * Math.PI);
     });
+}
+
+// ---------- Robot süpürge: 5 dakikada bir ~1 dakika temizler, sonra istasyonuna döner ----------
+// Rota dönem numarasından türeyen sabit zarla seçilir ve sunucu saatiyle yürür: herkeste aynı.
+const RV_CYCLE = 300000, RV_CLEAN = 60000, RV_SPEED = 0.55;
+const RV_DOCK = [7.2, -6.95], RV_FRONT = [7.2, -6.1];
+function rvRoute(k) {
+  if (room.rv.k === k) return room.rv.route;
+  const seed = rmHash('robot-supurge');
+  const pts = [RV_DOCK, RV_FRONT];
+  let cur = RV_FRONT, len = 0;
+  const add = (path) => {
+    for (const q of path) {
+      const a = pts[pts.length - 1];
+      len += Math.hypot(q[0] - a[0], q[1] - a[1]);
+      pts.push(q);
+    }
+  };
+  for (let n = 0; len < (RV_CLEAN / 1000) * RV_SPEED && n < 80; n++) {
+    const q = [(rmRand(seed, k * 131 + n * 2 + 1) - 0.5) * (2 * RM_BX - 1), (rmRand(seed, k * 131 + n * 2 + 2) - 0.5) * (2 * RM_BZ - 1)];
+    if (!roomFreeAt(...q)) continue;
+    add(roomPath(cur, 'walk', 0, q));
+    cur = q;
+  }
+  add(roomPath(cur, 'walk', 0, RV_FRONT));
+  pts.push(RV_DOCK);
+  const lens = [0];
+  for (let i = 1; i < pts.length; i++) lens.push(lens[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
+  room.rv.k = k;
+  room.rv.route = { pts, lens };
+  return room.rv.route;
+}
+// t anında süpürgenin yeri: { x, z, dir, cleaning }
+function roomVacuum(t) {
+  const k = Math.floor(t / RV_CYCLE);
+  const { pts, lens } = rvRoute(k);
+  const d = ((t - k * RV_CYCLE) / 1000) * RV_SPEED;
+  const L = lens[lens.length - 1];
+  let pose;
+  if (d >= L) pose = { x: RV_DOCK[0], z: RV_DOCK[1], dir: 0, cleaning: false };
+  else {
+    let i = 1;
+    while (lens[i] < d) i++;
+    const a = pts[i - 1], b = pts[i];
+    const f = (d - lens[i - 1]) / (lens[i] - lens[i - 1] || 1);
+    const dir = Math.atan2(b[0] - a[0], b[1] - a[1]);
+    // istasyona geri geri girer
+    pose = { x: a[0] + (b[0] - a[0]) * f, z: a[1] + (b[1] - a[1]) * f, dir: i === pts.length - 1 ? dir + Math.PI : dir, cleaning: true };
+  }
+  room.rv.pose = pose;
+  return pose;
 }
 
 // ---------- TV: izlenen yayın duvardaki ekranda oynar ----------
