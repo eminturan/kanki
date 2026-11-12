@@ -18,7 +18,7 @@ Başarı ölçütü: oda açıkken her şey bugünkü kart görünümündeki kad
 ## Kapsam
 
 ### Var
-1. **Görünüm düğmesi:** Sahne başlığında (`.stage-actions`) bir düğme: 🎮 Oyun odası ↔ ▦ Klasik. Seçim `settings.roomView` olarak saklanır.
+1. **Görünüm düğmesi:** Sahne başlığında (`.stage-actions`) bir düğme: 🎮 Oyun odası ↔ ▦ Klasik. İlk açılışta herkeste **Klasik** gelir. Kişi değiştirirse seçimi o bilgisayarda kalıcı olur (`settings.roomView`, yerel ayarlar; sunucuya gitmez, uygulama kapanıp açılsa ve güncellense de korunur). Başka bilgisayarda yine Klasik ile başlar.
 2. **Oda:** Önizlemedeki oda: TV, koltuk, 3 oyun masası, atari, langırt, puflar, bitkiler; neon şeritler, "KANKİ" tabelası (arada titrer), kumanda tabelası, RGB LED, tavan ışık konileri, toz parçacıkları, parlak zemin, bloom, vinyet; kameraya bakan duvar gizlenir. Sürükle = döndür, tekerlek = yakınlaş.
 3. **Karakterler:** Kanaldaki her kişi (bot hariç) bir karakter. Gövde rengi `u.pingColor`'dan türetilir (beyazsa açık gri tonu). Kafada kameraya dönük yüz diski: `S.avatars` içindeki profil fotoğrafı, yoksa baş harf + `colorFor(name)` renkli zemin. Diskin çerçevesi ve isim etiketi kişinin isim rengi (`u.color` / `nameStyle`). Kendi karakterinde "(sen)".
 4. **Durumlar (mevcut veriden):**
