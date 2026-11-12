@@ -91,7 +91,7 @@ git commit -am "Sürüm 1.0.3"
 git tag v1.0.3
 git push origin main v1.0.3
 ```
-GitHub Actions paketleri derler, Release'e `latest.yml` ile birlikte ekler; kurulu uygulamalar güncellemeyi buradan görür.
+GitHub Actions paketleri derler, Release'e `latest.yml` ile birlikte ekler (Windows ve Mac birbirini beklemez, hangisi biterse dosyası hemen Release'e girer); kurulu uygulamalar güncellemeyi buradan görür.
 
 ## Giriş ve sunucu listesi
 - İlk açılışta sadece **kullanıcı adı** sorulur (şifre yok); ad bu bilgisayarda hatırlanır, Ayarlar › Profilim'den değiştirilir.

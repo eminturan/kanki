@@ -5,7 +5,8 @@ name: build
 #
 # Hız için:
 #  - Windows, Mac ve Admin paketleri ayrı makinelerde paralel derlenir (kurulumsuz Windows şimdilik kapalı)
-#  - Release sadece arkadaş sürümünü bekler; Kanki Admin paralelde derlenmeye devam eder
+#  - Arkadaş sürümünün her platformu kendi dosyasını Release'e kendisi ekler (Windows ve Mac birbirini beklemez);
+#    Kanki Admin paralelde derlenir, Release'i bekletmez
 #  - npm paketleri ve Electron indirmeleri önbelleğe alınır
 on:
   workflow_dispatch:
@@ -16,7 +17,7 @@ permissions:
   contents: write
 
 jobs:
-  # Arkadaş sürümü (Kanki): Release bunu bekler
+  # Arkadaş sürümü (Kanki): her platform bitince dosyasını Release'e hemen ekler
   client:
     name: Kanki · ${{ matrix.label }}
     strategy:
@@ -46,6 +47,26 @@ jobs:
       - run: npm ci --prefer-offline --no-audit --no-fund
       - run: npx electron-builder ${{ matrix.args }} --config electron-builder.client.json --publish never
         env: { CSC_IDENTITY_AUTO_DISCOVERY: 'false' }
+      # Release'i ilk biten açar (aynı etikette ikinci Release açılamaz, ikinci deneme hata verip geçer); sonra herkes kendi dosyasını ekler
+      - name: Release'e ekle
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NOTES: |
+            İndirme sayfası ve kurulum adımları: https://kanki-app.github.io/
+
+            | Platform | Dosya |
+            |---|---|
+            | Windows | `Kanki-Setup.exe` (otomatik güncellenir) |
+            | Mac (M1–M4) | `Kanki-mac-arm64.dmg` |
+            | Mac (Intel) | `Kanki-mac-x64.dmg` |
+        run: |
+          shopt -s nullglob
+          files=(dist/client/*.dmg dist/client/*.exe dist/client/latest.yml dist/client/*-Setup.exe.blockmap)
+          [ ${#files[@]} -gt 0 ] || { echo "dosya yok"; exit 1; }
+          gh release create "$GITHUB_REF_NAME" -R "$GITHUB_REPOSITORY" --title "Kanki $GITHUB_REF_NAME" --notes "$NOTES" || true
+          gh release upload "$GITHUB_REF_NAME" -R "$GITHUB_REPOSITORY" "${files[@]}" --clobber
       - uses: actions/upload-artifact@v4
         with:
           name: kanki-client-${{ matrix.label }}
@@ -97,28 +118,3 @@ jobs:
             dist/admin/*-Setup.exe.blockmap
           if-no-files-found: error
           compression-level: 0 # kurulum dosyaları zaten sıkıştırılmış
-
-  release:
-    if: startsWith(github.ref, 'refs/tags/v')
-    needs: client
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          pattern: kanki-client-*
-          merge-multiple: true
-          path: release
-      - run: ls -la release
-      - uses: softprops/action-gh-release@v2
-        with:
-          name: Kanki ${{ github.ref_name }}
-          body: |
-            İndirme sayfası ve kurulum adımları: https://kanki-app.github.io/
-
-            | Platform | Dosya |
-            |---|---|
-            | Windows | `Kanki-Setup.exe` (otomatik güncellenir) |
-            | Mac (M1–M4) | `Kanki-mac-arm64.dmg` |
-            | Mac (Intel) | `Kanki-mac-x64.dmg` |
-          files: release/*
-          fail_on_unmatched_files: true
