@@ -94,7 +94,7 @@ function roomFail(why) {
 function roomDebug() {
   const v = room.tvVideo;
   const tv = { key: room.tvKey || null, playing: !!(v && v.srcObject && v.readyState >= 2 && !v.paused) };
-  return { mounted: room.mounted, fps: room.fps, bloom: room.bloom, tv, chars: Object.fromEntries([...room.chars].map(([id, c]) => [id, c.debug || {}])) };
+  return { mounted: room.mounted, fps: room.fps, bloom: room.bloom, tv, follow: room.follow || null, chars: Object.fromEntries([...room.chars].map(([id, c]) => [id, c.debug || {}])) };
 }
 
 // ---------- Sahne ----------
@@ -401,6 +401,19 @@ function roomControls() {
   addEventListener('pointermove', move);
   addEventListener('pointerup', up);
   cv.addEventListener('wheel', wheel, { passive: false });
+  // Sağ tık: karakterin bugünkü kullanıcı menüsü
+  cv.addEventListener('contextmenu', (e) => {
+    const id = roomPick(e.clientX, e.clientY);
+    const u = id && S.users.get(id);
+    if (u) userMenu(e, u);
+    else e.preventDefault();
+  });
+  // Sol tık: karakteri takip et + profil kartı; boşluğa tık: bırak
+  room.onClick = (e) => {
+    const id = roomPick(e.clientX, e.clientY);
+    room.follow = id;
+    if (id) openProfile(id, room.chars.get(id).tag);
+  };
   room.off = () => {
     removeEventListener('pointermove', move);
     removeEventListener('pointerup', up);
@@ -455,7 +468,10 @@ function roomFrame(now) {
   roomTick?.(now, dt);
   const v = room.view, cam = room.camera;
   const look = room.look || (room.look = new THREE.Vector3(0, 1, 0));
-  const dd = v.dist * Math.max(1, 1.5 / cam.aspect);
+  const fc = room.follow && room.chars.get(room.follow);
+  if (room.follow && !fc) room.follow = null; // takip edilen çıktı
+  look.lerp(fc ? rmTmp.set(fc.g.position.x, 1.2, fc.g.position.z) : rmTmp.set(0, 1, 0), 0.08);
+  const dd = (fc ? Math.min(v.dist, 9) : v.dist) * Math.max(1, 1.5 / cam.aspect);
   cam.position.set(look.x + Math.sin(v.yaw) * Math.cos(v.pitch) * dd, look.y + Math.sin(v.pitch) * dd, look.z + Math.cos(v.yaw) * Math.cos(v.pitch) * dd);
   cam.lookAt(look);
   for (const [w, n] of room.walls) w.visible = n.x * cam.position.x + n.z * cam.position.z < 2;
@@ -805,4 +821,17 @@ function roomTvBar(cur, list) {
   const multi = list.length > 1;
   bar.innerHTML = `${multi ? '<button data-act="prev" title="Önceki yayın">‹</button>' : ''}<span class="rm-tv-name"></span>${multi ? '<button data-act="next" title="Sonraki yayın">›</button>' : ''}<button data-act="big" title="Yayını büyük izle (işaret, ping, yakınlaştırma burada)">⛶ Büyüt</button>`;
   bar.querySelector('.rm-tv-name').textContent = '📺 ' + cur.label;
+}
+
+// Ekrandaki noktada hangi karakter var (kullanıcı id'si ya da null)
+const rmRay = new THREE.Raycaster();
+function roomPick(clientX, clientY) {
+  if (!room.mounted) return null;
+  const r = room.renderer.domElement.getBoundingClientRect();
+  rmRay.setFromCamera({ x: ((clientX - r.left) / r.width) * 2 - 1, y: -((clientY - r.top) / r.height) * 2 + 1 }, room.camera);
+  const hits = rmRay.intersectObjects([...room.chars.values()].map((c) => c.g), true);
+  for (const h of hits) {
+    for (let o = h.object; o; o = o.parent) for (const c of room.chars.values()) if (c.g === o) return c.id;
+  }
+  return null;
 }
