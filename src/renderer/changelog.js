@@ -6,6 +6,19 @@
  */
 const CHANGELOG = [
   {
+    version: '1.1.0',
+    date: '2026-11-12',
+    title: 'Oyun odası',
+    added: [
+      '🎮 Ses kanalının üstündeki "Oyun odası" düğmesiyle kişi kartları yerine 3 boyutlu bir oyun odası açılır: neon ışıklar, TV, koltuk, oyun masaları, atari ve langırt. Herkeste Klasik görünüm gelir; seçtiğin görünüm bu bilgisayarda kalır.',
+      'Kanaldaki herkes bir karakter: kafasında profil fotoğrafı (yoksa baş harfi), gövdesi adminin belirlediği ping renginde. Konuşanın ayağından yeşil dalgalar yayılır; sesi kapalı, kulaklığı kapalı ve CANLI işaretleri etikette görünür.',
+      'Boşta olan pufta uyur, oyundaki oyun masasına oturur ve oyunun adı görünür; diğerleri gezer, koltuğa oturur, atari ya da langırt oynar.',
+      'İzlediğin ekran paylaşımı duvardaki TV\'de oynar. "Büyüt" ile bugünkü yayın penceresine geçersin (işaret, ping, yakınlaştırma orada), "Odaya dön" ile geri gelirsin.',
+      'Karaktere tıkla: kamera onu takip eder ve profili açılır; sağ tık her zamanki kişi menüsünü açar. Odayı sürükleyerek döndür, tekerlekle yakınlaştır.',
+      'Kanki arka plandayken oda yavaşlar, gizliyken durur; performans modunda ışıma ve efektler kapanır. 3D açılamazsa ya da bilgisayar yavaşsa kendiliğinden Klasik görünüme döner.',
+    ],
+  },
+  {
     version: '1.0.50',
     date: '2026-11-12',
     title: 'Ekranın bir bölgesini paylaş',
