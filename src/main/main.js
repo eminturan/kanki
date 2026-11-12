@@ -1321,6 +1321,121 @@ ipcMain.handle('ping:pick', () => {
   });
 });
 
+// Bölge paylaşımı: paylaşılan ekranın üstünde sürükleyerek dikdörtgen seçtirir, 0..1 oranında {x,y,w,h} döner
+const REGION_HTML = (hint) => `<!doctype html><meta charset="utf-8"><style>
+html,body{margin:0;height:100%;overflow:hidden;background:rgba(0,0,0,.35);cursor:crosshair;user-select:none}
+#h{position:fixed;left:50%;top:28px;transform:translateX(-50%);font:600 14px -apple-system,"Segoe UI",sans-serif;color:#fff;background:rgba(8,10,11,.85);padding:8px 16px;border-radius:12px;white-space:nowrap;pointer-events:none}
+#h b{color:#22d47e}
+#r{position:fixed;display:none;border:2px solid #22d47e;box-shadow:0 0 0 9999px rgba(0,0,0,.35);background:transparent}
+body.dr{background:transparent}
+</style><body><div id="h"><b>▣ Bölge seç</b> · Paylaşmak istediğin alanı sürükle &nbsp;·&nbsp; ${hint}</div><div id="r"></div><script>
+var done=false,s=null,r=document.getElementById('r');function out(t){if(done)return;done=true;document.title=t;}
+function box(e){var x=Math.min(s.x,e.clientX),y=Math.min(s.y,e.clientY);return{x:x,y:y,w:Math.abs(e.clientX-s.x),h:Math.abs(e.clientY-s.y)};}
+addEventListener('mousedown',function(e){if(e.button!==0)return out('X');s={x:e.clientX,y:e.clientY};document.body.className='dr';});
+addEventListener('mousemove',function(e){if(!s)return;var b=box(e);r.style.cssText='display:block;left:'+b.x+'px;top:'+b.y+'px;width:'+b.w+'px;height:'+b.h+'px';});
+addEventListener('mouseup',function(e){if(!s)return;var b=box(e);if(b.w<40||b.h<40){s=null;r.style.display='none';document.body.className='';return;}
+out('R'+[b.x/innerWidth,b.y/innerHeight,b.w/innerWidth,b.h/innerHeight].join(','));});
+addEventListener('contextmenu',function(e){e.preventDefault();});
+addEventListener('keydown',function(e){if(e.key==='Escape')out('X');});
+</script>`;
+ipcMain.handle('region:pick', async (_e, sourceId, editing) => {
+  const d = await displayForSource(sourceId);
+  if (!d) return null;
+  return new Promise((resolve) => {
+    const w = new BrowserWindow({
+      ...d.bounds,
+      frame: false,
+      transparent: true,
+      resizable: false,
+      movable: false,
+      skipTaskbar: true,
+      alwaysOnTop: true,
+      hasShadow: false,
+      enableLargerThanScreen: true,
+      show: false,
+      webPreferences: { sandbox: true, contextIsolation: true },
+    });
+    let over = false;
+    const finish = (r) => {
+      if (over) return;
+      over = true;
+      clearTimeout(timer);
+      if (!w.isDestroyed()) w.destroy();
+      resolve(r);
+    };
+    const timer = setTimeout(() => finish(null), 60000);
+    w.setAlwaysOnTop(true, 'screen-saver');
+    w.setVisibleOnAllWorkspaces?.(true, { visibleOnFullScreen: true });
+    w.setContentProtection(true);
+    w.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+    w.webContents.on('will-navigate', (e) => e.preventDefault());
+    w.on('closed', () => finish(null));
+    w.on('page-title-updated', (e, title) => {
+      e.preventDefault();
+      const m = /^R([\d.e-]+),([\d.e-]+),([\d.e-]+),([\d.e-]+)$/.exec(title);
+      if (!m) return finish(null);
+      const [x, y, rw, rh] = m.slice(1).map((v) => Math.max(0, Math.min(1, Number(v) || 0)));
+      finish({ x, y, w: Math.min(rw, 1 - x), h: Math.min(rh, 1 - y) });
+    });
+    w.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(REGION_HTML(editing ? 'Esc: mevcut bölgeyi koru' : 'Esc: vazgeç')));
+    w.webContents.once('did-finish-load', () => {
+      if (w.isDestroyed()) return;
+      w.setBounds(d.bounds);
+      w.show();
+      w.focus();
+      // Test: KANKI_REGION_AT="x,y,w,h" (0..1) ile seçimi kendisi sürükler
+      if (process.env.KANKI_REGION_AT) {
+        const [rx, ry, rw, rh] = process.env.KANKI_REGION_AT.split(',').map(Number);
+        const P = (fx, fy) => ({ x: Math.round(fx * d.bounds.width), y: Math.round(fy * d.bounds.height), button: 'left', clickCount: 1 });
+        setTimeout(() => {
+          if (w.isDestroyed()) return;
+          w.webContents.sendInputEvent({ type: 'mouseDown', ...P(rx, ry) });
+          w.webContents.sendInputEvent({ type: 'mouseMove', ...P(rx + rw, ry + rh) });
+          w.webContents.sendInputEvent({ type: 'mouseUp', ...P(rx + rw, ry + rh) });
+        }, 400);
+      }
+    });
+  });
+});
+// Yayıncının ekranında paylaşılan bölgenin çevresine ince çerçeve (tıklamaları geçirir, yayına girmez)
+const regionFrames = new Map();
+ipcMain.handle('region:frame', async (_e, shareId, sourceId, r) => {
+  const old = regionFrames.get(shareId);
+  if (old && !old.isDestroyed()) old.destroy();
+  regionFrames.delete(shareId);
+  if (!r) return true;
+  const d = await displayForSource(sourceId);
+  if (!d) return false;
+  const B = 3;
+  const b = d.bounds;
+  const fw = new BrowserWindow({
+    x: Math.round(b.x + r.x * b.width) - B,
+    y: Math.round(b.y + r.y * b.height) - B,
+    width: Math.round(r.w * b.width) + 2 * B,
+    height: Math.round(r.h * b.height) + 2 * B,
+    frame: false,
+    transparent: true,
+    resizable: false,
+    movable: false,
+    skipTaskbar: true,
+    focusable: false,
+    alwaysOnTop: true,
+    hasShadow: false,
+    enableLargerThanScreen: true,
+    show: false,
+    webPreferences: { sandbox: true, contextIsolation: true },
+  });
+  regionFrames.set(shareId, fw);
+  fw.setAlwaysOnTop(true, 'screen-saver');
+  fw.setVisibleOnAllWorkspaces?.(true, { visibleOnFullScreen: true });
+  fw.setIgnoreMouseEvents(true);
+  fw.setContentProtection(true);
+  fw.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(`<!doctype html><style>html,body{margin:0;height:100%;background:transparent}body{box-sizing:border-box;border:${B}px solid rgba(34,212,126,.9);border-radius:4px}</style>`));
+  fw.once('ready-to-show', () => !fw.isDestroyed() && fw.showInactive());
+  return true;
+});
+app.on('will-quit', () => regionFrames.forEach((w) => !w.isDestroyed() && w.destroy()));
+
 // Birlikte izle: YouTube videosunun görüntü ve ses adresleri (yt-dlp)
 let watchHeaders = {};
 ipcMain.handle('watch:resolve', async (_e, url, maxHeight) => {

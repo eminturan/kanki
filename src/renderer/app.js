@@ -839,6 +839,7 @@ async function openPicker(arg) {
   $('#opt-hint').value = sh.hint;
   $('#opt-bitrate').value = sh.bitrate;
   $('#opt-audio').checked = sh.audio;
+  $('#opt-region').checked = !!cur?.opts.region;
   $('#picker-title').textContent = cur ? `Yayını düzenle: ${cur.label}` : 'Ekran Paylaş';
   $('#btn-go-live').textContent = cur ? 'Değişiklikleri uygula' : 'Yayına Başla';
   $('#picker-note').textContent =
@@ -857,6 +858,7 @@ async function openPicker(arg) {
 }
 
 function renderSources() {
+  $('#opt-region-wrap').classList.toggle('hidden', !(CAN_REGION && pickerType === 'screen'));
   const box = $('#sources');
   box.innerHTML = '';
   const list = pickerSources.filter((s) => s.type === pickerType);
@@ -907,8 +909,15 @@ async function goLive() {
   const res = Number(sh.res);
   const bitrate = Number(sh.bitrate) || autoBitrate(res, fps);
   const surface = src?.type === 'window' ? 'window' : 'screen';
-  if (editId) return applyShareEdit(editId, { sourceId, label, surface, fps, res, bitrate, bitrateSel: sh.bitrate, hint: sh.hint, audio: sh.audio });
-  const video = videoConstraints(res, fps);
+  let region = null;
+  if (CAN_REGION && surface === 'screen' && $('#opt-region').checked) {
+    const prev = editId && S.myShares.get(editId)?.opts.sourceId === sourceId ? S.myShares.get(editId).opts.region : null;
+    region = (await kanki.regionPick(sourceId, !!prev)) || prev;
+    if (!region) return toast('Bölge seçilmedi', editId ? 'Yayın değiştirilmedi.' : 'Yayın başlatılmadı.');
+  }
+  if (editId) return applyShareEdit(editId, { sourceId, label, surface, fps, res, bitrate, bitrateSel: sh.bitrate, hint: sh.hint, audio: sh.audio, region });
+  // Bölgede ekran tam çözünürlükte yakalanır, sonra kırpılır (yoksa küçük bölge bulanık kalır)
+  const video = videoConstraints(region ? 0 : res, fps);
   // Aynı anda birden fazla yayında sistem sesi sadece bir kez gönderilsin (yoksa yankı olur)
   const audioTaken = [...S.myShares.values()].some((x) => x.stream.getAudioTracks().length);
   const wantAudio = sh.audio && !audioTaken;
@@ -923,7 +932,51 @@ async function goLive() {
     return;
   }
   if (sh.audio && audioTaken) toast('Sistem sesi diğer yayında', 'Ses yankı yapmasın diye sadece ilk yayına ekleniyor.');
-  addShare(stream, { fps, res, bitrate, bitrateSel: sh.bitrate, hint: sh.hint, audioMode, sourceId, surface }, label);
+  const opts = { fps, res, bitrate, bitrateSel: sh.bitrate, hint: sh.hint, audioMode, sourceId, surface };
+  let out = stream;
+  if (region) {
+    const raw = stream.getVideoTracks()[0];
+    const crop = makeCrop(raw, region);
+    out = new MediaStream([crop.track, ...stream.getAudioTracks()]);
+    Object.assign(opts, { raw, crop, region });
+  }
+  addShare(out, opts, label);
+}
+
+// Bölge paylaşımı: ekranın sadece bir dikdörtgeni gönderilir. Kareler kopyalanmadan kırpılır (VideoFrame visibleRect).
+const CAN_REGION = !!kanki.regionPick && typeof MediaStreamTrackProcessor === 'function' && typeof MediaStreamTrackGenerator === 'function';
+function makeCrop(raw, region) {
+  const c = { r: region };
+  const gen = new MediaStreamTrackGenerator({ kind: 'video' });
+  const even = (v) => Math.max(0, Math.floor(v / 2) * 2); // YUV kareler çift hizalı kırpılmalı
+  new MediaStreamTrackProcessor({ track: raw }).readable
+    .pipeThrough(
+      new TransformStream({
+        transform(f, ctl) {
+          const v = f.visibleRect;
+          const x = even(v.x + c.r.x * v.width);
+          const y = even(v.y + c.r.y * v.height);
+          const width = Math.max(2, even(Math.min(c.r.w * v.width, v.x + v.width - x)));
+          const height = Math.max(2, even(Math.min(c.r.h * v.height, v.y + v.height - y)));
+          try {
+            ctl.enqueue(new VideoFrame(f, { visibleRect: { x, y, width, height }, displayWidth: width, displayHeight: height }));
+          } catch (e) {
+            log('crop', e.message);
+          } finally {
+            f.close();
+          }
+        },
+      })
+    )
+    .pipeTo(gen.writable)
+    .catch(() => {});
+  c.track = gen;
+  return c;
+}
+// İzleyenin yayın üstündeki 0..1 konumunu (ping, işaret, uzaktan kontrol) paylaşılan ekrandaki konuma çevir
+function regionPt(sh, x, y) {
+  const r = sh?.opts?.region;
+  return r ? [r.x + x * r.w, r.y + y * r.h] : [x, y];
 }
 
 function videoConstraints(res, fps) {
@@ -982,20 +1035,15 @@ async function applyShareEdit(id, o) {
   const wantAudio = !!o.audio && !audioTakenElsewhere;
   const watchers = () => [...sh.watchers].map((pid) => S.peers.get(pid)).filter(Boolean);
   const changes = [];
+  let newRaw = null;
   // 1) Yeni kaynak ya da sistem sesi açılacaksa yeniden yakala (eski yayın bu sırada sürer)
   if (sourceChanged || (wantAudio && !hadAudio)) {
-    const cap = await captureDisplay(sourceChanged ? o.sourceId : sh.opts.sourceId, videoConstraints(o.res, o.fps), wantAudio && !hadAudio);
+    const cap = await captureDisplay(sourceChanged ? o.sourceId : sh.opts.sourceId, videoConstraints(o.region ? 0 : o.res, o.fps), wantAudio && !hadAudio);
     if (!cap.stream) return toast('Yayın değiştirilemedi', 'Yeni kaynak yakalanamadı; yayın eskisi gibi devam ediyor.', 'err', 7000);
     const nv = cap.stream.getVideoTracks()[0];
     if (sourceChanged && nv) {
-      const ov = sh.stream.getVideoTracks()[0];
       nv.addEventListener('ended', () => removeShare(id));
-      for (const p of watchers()) await p.replaceShareTrack(id, 'video', nv);
-      if (ov) {
-        sh.stream.removeTrack(ov);
-        ov.stop();
-      }
-      sh.stream.addTrack(nv); // aynı akış kimliği: izleyenler yayını aynı pencerede görmeye devam eder
+      newRaw = nv;
       changes.push('kaynak');
     } else if (nv) nv.stop();
     const na = cap.stream.getAudioTracks()[0];
@@ -1008,6 +1056,32 @@ async function applyShareEdit(id, o) {
     } else if (na) na.stop();
     if (wantAudio && !hadAudio && !na) toast('Sistem sesi eklenemedi', 'Yayın görüntü ile devam ediyor.');
   }
+  // 1b) Görüntü: yeni kaynak ve/veya bölge değişikliği. Aynı akış kimliği: izleyenler aynı pencerede izlemeye devam eder.
+  const curV = sh.stream.getVideoTracks()[0];
+  const oldRaw = sh.opts.raw || curV;
+  const raw = newRaw || oldRaw;
+  let out = raw;
+  let crop = null;
+  if (o.region && sh.opts.crop && !newRaw) {
+    sh.opts.crop.r = o.region;
+    crop = sh.opts.crop;
+    out = curV;
+  } else if (o.region && raw) {
+    crop = makeCrop(raw, o.region);
+    out = crop.track;
+  }
+  if (out && out !== curV) {
+    for (const p of watchers()) await p.replaceShareTrack(id, 'video', out);
+    if (curV) {
+      sh.stream.removeTrack(curV);
+      if (curV !== raw) curV.stop();
+    }
+    sh.stream.addTrack(out);
+  }
+  if (newRaw && oldRaw && oldRaw !== curV) oldRaw.stop();
+  if (JSON.stringify(o.region) !== JSON.stringify(sh.opts.region || null)) changes.push(o.region ? 'bölge' : 'tüm ekran');
+  Object.assign(sh.opts, { raw: crop ? raw : null, crop, region: o.region || null });
+  kanki.regionFrame?.(id, o.sourceId || sh.opts.sourceId, o.region || null);
   // 2) Sistem sesi kapatılacaksa
   if (!wantAudio && hadAudio) {
     const oa = sh.stream.getAudioTracks()[0];
@@ -1023,7 +1097,7 @@ async function applyShareEdit(id, o) {
   const qualityChanged = o.fps !== sh.opts.fps || o.res !== sh.opts.res || o.bitrate !== sh.opts.bitrate || o.hint !== sh.opts.hint;
   if (vt) {
     vt.contentHint = o.hint === 'detail' ? 'detail' : 'motion';
-    await vt.applyConstraints(videoConstraints(o.res, o.fps)).catch((e) => log('constraints', e.message));
+    await (sh.opts.raw || vt).applyConstraints(videoConstraints(o.region ? 0 : o.res, o.fps)).catch((e) => log('constraints', e.message));
   }
   for (const p of S.peers.values()) await p.updateShareEncoding(id, o.bitrate, o.fps);
   if (qualityChanged) changes.push('kalite');
@@ -1062,6 +1136,8 @@ function addShare(stream, opts, label) {
     vt.contentHint = opts.hint === 'detail' ? 'detail' : 'motion';
     vt.addEventListener('ended', () => removeShare(id));
   }
+  opts.raw?.addEventListener('ended', () => removeShare(id));
+  if (opts.region) kanki.regionFrame?.(id, opts.sourceId, opts.region);
   // Aynı adı taşıyan yayınları ayırt et (ör. "Ekran", "Ekran 2")
   let name = String(label || 'Ekran').slice(0, 60);
   const taken = new Set([...S.myShares.values()].map((x) => x.label));
@@ -1081,6 +1157,8 @@ function removeShare(id, notify = true) {
   if (S.rcHost?.shareId === id) stopRcHost(true, 'Yayın durdu');
   for (const p of S.peers.values()) p.stopShare(id, notify);
   sh.stream.getTracks().forEach((t) => t.stop());
+  sh.opts.raw?.stop();
+  if (sh.opts.region) kanki.regionFrame?.(id, null, null);
   S.myShares.delete(id);
   if (notify) {
     sendShareStatus();
@@ -5399,6 +5477,10 @@ new MutationObserver(() => $('#rc-modal').classList.contains('hidden') && S.rcPe
 // Gelen fare/klavye olayı: sadece izin verilen kişiden ve kontrol açıkken uygulanır
 function rcIncoming(peerId, m) {
   if (!S.rcHost || S.rcHost.peerId !== peerId || !m || !RC_TYPES.has(m.t)) return;
+  if (m.x !== undefined) {
+    const [x, y] = regionPt(S.myShares.get(S.rcHost.shareId), m.x, m.y);
+    m = { ...m, x, y };
+  }
   kanki.rcInput(m);
 }
 function stopRcHost(notify = true, why = '') {

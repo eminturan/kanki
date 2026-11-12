@@ -6,6 +6,15 @@
  */
 const CHANGELOG = [
   {
+    version: '1.0.50',
+    date: '2026-11-12',
+    title: 'Ekranın bir bölgesini paylaş',
+    added: [
+      '▣ Ekran paylaşırken "Sadece bir bölgesini paylaş"ı işaretle: ekranda sürükleyerek bir dikdörtgen çiz, izleyenler sadece o alanı görür. Paylaşılan alanın çevresinde sadece senin gördüğün ince yeşil bir çerçeve durur.',
+      'Bölgeyi yayın panelindeki Düzenle\'den değiştirebilir ya da tüm ekrana dönebilirsin; izleyenlerde yayın kesilmez. Ping, işaret ve uzaktan kontrol bölgenin içinde doğru yere düşer.',
+    ],
+  },
+  {
     version: '1.0.49',
     date: '2026-11-12',
     title: 'Yayını yakınlaştır',

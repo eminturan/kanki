@@ -40,6 +40,8 @@ contextBridge.exposeInMainWorld('kanki', {
   overlay: (p) => ipcRenderer.send('overlay:update', p),
   showMark: (m) => ipcRenderer.invoke('mark:show', m),
   pingPick: () => ipcRenderer.invoke('ping:pick'),
+  regionPick: (sourceId, editing) => ipcRenderer.invoke('region:pick', sourceId, editing),
+  regionFrame: (shareId, sourceId, r) => ipcRenderer.invoke('region:frame', shareId, sourceId, r),
   // Doğrudan dosya aktarımı
   xferPick: () => ipcRenderer.invoke('xfer:pick'),
   xferRead: (key, len) => ipcRenderer.invoke('xfer:read', key, len),

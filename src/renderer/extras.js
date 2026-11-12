@@ -1444,7 +1444,7 @@ function onMark(m) {
   if (tile) drawMark(tile.querySelector('.mark-layer'), tile.querySelector('video'), m);
   if (m.owner === S.myId) {
     const sh = S.myShares.get(m.share);
-    if (sh?.opts?.sourceId && kanki.showMark) kanki.showMark({ sourceId: sh.opts.sourceId, kind: m.kind, pts: m.pts, name: m.name, color: markColor(m) });
+    if (sh?.opts?.sourceId && kanki.showMark) kanki.showMark({ sourceId: sh.opts.sourceId, kind: m.kind, pts: (m.pts || []).map((q) => regionPt(sh, q[0], q[1])), name: m.name, color: markColor(m) });
     if (m.from !== S.myId && m.stroke !== 'part' && Date.now() - (S.lastMarkLog || 0) > 4000) {
       S.lastMarkLog = Date.now();
       logEvent('📍', `${m.name} yayınına işaret koydu`, { dim: true });
