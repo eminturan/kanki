@@ -6,7 +6,7 @@
  */
 const CHANGELOG = [
   {
-    version: '1.1.4',
+    version: '1.1.3',
     date: '2026-11-12',
     title: 'Oyun odası: herkeste aynı sahne',
     changed: [
