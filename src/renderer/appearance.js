@@ -78,6 +78,7 @@ function applyAppearance() {
   r.classList.toggle('no-aurora', lite || !settings.aurora);
   r.classList.toggle('no-glow', lite || !settings.speakGlow);
   r.classList.toggle('perf', !!settings.perfMode);
+  if (typeof roomPerf === 'function') roomPerf(); // oyun odasında ışıma/toz/gölge
   r.classList.toggle('reduce-motion', settings.motion === 'reduce' || (settings.motion === 'system' && apMqReduce.matches));
   r.classList.toggle('flush', settings.panels === 'flush');
   r.classList.toggle('compact', settings.density === 'compact');
