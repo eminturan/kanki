@@ -124,7 +124,7 @@ GitHub Actions paketleri derler, Release'e `latest.yml` ile birlikte ekler; kuru
 - **Üye listesi:** Sohbet panelinin sağ üstündeki kişiler simgesi tüm sunucudakileri gösterir: en üstte sunucu sahibi, sonra "ayrı göster" rolleri, sonra kanal kanal herkes.
 - **Mesajlar:** `**kalın**`, `*italik*`, `~~üstü çizili~~`, `` `kod` `` ve ```` ```kod bloğu``` ```` desteklenir. `@isim` ile bahsedilen kişide mesaj sarı vurgulanır ve ses çalar (`@herkes` kanaldaki herkese). "X yazıyor…" göstergesi, emoji seçici, gün ayraçları ve yukarı kaydırınca "Yeni mesajlar ↓" düğmesi vardır.
 - **Tepki, yanıt, düzenleme, silme:** Mesajın üzerine gelince sağ üstte araç çubuğu çıkar (sağ tık menüsü de var). Tepkiler mesajın altında sayılarıyla görünür. Yanıtta asıl mesaj alıntılanır, tıklayınca ona gider. Kendi mesajını düzenleyip silebilirsin (boş kutuda `↑` son mesajını düzenler); "Mesajları yönet" yetkisi olan herkesin mesajını silebilir.
-- **Resim gönderme:** Resmi mesaj kutusuna yapıştır, sohbet paneline sürükle-bırak ya da `+` düğmesiyle seç. Gönderilmeden önce küçültülür (en uzun kenar 1920 px). Sunucu her kanalda son 30 resmi saklar. Resme tıklayınca büyür, oradan kaydedilebilir.
+- **Resim gönderme:** Resmi mesaj kutusuna yapıştır, sohbet paneline sürükle-bırak ya da `+` düğmesiyle seç. Gönderilmeden önce küçültülür (en uzun kenar 1920 px). Sunucu her kanalda son 5 resmi saklar (1.1.2; önceden 30, `HISTORY_IMAGES`). Resme tıklayınca büyür, oradan kaydedilebilir.
 - **Profil:** Ayarlar › Profilim'den profil fotoğrafı ve durum yazısı (ör. "🎮 Oyun oynuyor") eklenir. Fotoğraf her yerde baş harfin yerine görünür.
 - **Sohbeti gizle:** Sahnenin sağ üstündeki sohbet düğmesi sağ paneli kapatır, yayınlara daha çok yer kalır; gizliyken gelen mesaj sayısı düğmede görünür.
 - Mesaj kutusu çok satırlıdır: `Enter` gönderir, `Shift+Enter` yeni satır açar.
@@ -147,7 +147,7 @@ GitHub Actions paketleri derler, Release'e `latest.yml` ile birlikte ekler; kuru
 - Sunucu tarafında destek gerekir: Kanki Admin 1.0.18 ve üstü. Eski sunucularda panel uyarı gösterir ve sesler sadece sende çalar.
 
 ## Sohbet araçları
-- **Dosya gönderme:** mesaj kutusundaki + düğmesi ya da sürükle-bırak. Resim değilse dosya olarak gider (en fazla 50 MB). Dosyalar sunucunun belleğinde durur (en fazla 400 MB, 12 saat), sunucu kapanınca silinir; diske yazılmaz.
+- **Dosya gönderme (1.1.2'den beri varsayılan kapalı):** Sunucunun `server-config.json` dosyasına `"fileUploads": true` yazılıp sunucu yeniden başlatılırsa açılır; kapalıyken `features` listesinde `files` yok, `/upload` 403 döner, + menüsü sadece resim seçer. Açıkken: mesaj kutusundaki + düğmesi ya da sürükle-bırak. Resim değilse dosya olarak gider (en fazla 50 MB). Dosyalar sunucunun belleğinde durur (en fazla 400 MB, 12 saat), sunucu kapanınca silinir; diske yazılmaz.
 - **Bağlantı önizlemesi:** mesajdaki ilk bağlantının başlığı, açıklaması ve resmi sunucu tarafından alınır. Yerel ağ adreslerine (192.168.x.x, 127.0.0.1…) istek atılmaz.
 - **GIF:** mesaj kutusundaki GIF düğmesi. Yönetici, Sunucu Ayarları › Genel Bakış'a bir [KLIPY](https://klipy.com) (ücretsiz) ya da GIPHY anahtarı girer; arkadaşlar anahtarsız arar. (Google'ın Tenor servisi 2026'da kapandı.)
 - **Anket, çark, takım kur:** + düğmesinden. Çarkın sonucunu sunucu seçer; takım kur, ses kanalındakileri rastgele böler.

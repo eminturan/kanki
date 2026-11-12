@@ -545,8 +545,9 @@ function attachMenu(e) {
   e.stopPropagation();
   const r = $('#btn-attach').getBoundingClientRect();
   const polls = feat('polls') && can('createPolls');
+  $('#file-input').accept = feat('files') ? '' : 'image/*'; // sohbete dosya yükleme kapalıysa sadece resim
   const items = cleanItems([
-    can('attachFiles') && { label: '📎 Dosya ya da resim gönder', run: () => $('#file-input').click() },
+    can('attachFiles') && { label: feat('files') ? '📎 Dosya ya da resim gönder' : '🖼️ Resim gönder', run: () => $('#file-input').click() },
     polls && '-',
     polls && { label: '📊 Anket oluştur', run: pollForm },
     polls && { label: '🎡 Çark çevir', run: wheelForm },
@@ -624,7 +625,7 @@ async function uploadFile(file) {
   if (!can('attachFiles')) return toast('Dosya gönderemezsin', 'Bu sunucuda dosya ve resim gönderme yetkin yok.', 'err');
   const blk = chatBlock();
   if (blk) return toast('Dosya gönderilemiyor', blk.text, 'err');
-  if (!feat('files') || !kanki.uploadFile) return toast('Dosya gönderilemiyor', 'Bu sunucu dosya göndermeyi desteklemiyor; sunucuyu kuran kişinin Kanki Admin’i güncellemesi gerekir.', 'err');
+  if (!feat('files') || !kanki.uploadFile) return toast('Dosya yükleme kapalı', 'Bu sunucuda sohbete dosya yükleme kapalı. Dosyayı kişiye sağ tık › Dosya gönder ile doğrudan gönderebilirsin.', 'err');
   if (file.size > 50 * 1024 * 1024) return toast('Dosya çok büyük', 'En fazla 50 MB gönderebilirsin.', 'err');
   if (!file.size) return toast('Dosya boş', '', 'err');
   const job = { name: file.name, size: file.size };

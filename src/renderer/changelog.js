@@ -6,6 +6,15 @@
  */
 const CHANGELOG = [
   {
+    version: '1.1.2',
+    date: '2026-11-12',
+    title: 'Daha az internet kotası',
+    changed: [
+      'Sunucu her yazı kanalında artık son 5 resmi saklıyor (önceden 30). Kanalı açan herkese eski resimler tekrar gönderilmediği için sunucunun interneti daha az harcanıyor.',
+      'Sohbete + ile dosya yükleme şimdilik kapalı; + menüsünden sadece resim gönderilir. Dosya göndermek için kişiye sağ tık › Dosya gönder: dosya sunucudan geçmeden doğrudan gider.',
+    ],
+  },
+  {
     version: '1.1.1',
     date: '2026-11-12',
     title: 'Oyun odası düzeltmeleri',

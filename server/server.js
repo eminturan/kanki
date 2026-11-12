@@ -266,6 +266,9 @@ function startServer(opts = {}) {
   // Profil fotoğrafı: küçük bir resim (data URL). Durum yayınlarını şişirmesin diye ayrı mesajla gider.
   const AVATAR_MAX = 60 * 1024;
   const IMAGE_MAX = 3 * 1024 * 1024;
+  const HISTORY_IMAGES = 5;
+  // Sohbete dosya yükleme (ngrok'tan geçer): varsayılan kapalı; server-config.json'da "fileUploads": true ile açılır
+  const fileUploads = () => conf.fileUploads === true;
   const isImageData = (s, max) => typeof s === 'string' && s.length <= max && /^data:image\/(png|jpeg|webp|gif);base64,[A-Za-z0-9+/=]+$/.test(s);
   const cleanStatus = (s) => cleanName(s, 80);
   // İsim stili (yazı tipi, efekt, renkler): sadece bilinen değerler kabul edilir
@@ -543,9 +546,9 @@ function startServer(opts = {}) {
     const arr = chatHistory.get(channelId);
     arr.push(msg);
     if (arr.length > 200) arr.splice(Math.max(0, arr.findIndex((x) => !x.pinned)), 1); // sabitlenmiş mesajlar silinmez
-    // Bellek şişmesin: kanal başına en yeni 30 resim saklanır, eskilerinin yerine not kalır
+    // Kanal başına en yeni 5 resim saklanır (kanalı açan herkese ngrok'tan tekrar gider), eskilerinin yerine not kalır
     const withImg = arr.filter((x) => x.image);
-    for (const x of withImg.slice(0, Math.max(0, withImg.length - 30))) {
+    for (const x of withImg.slice(0, Math.max(0, withImg.length - HISTORY_IMAGES))) {
       x.image = null;
       x.imageExpired = true;
     }
@@ -1000,6 +1003,10 @@ function startServer(opts = {}) {
         req.resume();
         return json(403, { error: 'Yetkisiz' });
       }
+      if (!fileUploads()) {
+        req.resume();
+        return json(403, { error: 'Sohbete dosya yükleme bu sunucuda kapalı. Dosyayı kişiye sağ tık › Dosya gönder ile gönderebilirsin.', code: 'uploads_off' });
+      }
       if (!can(user, 'attachFiles') || timedOut(user)) {
         req.resume();
         return json(403, { error: timedOut(user) ? 'Zaman aşımındayken dosya gönderemezsin.' : 'Bu sunucuda dosya gönderme yetkin yok.', code: timedOut(user) ? 'timed_out' : 'forbidden' });
@@ -1256,7 +1263,7 @@ function startServer(opts = {}) {
           admin: isAdmin,
           mod: isModUser(me),
           token: me.token,
-          features: ['sfx', 'activity', 'log', 'pins', 'polls', 'votes', 'files', 'preview', 'gif', 'roles', 'chpass', 'afk', 'bans', 'marks', 'watch', 'perms', 'audit', 'timeout', 'serverDeafen', 'moveAll', 'purge', 'slowmode', 'readOnly', 'announce', 'welcomeMessage', 'headers', 'afkMic', 'webClient', 'info', 'leaveVoice', 'icon', 'flash', 'flashCooldown', 'liftVoteMute', 'storm', 'bolts', 'ping', 'pingCooldown', 'pingColor', 'p2pFiles'],
+          features: ['sfx', 'activity', 'log', 'pins', 'polls', 'votes', ...(fileUploads() ? ['files'] : []), 'preview', 'gif', 'roles', 'chpass', 'afk', 'bans', 'marks', 'watch', 'perms', 'audit', 'timeout', 'serverDeafen', 'moveAll', 'purge', 'slowmode', 'readOnly', 'announce', 'welcomeMessage', 'headers', 'afkMic', 'webClient', 'info', 'leaveVoice', 'icon', 'flash', 'flashCooldown', 'liftVoteMute', 'storm', 'bolts', 'ping', 'pingCooldown', 'pingColor', 'p2pFiles'],
           // Roller ve yetkiler
           perms: [...permsOf(me)],
           roles: userRoleIds(me),
