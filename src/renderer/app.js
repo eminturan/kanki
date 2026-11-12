@@ -2104,7 +2104,8 @@ function onMessage(m) {
       renderMusic();
       break;
     case 'botReply':
-      toast('🎵 Müzik Botu', m.text, '', 6000);
+      // bot artık sohbete yazmıyor; cevap burada (kuyruk listesi gibi çok satırlıysa daha uzun kalır)
+      toast('🎵 Müzik Botu', String(m.text || '').replace(/\*\*|`/g, ''), 'multiline', String(m.text || '').includes('\n') ? 12000 : 6000);
       break;
     case 'avatars':
       S.avatars = new Map(Object.entries(m.avatars || {}));

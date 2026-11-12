@@ -229,9 +229,9 @@ const fmt = (s) => {
 };
 const chName = (cid) => B.channels.find((c) => c.id === cid)?.name || 'başka bir kanal';
 let replyTo = null; // kanalda değilken yanıt isteyen kişiye özel gider
+// Bot sohbete yazmaz (herkese gidip ngrok kotası harcamasın): cevap sadece komutu verene bildirim olarak gider
 function say(text) {
-  if (B.channelId) send({ t: 'chat', text });
-  else if (replyTo) send({ t: 'botReplyTo', to: replyTo, text });
+  if (replyTo) send({ t: 'botReplyTo', to: replyTo, text });
 }
 // Kanala geç ve sunucu onaylayana kadar bekle (yanıtlar o kanala yazılsın)
 async function joinChannel(cid) {

@@ -12,6 +12,8 @@ const CHANGELOG = [
     changed: [
       'Sunucu her yazı kanalında artık son 5 resmi saklıyor (önceden 30). Kanalı açan herkese eski resimler tekrar gönderilmediği için sunucunun interneti daha az harcanıyor.',
       'Sohbete + ile dosya yükleme şimdilik kapalı; + menüsünden sadece resim gönderilir. Dosya göndermek için kişiye sağ tık › Dosya gönder: dosya sunucudan geçmeden doğrudan gider.',
+      'Müzik botu artık sohbete yazmıyor; komutuna verdiği cevap sadece sana bildirim olarak gelir.',
+      'Sunucuyla uygulama arasındaki mesajlar sıkıştırılıyor; aynı kullanımda çok daha az internet harcanıyor.',
     ],
   },
   {

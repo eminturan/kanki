@@ -1126,7 +1126,8 @@ function startServer(opts = {}) {
       } catch {}
     }
   });
-  const wss = new WebSocketServer({ server: httpServer, maxPayload: 4 * 1024 * 1024 }); // sohbette resim gönderilebilsin
+  // maxPayload: sohbette resim gönderilebilsin. perMessageDeflate: 1 KB üstü mesajlar sıkıştırılır (durum mesajları ~5× küçülür, ngrok kotası)
+  const wss = new WebSocketServer({ server: httpServer, maxPayload: 4 * 1024 * 1024, perMessageDeflate: { threshold: 1024 } });
   wss.on('error', (e) => log('WebSocket sunucu hatası:', e && e.message));
   // Şifre deneme sınırı (IP başına; bu makineden gelenler hariç): 10 dakikada 10 hatalı deneme → 5 dakika bekle
   const pwFails = new Map(); // ip -> { n, first, until }
@@ -1481,7 +1482,7 @@ function startServer(opts = {}) {
           // Bot kanalda değilken (ya da sadece isteyene) kısa yanıt
           if (!me.bot) break;
           const target = users.get(m.to);
-          if (target) send(target.ws, { t: 'botReply', text: String(m.text || '').slice(0, 300) });
+          if (target) send(target.ws, { t: 'botReply', text: String(m.text || '').slice(0, 1500) }); // kuyruk listesi de sığsın
           break;
         }
         case 'botLeave': {

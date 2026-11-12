@@ -413,6 +413,7 @@ body.mac .titlebar { padding-left: 84px; }
   box-shadow: 0 8px 16px rgba(0, 0, 0, .3); animation: tin .18s ease-out; border-left: 3px solid var(--accent);
 }
 .toast.err { border-left-color: var(--red); }
+.toast.multiline { white-space: pre-line; }
 .toast.poke { border-left-color: var(--amber); }
 .toast b { display: block; margin-bottom: 2px; }
 @keyframes tin { from { transform: translateY(8px); opacity: 0; } }
