@@ -248,6 +248,7 @@ function startServer(opts = {}) {
     prio: isPrio(u),
     pingColor: pingColorOf(u),
     xfer: !!u.xfer,
+    room: u.room || null,
   });
   // Ping ve yayına çizim rengi: yetkilinin kişiye seçtiği renk, seçilmediyse beyaz
   const pingColorOf = (u) => (u && !u.bot && memberOf(u.clientKey)?.pingColor) || '#ffffff';
@@ -561,6 +562,7 @@ function startServer(opts = {}) {
       u.channelId = null;
       u.sharing = false;
       u.shares = [];
+      u.room = null;
       activity({ kind: 'move', id: u.id, name: u.name, from: old, to: null });
       for (const v of votes.values()) if (v.targetId === u.id) endVote(v, false);
       broadcastState();
@@ -573,6 +575,7 @@ function startServer(opts = {}) {
     u.channelId = channelId;
     u.sharing = false;
     u.shares = [];
+    u.room = null; // yeni kanalın odasında otomatikle başla
     if (inAfk(u) && !u.muted) {
       u.muted = true;
       send(u.ws, { t: 'forceMute', by: 'Sunucu', server: true, afk: true });
@@ -1786,6 +1789,27 @@ function startServer(opts = {}) {
             (u) => u.channelId === me.channelId && u.id !== me.id && !u.bot
           );
           break;
+        case 'room': {
+          // Oyun odası: kendi karakterini yönlendir (durumda saklanır) / el salla, dans, ping (kanala yayın)
+          const now = Date.now();
+          if (!me.channelId || me.bot || timedOut(me) || now - (me.roomAt || 0) < 250) break;
+          me.roomAt = now;
+          const num = (x, a) => Math.max(-a, Math.min(a, Number(x) || 0));
+          const p = Array.isArray(m.p) ? [num(m.p[0], 10), num(m.p[1], 7.5)] : null;
+          if (m.kind === 'go' && p) {
+            const spot = ['tv', 'desk', 'arcade', 'foos', 'puf'].includes(m.spot) ? m.spot : null;
+            me.room = { p, spot, at: now };
+            broadcastState();
+          } else if (m.kind === 'auto') {
+            if (me.room) {
+              me.room = null;
+              broadcastState();
+            }
+          } else if (m.kind === 'emote' || (m.kind === 'ping' && p)) {
+            broadcast({ t: 'room', from: me.id, name: me.name, color: pingColorOf(me), kind: m.kind, emote: m.emote === 'dance' ? 'dance' : 'wave', p, at: now }, (u) => u.channelId === me.channelId && !u.bot);
+          }
+          break;
+        }
         case 'poke': {
           const target = users.get(m.to);
           if (!target || target.bot) break;

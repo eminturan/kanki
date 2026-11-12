@@ -167,6 +167,9 @@ function onExtraMessage(m) {
     case 'mark':
       onMark(m);
       break;
+    case 'room':
+      if (typeof roomEvent === 'function') roomEvent(m);
+      break;
     case 'spot':
       onPing(m);
       break;

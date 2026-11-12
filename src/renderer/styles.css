@@ -1787,6 +1787,11 @@ label.check.locked { opacity: .55; cursor: not-allowed; }
 .room { position: absolute; inset: 0; overflow: hidden; border-radius: inherit; background: #020203; }
 .room canvas { display: block; width: 100%; height: 100%; }
 .rm-tags { position: absolute; inset: 0; pointer-events: none; }
+.rm-bar { position: absolute; left: 12px; bottom: 12px; display: flex; gap: 6px; z-index: 2; }
+.rm-bar button { height: 34px; min-width: 34px; padding: 0 10px; border: 1px solid rgba(255,255,255,.12); border-radius: 10px; background: rgba(8,8,10,.72); color: #fff; font-size: 16px; cursor: pointer; }
+.rm-bar button:hover { background: rgba(40,40,48,.85); }
+.rm-bar .rm-auto { font-size: 13px; font-weight: 700; }
+.rm-ping { position: absolute; left: 0; top: 0; font-weight: 800; font-size: 13px; padding: 2px 8px; border-radius: 8px; background: rgba(8,8,10,.78); white-space: nowrap; }
 .rm-tag { position: absolute; left: 0; top: 0; text-align: center; white-space: nowrap; will-change: transform; }
 .rm-n { display: inline-flex; align-items: center; gap: 4px; font-weight: 800; font-size: 13px; padding: 2px 9px; border-radius: 9px; background: rgba(8,8,10,.78); text-shadow: 0 0 8px currentColor; }
 .rm-ic { display: inline-flex; gap: 3px; color: #ff6b78; }

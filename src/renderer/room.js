@@ -35,6 +35,20 @@ function roomMount(el) {
     el.append(renderer.domElement);
     room.tags = el.appendChild(document.createElement('div'));
     room.tags.className = 'rm-tags';
+    room.bar = el.appendChild(document.createElement('div'));
+    room.bar.className = 'rm-bar';
+    room.bar.innerHTML = '<button data-e="wave" title="El salla">👋</button><button data-e="dance" title="Dans et">💃</button><button class="rm-auto" hidden title="Karakterin kendi gezsin">🤖 Otomatik</button>';
+    room.bar.onclick = (e) => {
+      const b = e.target.closest('button');
+      if (!b) return;
+      if (b.dataset.e) send({ t: 'room', kind: 'emote', emote: b.dataset.e });
+      else {
+        send({ t: 'room', kind: 'auto' });
+        b.hidden = true;
+      }
+    };
+    room.emotes = new Map();
+    room.pings = [];
     renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -81,7 +95,7 @@ function roomUnmount() {
   room.el?.replaceChildren();
   room.chars.clear();
   room.tags = null;
-  Object.assign(room, { mounted: false, el: null, renderer: null, scene: null, camera: null, composer: null, bloomPass: null, raf: 0, fps: 0, bloom: false, ro: null, off: null, anim: [], tvVideo: null, tvTex: null, tvKey: null, tvList: [], tvBar: null, envRT: null, rv: null, bubbles: null });
+  Object.assign(room, { mounted: false, el: null, renderer: null, scene: null, camera: null, composer: null, bloomPass: null, raf: 0, fps: 0, bloom: false, ro: null, off: null, anim: [], tvVideo: null, tvTex: null, tvKey: null, tvList: [], tvBar: null, envRT: null, rv: null, bubbles: null, bar: null, emotes: null, pings: [], vac: null });
 }
 
 function roomFail(why) {
@@ -565,6 +579,7 @@ function roomBuild() {
   }
   vac.add(vb, bump, lidar, led, brush);
   sc.add(vac);
+  room.vac = vac;
   room.rv = { k: -1, route: null, pose: null };
   room.anim.push((now) => {
     const p = roomVacuum(roomNow());
@@ -633,14 +648,26 @@ function roomControls() {
   cv.addEventListener('contextmenu', (e) => {
     const id = roomPick(e.clientX, e.clientY);
     const u = id && S.users.get(id);
-    if (u) userMenu(e, u);
-    else e.preventDefault();
+    if (u) return userMenu(e, u);
+    e.preventDefault();
+    const fp = rmFloorPt(e.clientX, e.clientY);
+    if (fp) send({ t: 'room', kind: 'ping', p: fp });
   });
   // Sol tık: karakteri takip et + profil kartı; boşluğa tık: bırak
   room.onClick = (e) => {
     const id = roomPick(e.clientX, e.clientY);
     room.follow = id;
-    if (id) openProfile(id, room.chars.get(id).tag);
+    if (id) return openProfile(id, room.chars.get(id).tag);
+    const fp = rmFloorPt(e.clientX, e.clientY);
+    if (!fp || !room.chars.has(S.myId)) return;
+    // eşyanın yanına tıklandıysa oraya otur / oyna
+    let best = null, bd = 1.3;
+    for (const [g, list] of Object.entries(ROOM_SPOTS))
+      for (const q of list) {
+        const d = Math.hypot(q[0] - fp[0], q[1] - fp[1]);
+        if (d < bd) [best, bd] = [g, d];
+      }
+    send({ t: 'room', kind: 'go', p: fp, spot: best });
   };
   room.off = () => {
     removeEventListener('pointermove', move);
@@ -902,6 +929,8 @@ function roomSync(members) {
     n.style.color = u.pingColor || '#ffffff'; // isim, adminin seçtiği ping renginde
     c.tag.querySelector('.rm-ic').innerHTML = (u.muted ? ICON.micOff : '') + (u.deafened ? ICON.headOff : '') + (icons.includes('live') ? '<b class="live">CANLI</b>' : '');
     Object.assign(c.debug, { name, body, icons });
+    c.man = u.room || null;
+    if (u.id === S.myId && room.bar) room.bar.querySelector('.rm-auto').hidden = !(c.man && roomNow() - c.man.at < RM_MAN_MS);
     const mode = roomMode(u);
     if (mode !== c.mode) {
       c.mode = mode;
@@ -932,8 +961,10 @@ const rmQ = new THREE.Quaternion();
 let roomTick = (now, dt) => {
   const cam = room.camera, W = room.el.clientWidth, H = room.el.clientHeight;
   const r = room.el.getBoundingClientRect();
+  for (const c of room.chars.values()) roomMove(c);
+  roomSeparate();
+  roomPings(now);
   for (const c of room.chars.values()) {
-    roomMove(c);
     c.head.getWorldQuaternion(rmQ);
     c.facePiv.quaternion.copy(rmQ.invert()).multiply(cam.quaternion);
     const p = c.g.position;
@@ -1092,9 +1123,14 @@ function roomMode(u) {
 const RM_LABEL = { arcade: '🕹️ Atari oynuyor', foos: '⚽ Langırt oynuyor', walk: '🚶 Geziniyor' };
 // k. dilimde herkesin hedefi: Map(id → { goal, i, p:[x,z], label }) — kimlik sırasıyla dağıtılır
 const rmAssignCache = new Map();
-function roomAssign(k) {
+const RM_MAN_MS = 180000;
+const RM_SPOT_LABEL = { tv: '🛋️ Koltukta', desk: '🖥️ Masada', arcade: '🕹️ Atari oynuyor', foos: '⚽ Langırt oynuyor', puf: '🪑 Pufta' };
+// c'nin k. dilimde geçerli elle hedefi (before: bu andan önce verilmiş olanlar)
+const rmManual = (c, k, before = Infinity) =>
+  c.mode === 'free' && c.man && c.man.at < before && c.man.at < (k + 1) * RM_SLOT && k * RM_SLOT < c.man.at + RM_MAN_MS ? c.man : null;
+function roomAssign(k, before = Infinity) {
   const ids = [...room.chars.keys()].sort();
-  const key = k + '|' + ids.map((id) => id + ':' + room.chars.get(id).mode).join(',');
+  const key = k + '|' + before + '|' + ids.map((id) => id + ':' + room.chars.get(id).mode + ':' + (rmManual(room.chars.get(id), k, before)?.at || '')).join(',');
   if (rmAssignCache.has(key)) return rmAssignCache.get(key);
   const taken = new Set();
   const out = new Map();
@@ -1116,8 +1152,23 @@ function roomAssign(k) {
     return { goal: 'walk', i: 0, p, label };
   };
   const spot = (goal, i, label) => ({ goal, i, p: ROOM_SPOTS[goal][i], label });
-  // önce duruma bağlı olanlar (yerleri her dilimde aynı kalır)
+  // önce elle verilenler (erken verilen önce): seçilen eşyanın en yakın boş yeri, yoksa tıklanan nokta
+  const mans = ids.map((id) => [id, rmManual(room.chars.get(id), k, before)]).filter(([, m]) => m).sort((a, b) => a[1].at - b[1].at || (a[0] < b[0] ? -1 : 1));
+  for (const [id, m] of mans) {
+    let a = null;
+    if (m.spot && ROOM_SPOTS[m.spot]) {
+      const free = ROOM_SPOTS[m.spot].map((q, j) => [j, Math.hypot(q[0] - m.p[0], q[1] - m.p[1])]).filter(([j]) => !taken.has(m.spot + j)).sort((x, y) => x[1] - y[1]);
+      if (free.length) {
+        taken.add(m.spot + free[0][0]);
+        a = spot(m.spot, free[0][0], RM_SPOT_LABEL[m.spot]);
+      }
+    }
+    if (!a) a = { goal: 'walk', i: 0, p: roomFreeAt(...m.p) ? m.p : rmCellXZ(rmNearestCell(...m.p)), label: '🧍 Takılıyor' };
+    out.set(id, { ...a, at: m.at });
+  }
+  // sonra duruma bağlı olanlar (yerleri her dilimde aynı kalır)
   for (const id of ids) {
+    if (out.has(id)) continue;
     const m = room.chars.get(id).mode;
     if (m === 'idle') {
       const i = take('puf');
@@ -1155,8 +1206,23 @@ function rmSegAt(c, t) {
   if (!s || s.k !== k) {
     // yeni dilim: önceki hedeften (bilinmiyorsa önceki dilimin hesabından) yola çık
     const prev = s && s.k === k - 1 ? s.a.p : roomAssign(k - 1).get(c.id)?.p || want.p;
-    s = c.seg = rmSeg(prev, want, k * RM_SLOT, k);
+    if (want.at > k * RM_SLOT) {
+      // dilimin ortasında verilmiş: o ana kadar eski hedefe yürüyordu
+      s = rmSeg(prev, roomAssign(k, want.at).get(c.id) || want, k * RM_SLOT, k);
+      if (t >= want.at) {
+        const p = rmPose(s, want.at);
+        s = rmSeg([p.x, p.z], want, want.at, k);
+      }
+      c.seg = s;
+    } else s = c.seg = rmSeg(prev, want, k * RM_SLOT, k);
     c.pendingAt = 0;
+  } else if (!rmSameTarget(s.a, want) && want.at > s.start) {
+    // elle verilen yeni hedef: tam verildiği anda dön
+    if (t >= want.at) {
+      const p = rmPose(s, want.at);
+      s = c.seg = rmSeg([p.x, p.z], want, want.at, k);
+      c.pendingAt = 0;
+    }
   } else if (!rmSameTarget(s.a, want)) {
     // durum ya da kanaldakiler değişti: herkeste aynı anda (sonraki 2 sn'lik sınırda) yeni hedefe dön
     c.pendingAt ||= Math.ceil(t / 2000) * 2000;
@@ -1221,6 +1287,7 @@ function roomMove(c) {
   // koltuktaki: TV'de yayın varsa izliyor, yoksa takılıyor
   const label = a.goal === 'tv' && c.mode === 'free' ? (room.tvKey ? '📺 Yayını izliyor' : '🛋️ Koltukta takılıyor') : a.label;
   Object.assign(c.debug, { goal: a.goal, label, pos: { x: p.x, z: p.z }, seated: p.seated, t });
+  c.fixed = p.seated || (p.arrived && a.goal !== 'walk'); // oturan / oynayan itilmez
   const act = c.tag.querySelector('.rm-a');
   const text = p.arrived || a.goal === 'walk' ? label : '🚶 → ' + label;
   if (act.textContent !== text) act.textContent = text;
@@ -1242,6 +1309,26 @@ function roomMove(c) {
     const play = a.goal === 'arcade' || a.goal === 'foos' || a.goal === 'desk';
     c.arms.forEach((arm, j) => (arm.rotation.x = play ? -1.1 + Math.sin(t * 0.02 + j * 2) * 0.12 : sit ? -0.3 : 0));
     c.head.rotation.z = c.mode === 'idle' ? 0.45 : Math.sin(t * 0.001 + c.phase) * 0.05;
+  }
+  // el sallama / dans (4 sn, herkeste aynı an)
+  c.arms.forEach((arm) => (arm.rotation.z = 0));
+  const em = room.emotes?.get(c.id);
+  const et = em ? t - em.at : -1;
+  c.debug.emote = et >= 0 && et < 4000 ? em.kind : null;
+  if (c.debug.emote === 'wave') {
+    c.arms[1].rotation.x = 0;
+    c.arms[1].rotation.z = 2.5 + Math.sin(et * 0.015) * 0.35;
+  } else if (c.debug.emote === 'dance') {
+    const b = et * 0.011;
+    c.arms[0].rotation.z = -2.2 - Math.sin(b) * 0.6;
+    c.arms[1].rotation.z = 2.2 - Math.sin(b) * 0.6;
+    c.arms.forEach((arm) => (arm.rotation.x = 0));
+    if (!sit) {
+      pos.y = Math.abs(Math.sin(b)) * 0.18;
+      c.g.rotation.y += Math.sin(b * 0.5) * 0.06;
+      c.legs[0].rotation.x = Math.sin(b) * 0.35;
+      c.legs[1].rotation.x = -Math.sin(b) * 0.35;
+    }
   }
   // konuşma halkası ve dalgalar
   const ring = c.ring.material;
@@ -1368,6 +1455,97 @@ function roomTvBar(cur, list) {
 
 // Ekrandaki noktada hangi karakter var (kullanıcı id'si ya da null)
 const rmRay = new THREE.Raycaster();
+// Ekrandaki noktanın zemindeki karşılığı [x, z] (oda dışıysa null)
+const rmFloor = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+function rmFloorPt(clientX, clientY) {
+  if (!room.mounted) return null;
+  const r = room.renderer.domElement.getBoundingClientRect();
+  rmRay.setFromCamera({ x: ((clientX - r.left) / r.width) * 2 - 1, y: -((clientY - r.top) / r.height) * 2 + 1 }, room.camera);
+  const v = rmRay.ray.intersectPlane(rmFloor, new THREE.Vector3());
+  return v && Math.abs(v.x) < RW / 2 && Math.abs(v.z) < RD / 2 ? [+v.x.toFixed(2), +v.z.toFixed(2)] : null;
+}
+
+// Sunucudan gelen oda olayı: el sallama / dans ya da ping
+function roomEvent(m) {
+  if (!room.mounted) return;
+  if (m.kind === 'emote') room.emotes.set(m.from, { kind: m.emote, at: m.at });
+  if (m.kind !== 'ping' || !m.p) return;
+  const ring = new THREE.Mesh(new THREE.RingGeometry(0.32, 0.46, 40), new THREE.MeshBasicMaterial({ color: m.color || '#ffffff', transparent: true, toneMapped: false, depthWrite: false, side: THREE.DoubleSide }));
+  ring.rotation.x = -Math.PI / 2;
+  ring.position.set(m.p[0], 0.04, m.p[1]);
+  room.scene.add(ring);
+  const tag = room.tags.appendChild(document.createElement('div'));
+  tag.className = 'rm-ping';
+  tag.textContent = '📍 ' + m.name;
+  tag.style.color = m.color || '#ffffff';
+  room.pings.push({ ring, tag, p: m.p, at: m.at });
+}
+// Ping halkaları: 4 sn büyüyüp sönerek durur
+function roomPings() {
+  const t = roomNow(), cam = room.camera, W = room.el.clientWidth, H = room.el.clientHeight;
+  room.pings = room.pings.filter((pg) => {
+    const age = (t - pg.at) / 4000;
+    if (age >= 1) {
+      room.scene.remove(pg.ring);
+      pg.ring.geometry.dispose();
+      pg.ring.material.dispose();
+      pg.tag.remove();
+      return false;
+    }
+    pg.ring.scale.setScalar(1 + ((age * 4) % 1) * 0.8);
+    pg.ring.material.opacity = 1 - age;
+    rmTmp.set(pg.p[0], 0.7, pg.p[1]).project(cam);
+    pg.tag.style.transform = `translate(${((rmTmp.x + 1) / 2) * W}px, ${((1 - rmTmp.y) / 2) * H}px) translate(-50%, -100%)`;
+    pg.tag.style.opacity = rmTmp.z < 1 ? 1 - age * age : 0;
+    return true;
+  });
+}
+
+// Çarpışma: aynı andaki hesaplanmış yerlerden durumsuz itme (her bilgisayarda aynı sonuç, ağ yok).
+// Yürüyenler birbirinden 0,8 birim uzak durur; oturan / oynayan yerinden oynamaz; süpürge kişilerden kaçar.
+const RM_GAP = 0.8, RV_GAP = 0.75;
+function roomSeparate() {
+  const list = [...room.chars.values()].sort((a, b) => (a.id < b.id ? -1 : 1));
+  const off = list.map(() => [0, 0]);
+  for (let i = 0; i < list.length; i++)
+    for (let j = i + 1; j < list.length; j++) {
+      const a = list[i], b = list[j];
+      if (a.fixed && b.fixed) continue;
+      const pa = a.g.position, pb = b.g.position;
+      let dx = pb.x - pa.x, dz = pb.z - pa.z;
+      const d = Math.hypot(dx, dz);
+      if (d >= RM_GAP) continue;
+      [dx, dz] = d > 1e-4 ? [dx / d, dz / d] : [1, 0];
+      const push = RM_GAP - d;
+      const wa = a.fixed ? 0 : b.fixed ? 1 : 0.5;
+      off[i][0] -= dx * push * wa;
+      off[i][1] -= dz * push * wa;
+      off[j][0] += dx * push * (1 - wa);
+      off[j][1] += dz * push * (1 - wa);
+    }
+  list.forEach((c, i) => {
+    const pos = c.g.position, x = pos.x + off[i][0], z = pos.z + off[i][1];
+    if ((off[i][0] || off[i][1]) && !roomInObst(x, z, 0.25)) {
+      pos.x = x;
+      pos.z = z;
+    }
+  });
+  const v = room.vac?.position;
+  if (!v) return;
+  let ox = 0, oz = 0;
+  for (const c of list) {
+    const dx = v.x - c.g.position.x, dz = v.z - c.g.position.z, d = Math.hypot(dx, dz);
+    if (d < RV_GAP && d > 1e-4) {
+      ox += (dx / d) * (RV_GAP - d);
+      oz += (dz / d) * (RV_GAP - d);
+    }
+  }
+  if ((ox || oz) && !roomInObst(v.x + ox, v.z + oz, 0.2)) {
+    v.x += ox;
+    v.z += oz;
+  }
+}
+
 function roomPick(clientX, clientY) {
   if (!room.mounted) return null;
   const r = room.renderer.domElement.getBoundingClientRect();

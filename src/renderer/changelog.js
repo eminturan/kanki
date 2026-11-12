@@ -6,6 +6,17 @@
  */
 const CHANGELOG = [
   {
+    version: '1.1.5',
+    date: '2026-11-13',
+    title: 'Oyun odası: karakterini yönet',
+    added: [
+      'Odada yere tıkla, karakterin oraya yürüsün; koltuğa, pufa, masaya, atariye ya da langırta tıkla, gidip otursun ya da oynasın. 3 dakika sonra ya da "🤖 Otomatik" ile kendi gezmeye döner.',
+      'Sol alttaki 👋 ve 💃 ile el salla ya da dans et; herkes aynı anda görür.',
+      'Yere sağ tıkla: ping halkası ve ismin herkeste 4 saniye görünür.',
+    ],
+    fixed: ['Karakterler birbirinin içinden geçmiyor; robot süpürge de kişilerin ayağının altından geçmek yerine kenara kayıyor.'],
+  },
+  {
     version: '1.1.4',
     date: '2026-11-12',
     title: 'Oyun odası: yeni eşyalar ve insan karakterler',
