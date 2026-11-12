@@ -2451,8 +2451,10 @@ function renderStage() {
           class: `share-pill ${on ? 'active' : ''}`,
           title: on ? (popped ? 'Ayrı pencerede — öne getirmek için tıkla' : 'Öne getir') : 'İzlemeye başla',
           onclick: () => {
+            if (roomActive() && !popped) room.tvWant = key; // oyun odasında tıklanan yayın TV'ye gelir
             if (!on) return watchShare(u.id, sh.id, true);
             if (popped) return popouts.get(key).win.focus();
+            if (roomActive()) return renderTiles();
             const el = tileEls.get(key);
             if (el) {
               bringFront(el, key);
@@ -3196,7 +3198,8 @@ window.addEventListener('keydown', (e) => {
     e.preventDefault();
     toggleDeafen();
   }
-  if (e.key === 'f' && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName || '') && tileEls.size) toggleFullscreen();
+  // oyun odasında yayın pencereleri gizli: tam ekran için önce Büyüt
+  if (e.key === 'f' && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName || '') && tileEls.size && !roomActive()) toggleFullscreen();
   if (e.key === 'Escape') {
     hideCtx();
     // Üstte başka pencere açıksa önce o kapansın; sunucu ayarları kaydedilmemişse açık kalsın

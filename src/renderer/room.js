@@ -94,7 +94,8 @@ function roomFail(why) {
 function roomDebug() {
   const v = room.tvVideo;
   const tv = { key: room.tvKey || null, playing: !!(v && v.srcObject && v.readyState >= 2 && !v.paused) };
-  return { mounted: room.mounted, fps: room.fps, bloom: room.bloom, tv, follow: room.follow || null, chars: Object.fromEntries([...room.chars].map(([id, c]) => [id, c.debug || {}])) };
+  const mem = room.renderer ? { ...room.renderer.info.memory } : {};
+  return { mounted: room.mounted, fps: room.fps, bloom: room.bloom, tv, mem, follow: room.follow || null, chars: Object.fromEntries([...room.chars].map(([id, c]) => [id, c.debug || {}])) };
 }
 
 // ---------- Sahne ----------
@@ -611,6 +612,14 @@ function roomSync(members) {
   for (const [id, c] of room.chars) {
     if (seen.has(id)) continue;
     room.scene.remove(c.g);
+    // Three.js sahneden çıkarınca GPU belleğini boşaltmaz; oda gün boyu açık kalırsa büyümesin
+    c.g.traverse((o) => {
+      o.geometry?.dispose();
+      if (o.material) {
+        if (o.material.map !== rmZ) o.material.map?.dispose(); // Z dokusu herkesin ortak
+        o.material.dispose();
+      }
+    });
     c.tag.remove();
     roomFree(c);
     room.chars.delete(id);
@@ -775,6 +784,8 @@ function roomMove(c, now, dt) {
 function roomTv(list) {
   if (!room.mounted) return;
   room.tvList = list;
+  // Yayın etiketine tıklanan yayın (henüz görüntüsü gelmemiş olabilir) gelince TV'ye geçer
+  if (room.tvWant && list.some((x) => x.key === room.tvWant)) [room.tvKey, room.tvWant] = [room.tvWant, null];
   if (!list.some((x) => x.key === room.tvKey)) room.tvKey = list[0]?.key || null;
   const cur = list.find((x) => x.key === room.tvKey) || null;
   if (!room.tvVideo) {
