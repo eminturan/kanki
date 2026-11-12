@@ -466,7 +466,6 @@ function roomFrame(now) {
     }
   }
   for (const f of room.anim) f(now, dt);
-  roomTick?.(now, dt);
   const v = room.view, cam = room.camera;
   const look = room.look || (room.look = new THREE.Vector3(0, 1, 0));
   const fc = room.follow && room.chars.get(room.follow);
@@ -475,6 +474,8 @@ function roomFrame(now) {
   const dd = (fc ? Math.min(v.dist, 9) : v.dist) * Math.max(1, 1.5 / cam.aspect);
   cam.position.set(look.x + Math.sin(v.yaw) * Math.cos(v.pitch) * dd, look.y + Math.sin(v.pitch) * dd, look.z + Math.cos(v.yaw) * Math.cos(v.pitch) * dd);
   cam.lookAt(look);
+  cam.updateMatrixWorld(); // etiketler ve tıklama bu karenin kamerasıyla hesaplansın (takipte titremesin)
+  roomTick?.(now, dt);
   for (const [w, n] of room.walls) w.visible = n.x * cam.position.x + n.z * cam.position.z < 2;
   room.composer.render();
 }
@@ -577,7 +578,7 @@ function roomMakeChar(u) {
     return sp;
   });
   // ilk yer: odanın ortasına yakın rastgele
-  g.position.set((Math.random() - 0.5) * 8, 0, 2 + Math.random() * 3);
+  g.position.set((Math.random() - 0.5) * 8, 0, 3 + Math.random() * 2.5); // koltuğun arkası, boş alan
   room.scene.add(g);
   const tag = document.createElement('div');
   tag.className = 'rm-tag';
@@ -604,7 +605,7 @@ function roomSync(members) {
     const icons = [u.muted && 'mic', u.deafened && 'head', screenSharesOf(u).length && 'live'].filter(Boolean);
     const n = c.tag.querySelector('.rm-name');
     n.textContent = name;
-    n.style.color = nc;
+    n.style.color = u.pingColor || '#ffffff'; // isim, adminin seçtiği ping renginde
     c.tag.querySelector('.rm-ic').innerHTML = (u.muted ? ICON.micOff : '') + (u.deafened ? ICON.headOff : '') + (icons.includes('live') ? '<b class="live">CANLI</b>' : '');
     Object.assign(c.debug, { name, body, icons });
     roomPlan(c);
@@ -675,21 +676,123 @@ function roomGo(c, goal, label, stay) {
   c.label = label;
   c.until = performance.now() + stay;
   c.arrived = false;
+  let i = 0;
   if (goal === 'walk') {
-    c.target = new THREE.Vector3((Math.random() - 0.5) * (RW - 6), 0, (Math.random() - 0.5) * (RD - 6));
     c.sit = false;
     c.look = null;
   } else {
     const taken = roomTaken();
-    const i = ROOM_SPOTS[goal].findIndex((_, j) => !taken.has(goal + j));
+    i = ROOM_SPOTS[goal].findIndex((_, j) => !taken.has(goal + j));
     const [x, z] = ROOM_SPOTS[goal][i];
     c.spot = goal + i;
-    c.target = new THREE.Vector3(x, 0, z);
     c.sit = goal === 'tv' || goal === 'desk' || goal === 'puf';
     const [fx, fz] = RM_FACE[goal];
     c.look = new THREE.Vector3(fx ?? x, 0, fz ?? z);
   }
+  // eşyaların etrafından dolaşan yol (oturduğu yerden kalkarken önce öne çıkar)
+  const p = c.g.position;
+  c.leaving = roomInObst(p.x, p.z, RM_R);
+  c.path = roomPath([p.x, p.z], goal, i).map(([x, z]) => new THREE.Vector3(x, 0, z));
+  c.target = c.path[0];
   Object.assign(c.debug, { goal, label });
+}
+// ---------- Engeller ve yol bulma ----------
+// Eşyaların zemindeki kutuları [x0, x1, z0, z1]; ilki koltuk
+const ROOM_OBST = [
+  [-2.78, 2.78, 0.95, 2.28],
+  ...[-3.4, 0, 3.4].map((z) => [-9.2, -7.45, z - 1.1, z + 1.1]), // masa + sandalye
+  [8.3, 9.4, -5.05, -3.95], // atari
+  [5.1, 7.9, 2.8, 4.4], // langırt
+  [-4.15, -3.05, -2.05, -0.95], // puflar
+  [3.05, 4.15, -2.05, -0.95],
+  [-9.45, -8.95, -6.95, -6.45], // bitkiler
+  [8.95, 9.45, 6.45, 6.95],
+];
+const RM_R = 0.4; // karakterin yarıçapı
+const RM_BX = RW / 2 - 0.6, RM_BZ = RD / 2 - 0.6; // duvarlardan uzak dur
+const roomInObst = (x, z, r = 0) => ROOM_OBST.some(([x0, x1, z0, z1]) => x > x0 - r && x < x1 + r && z > z0 - r && z < z1 + r);
+const roomFreeAt = (x, z) => Math.abs(x) <= RM_BX && Math.abs(z) <= RM_BZ && !roomInObst(x, z, RM_R);
+// Oturulan yere önden yaklaşma noktası (koltuk, masa sandalyesi, puf eşyanın içinde)
+const RM_APPROACH = { tv: ([x]) => [x, 0.3], desk: ([x, z]) => [x + 1.1, z], puf: ([x, z]) => [x, z + 1.0] };
+const RM_CELL = 0.5;
+const RM_NX = Math.floor((2 * RM_BX) / RM_CELL) + 1, RM_NZ = Math.floor((2 * RM_BZ) / RM_CELL) + 1;
+const rmCellXZ = (i) => [-RM_BX + (i % RM_NX) * RM_CELL, -RM_BZ + Math.floor(i / RM_NX) * RM_CELL];
+let rmGrid = null; // geçilebilir hücreler (bir kez hesaplanır)
+function rmNearestCell(x, z) {
+  rmGrid ||= Array.from({ length: RM_NX * RM_NZ }, (_, i) => roomFreeAt(...rmCellXZ(i)));
+  let best = -1, bd = Infinity;
+  rmGrid.forEach((ok, i) => {
+    if (!ok) return;
+    const [cx, cz] = rmCellXZ(i);
+    const d = (cx - x) ** 2 + (cz - z) ** 2;
+    if (d < bd) [best, bd] = [i, d];
+  });
+  return best;
+}
+const rmClear = (a, b) => {
+  const n = Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / 0.1);
+  for (let k = 1; k < n; k++) if (!roomFreeAt(a[0] + ((b[0] - a[0]) * k) / n, a[1] + ((b[1] - a[1]) * k) / n)) return false;
+  return true;
+};
+// from'dan goal'ün i. yerine (walk: rastgele boş noktaya) yol: [[x, z], ...], son nokta hedefin kendisi
+function roomPath(from, goal, i = 0) {
+  const head = [];
+  let start = from;
+  // bir yerde oturuyorsa önce o yerin önüne çık
+  if (roomInObst(from[0], from[1], RM_R)) {
+    for (const [g, list] of Object.entries(ROOM_SPOTS))
+      list.forEach((s) => {
+        if (RM_APPROACH[g] && Math.hypot(s[0] - from[0], s[1] - from[1]) < 0.3) start = RM_APPROACH[g](s);
+      });
+    if (start !== from) head.push(start);
+  }
+  let end, tail;
+  if (goal === 'walk') {
+    for (let k = 0; k < 50 && !end; k++) {
+      const p = [(Math.random() - 0.5) * (RW - 6), (Math.random() - 0.5) * (RD - 6)];
+      if (roomFreeAt(...p)) end = p;
+    }
+    end ||= [0, 4];
+    tail = [end];
+  } else {
+    const spot = ROOM_SPOTS[goal][i];
+    end = RM_APPROACH[goal] ? RM_APPROACH[goal](spot) : spot;
+    tail = end === spot ? [spot] : [end, spot];
+  }
+  // A* ızgarada (8 yön, köşe kesmeden)
+  const s0 = rmNearestCell(...start), e0 = rmNearestCell(...end);
+  const prev = new Map([[s0, -1]]), cost = new Map([[s0, 0]]);
+  const open = [[0, s0]];
+  const h = (i2) => Math.hypot(rmCellXZ(i2)[0] - rmCellXZ(e0)[0], rmCellXZ(i2)[1] - rmCellXZ(e0)[1]);
+  while (open.length) {
+    open.sort((a, b) => a[0] - b[0]);
+    const [, cur] = open.shift();
+    if (cur === e0) break;
+    const cx = cur % RM_NX, cz = Math.floor(cur / RM_NX);
+    for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]]) {
+      const nx = cx + dx, nz = cz + dz;
+      if (nx < 0 || nz < 0 || nx >= RM_NX || nz >= RM_NZ) continue;
+      const n = nz * RM_NX + nx;
+      if (!rmGrid[n] || (dx && dz && (!rmGrid[cz * RM_NX + nx] || !rmGrid[nz * RM_NX + cx]))) continue;
+      const nc = cost.get(cur) + Math.hypot(dx, dz);
+      if (nc >= (cost.get(n) ?? Infinity)) continue;
+      cost.set(n, nc);
+      prev.set(n, cur);
+      open.push([nc + h(n), n]);
+    }
+  }
+  const cells = [];
+  if (prev.has(e0)) for (let c = e0; c !== -1; c = prev.get(c)) cells.unshift(rmCellXZ(c));
+  // gereksiz köşeleri at: görülebilen en uzak noktaya doğrudan git
+  const pts = [start, ...cells, end];
+  const out = [];
+  for (let a = 0; a < pts.length - 1; ) {
+    let b = pts.length - 1;
+    while (b > a + 1 && !rmClear(pts[a], pts[b])) b--;
+    out.push(pts[b]);
+    a = b;
+  }
+  return [...head, ...out.slice(0, -1), ...tail];
 }
 const roomHasFree = (goal) => ROOM_SPOTS[goal].length > [...roomTaken()].filter((k) => k.startsWith(goal)).length;
 // Kişinin durumuna göre ne yapacağını seç (durum değişmediyse dokunma)
@@ -736,6 +839,16 @@ function roomMove(c, now, dt) {
   const act = c.tag.querySelector('.rm-a');
   // koltuktaki: TV'de yayın varsa izliyor, yoksa takılıyor (yayın sonradan açılabilir)
   if (c.goal === 'tv' && c.mode === 'free') c.label = c.debug.label = room.tvKey ? '📺 Yayını izliyor' : '🛋️ Koltukta takılıyor';
+  // ara noktaya varınca sıradakine geç
+  if (!c.arrived && d <= 0.08 && c.path?.length > 1) {
+    c.path.shift();
+    c.target = c.path[0];
+    c.leaving = false;
+    return roomMove(c, now, dt);
+  }
+  c.debug.pos = { x: pos.x, z: pos.z };
+  // koltuğa/sandalyeye son adımda ya da kalkarken eşyanın içine girmesi normal
+  c.debug.seated = !!c.leaving || (c.sit && (c.arrived || c.path?.length <= 1));
   if (!c.arrived && d > 0.08) {
     rmTmp.normalize();
     pos.addScaledVector(rmTmp, Math.min(d, dt * 2.2));

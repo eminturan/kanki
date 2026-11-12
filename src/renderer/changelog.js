@@ -6,6 +6,16 @@
  */
 const CHANGELOG = [
   {
+    version: '1.1.1',
+    date: '2026-11-12',
+    title: 'Oyun odası düzeltmeleri',
+    changed: ['Oyun odasındaki isimler artık kişinin ping renginde.'],
+    fixed: [
+      'Karakterler koltuğun, masaların ve diğer eşyaların içinden geçmiyor; etraflarından dolaşıyor, koltuğa ve sandalyeye önden oturup kalkıyor.',
+      'Bir karakteri takip ederken isim etiketleri titremiyor.',
+    ],
+  },
+  {
     version: '1.1.0',
     date: '2026-11-12',
     title: 'Oyun odası',
