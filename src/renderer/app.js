@@ -2495,6 +2495,7 @@ function syncRoomView(members) {
   $('#room').classList.toggle('hidden', !on);
   if (!on) return roomUnmount();
   if (!roomMount($('#room'))) return roomFail('Bu bilgisayarda 3D çizim (WebGL) açılamadı.');
+  roomSync(members);
 }
 function toggleRoomView() {
   settings.roomView = !settings.roomView;

@@ -31,6 +31,8 @@ function roomMount(el) {
       roomFail('Ekran kartı bağlantısı koptu.');
     });
     el.append(renderer.domElement);
+    room.tags = el.appendChild(document.createElement('div'));
+    room.tags.className = 'rm-tags';
     renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -73,6 +75,7 @@ function roomUnmount() {
   }
   room.el?.replaceChildren();
   room.chars.clear();
+  room.tags = null;
   Object.assign(room, { mounted: false, el: null, renderer: null, scene: null, camera: null, composer: null, bloomPass: null, raf: 0, fps: 0, bloom: false, ro: null, off: null, anim: [] });
 }
 
@@ -452,5 +455,152 @@ function roomFrame(now) {
   for (const [w, n] of room.walls) w.visible = n.x * cam.position.x + n.z * cam.position.z < 2;
   room.composer.render();
 }
-// Karakterler (Task 3+) her karede buradan güncellenir
-let roomTick = null;
+
+// ---------- Karakterler ----------
+const ROOM_GRAY = '#c9ccd3'; // beyaz ping rengi gövdede bembeyaz parlamasın
+function roomBodyColor(u) {
+  const c = new THREE.Color(u.pingColor || '#ffffff');
+  const lum = 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
+  return lum > 0.85 ? ROOM_GRAY : '#' + c.getHexString();
+}
+const roomNameColor = (u) => u.color || colorFor(u.name);
+
+// Yüz diski dokusu: profil fotoğrafı (daireye kırpılır) ya da baş harf
+function roomFaceTex(c, u) {
+  const photo = S.avatars.get(u.id) || null;
+  const key = photo ? 'p:' + photo.length + ':' + photo.slice(-32) : 'i:' + u.name + roomNameColor(u);
+  if (c.faceKey === key) return;
+  c.faceKey = key;
+  c.debug.face = photo ? 'photo' : 'initial';
+  const cv = rmCanvas(256, 256, (g) => {
+    g.beginPath();
+    g.arc(128, 128, 128, 0, 7);
+    g.clip();
+    const gr = g.createLinearGradient(0, 0, 256, 256);
+    gr.addColorStop(0, colorFor(u.name));
+    gr.addColorStop(1, '#0b0b0d');
+    g.fillStyle = gr;
+    g.fillRect(0, 0, 256, 256);
+    g.fillStyle = '#fff';
+    g.font = 'bold 150px -apple-system, "Segoe UI", sans-serif';
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.fillText((u.name || '?').trim().charAt(0).toLocaleUpperCase('tr'), 128, 140);
+  });
+  const tex = new THREE.CanvasTexture(cv);
+  tex.encoding = THREE.sRGBEncoding;
+  c.face.material.map?.dispose();
+  c.face.material.map = tex;
+  c.face.material.needsUpdate = true;
+  if (!photo) return;
+  const img = new Image();
+  img.onload = () => {
+    if (c.faceKey !== key) return;
+    const g = cv.getContext('2d');
+    const sz = Math.min(img.width, img.height);
+    g.drawImage(img, (img.width - sz) / 2, (img.height - sz) / 2, sz, sz, 0, 0, 256, 256); // ortadan kare kırp
+    tex.needsUpdate = true;
+  };
+  img.src = photo;
+}
+
+function roomMakeChar(u) {
+  const g = new THREE.Group();
+  const bodyM = rmMat(0xffffff, { roughness: 0.55 });
+  const part = (geo, mat, y, parent) => {
+    const m = new THREE.Mesh(geo, mat);
+    m.position.y = y;
+    m.castShadow = true;
+    parent.add(m);
+    return m;
+  };
+  part(new THREE.CylinderGeometry(0.34, 0.42, 0.9, 18), bodyM, 1.05, g);
+  const limb = (x, y, r, len, mat) => {
+    const piv = new THREE.Group();
+    piv.position.set(x, y, 0);
+    part(new THREE.CylinderGeometry(r, r, len, 10), mat, -len / 2, piv);
+    g.add(piv);
+    return piv;
+  };
+  const legs = [-0.15, 0.15].map((x) => limb(x, 0.62, 0.11, 0.6, rmMat(0x1a1a20)));
+  const arms = [-0.45, 0.45].map((x) => limb(x, 1.4, 0.09, 0.62, bodyM));
+  const head = new THREE.Group();
+  head.position.y = 1.95;
+  g.add(head);
+  part(new THREE.SphereGeometry(0.5, 28, 20), bodyM, 0, head);
+  const facePiv = new THREE.Group();
+  head.add(facePiv);
+  const face = new THREE.Mesh(new THREE.CircleGeometry(0.44, 40), new THREE.MeshBasicMaterial({ toneMapped: false }));
+  face.position.z = 0.53;
+  const rim = new THREE.Mesh(new THREE.TorusGeometry(0.45, 0.045, 8, 40), new THREE.MeshBasicMaterial({ toneMapped: false }));
+  rim.position.z = 0.53;
+  facePiv.add(face, rim);
+  const ring = new THREE.Mesh(new THREE.RingGeometry(0.55, 0.72, 40), new THREE.MeshBasicMaterial({ color: 0x22d47e, transparent: true, opacity: 0, toneMapped: false, depthWrite: false }));
+  ring.rotation.x = -Math.PI / 2;
+  ring.position.y = 0.02;
+  g.add(ring);
+  const waves = [0, 1, 2].map(() => {
+    const w = new THREE.Mesh(new THREE.RingGeometry(0.62, 0.68, 48), new THREE.MeshBasicMaterial({ color: 0x22d47e, transparent: true, opacity: 0, toneMapped: false, depthWrite: false }));
+    w.rotation.x = -Math.PI / 2;
+    w.position.y = 0.03;
+    g.add(w);
+    return w;
+  });
+  // ilk yer: odanın ortasına yakın rastgele
+  g.position.set((Math.random() - 0.5) * 8, 0, 2 + Math.random() * 3);
+  room.scene.add(g);
+  const tag = document.createElement('div');
+  tag.className = 'rm-tag';
+  tag.innerHTML = '<div class="rm-n"><span class="rm-name"></span><span class="rm-ic"></span></div><div class="rm-a"></div>';
+  room.tags.append(tag);
+  return { id: u.id, g, bodyM, legs, arms, head, facePiv, face, rim, ring, waves, tag, phase: Math.random() * 6, debug: {} };
+}
+
+function roomSync(members) {
+  if (!room.mounted) return;
+  const seen = new Set();
+  for (const u of members) {
+    if (u.bot) continue;
+    seen.add(u.id);
+    let c = room.chars.get(u.id);
+    if (!c) room.chars.set(u.id, (c = roomMakeChar(u)));
+    c.u = u;
+    const body = roomBodyColor(u);
+    c.bodyM.color.set(body);
+    const nc = roomNameColor(u);
+    c.rim.material.color.set(nc);
+    roomFaceTex(c, u);
+    const name = u.name + (u.id === S.myId ? ' (sen)' : '');
+    const icons = [u.muted && 'mic', u.deafened && 'head', screenSharesOf(u).length && 'live'].filter(Boolean);
+    const n = c.tag.querySelector('.rm-name');
+    n.textContent = name;
+    n.style.color = nc;
+    c.tag.querySelector('.rm-ic').innerHTML = (u.muted ? ICON.micOff : '') + (u.deafened ? ICON.headOff : '') + (icons.includes('live') ? '<b class="live">CANLI</b>' : '');
+    Object.assign(c.debug, { name, body, icons });
+  }
+  for (const [id, c] of room.chars) {
+    if (seen.has(id)) continue;
+    room.scene.remove(c.g);
+    c.tag.remove();
+    room.chars.delete(id);
+  }
+}
+
+// Her kare: yüz diski kameraya dönsün, etiketler karakterin üstünde dursun
+const rmTmp = new THREE.Vector3();
+const rmQ = new THREE.Quaternion();
+let roomTick = (now, dt) => {
+  const cam = room.camera, W = room.el.clientWidth, H = room.el.clientHeight;
+  const r = room.el.getBoundingClientRect();
+  for (const c of room.chars.values()) {
+    c.head.getWorldQuaternion(rmQ);
+    c.facePiv.quaternion.copy(rmQ.invert()).multiply(cam.quaternion);
+    const p = c.g.position;
+    rmTmp.set(p.x, p.y + 2.7, p.z).project(cam);
+    const x = ((rmTmp.x + 1) / 2) * W, y = ((1 - rmTmp.y) / 2) * H;
+    c.tag.style.transform = `translate(${x}px, ${y}px) translate(-50%, -100%)`;
+    c.tag.style.opacity = rmTmp.z < 1 ? (room.follow && room.follow !== c.id ? 0.45 : 1) : 0;
+    rmTmp.set(p.x, p.y + 1.4, p.z).project(cam);
+    c.debug.screen = { x: r.left + ((rmTmp.x + 1) / 2) * W, y: r.top + ((1 - rmTmp.y) / 2) * H };
+  }
+};
