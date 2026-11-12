@@ -1414,6 +1414,7 @@ function startServer(opts = {}) {
           }
           if ('away' in m) me.away = !!m.away;
           if (['online', 'idle', 'dnd'].includes(m.presence)) {
+            if ((m.presence === 'idle') !== (me.presence === 'idle')) me.room = null; // boşta oldu/döndü: oda karakteri otomatiğe döner
             me.presence = m.presence;
             me.away = m.presence === 'idle';
           }
@@ -1735,6 +1736,7 @@ function startServer(opts = {}) {
           const music = String(m.music || '').slice(0, 120);
           const next = game || music ? { game, music } : null;
           if (JSON.stringify(next) !== JSON.stringify(me.activity || null)) {
+            if ((next?.game || '') !== (me.activity?.game || '')) me.room = null; // oyun başladı/bitti: oda karakteri otomatiğe döner
             me.activity = next;
             broadcastState();
           }

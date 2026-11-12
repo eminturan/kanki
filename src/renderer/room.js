@@ -1125,9 +1125,9 @@ const RM_LABEL = { arcade: '🕹️ Atari oynuyor', foos: '⚽ Langırt oynuyor'
 const rmAssignCache = new Map();
 const RM_MAN_MS = 180000;
 const RM_SPOT_LABEL = { tv: '🛋️ Koltukta', desk: '🖥️ Masada', arcade: '🕹️ Atari oynuyor', foos: '⚽ Langırt oynuyor', puf: '🪑 Pufta' };
-// c'nin k. dilimde geçerli elle hedefi (before: bu andan önce verilmiş olanlar)
+// c'nin k. dilimde geçerli elle hedefi (before: bu andan önce verilmiş olanlar); durum değişince sunucu siler
 const rmManual = (c, k, before = Infinity) =>
-  c.mode === 'free' && c.man && c.man.at < before && c.man.at < (k + 1) * RM_SLOT && k * RM_SLOT < c.man.at + RM_MAN_MS ? c.man : null;
+  c.man && c.man.at < before && c.man.at < (k + 1) * RM_SLOT && k * RM_SLOT < c.man.at + RM_MAN_MS ? c.man : null;
 function roomAssign(k, before = Infinity) {
   const ids = [...room.chars.keys()].sort();
   const key = k + '|' + before + '|' + ids.map((id) => id + ':' + room.chars.get(id).mode + ':' + (rmManual(room.chars.get(id), k, before)?.at || '')).join(',');

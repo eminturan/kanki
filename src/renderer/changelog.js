@@ -6,6 +6,12 @@
  */
 const CHANGELOG = [
   {
+    version: '1.1.6',
+    date: '2026-11-13',
+    title: 'Oyun odası: oyundayken de karakterini yönet',
+    fixed: ['Oyun oynarken ya da boştayken de odada tıkladığın yere gidiyorsun; daha önce karakter masadan ya da puftan kalkmıyordu. Oyuna girip çıkınca ya da boşta olunca karakter yine kendi yerine döner.'],
+  },
+  {
     version: '1.1.5',
     date: '2026-11-13',
     title: 'Oyun odası: karakterini yönet',
