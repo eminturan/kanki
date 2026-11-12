@@ -211,6 +211,7 @@
             <div class="stage-sub" id="stage-sub"></div>
           </div>
           <div class="stage-actions">
+            <button class="btn hidden" id="btn-room" title="Görünümü değiştir"></button>
             <button class="btn hidden" id="btn-grid" title="Yayın pencerelerini ekrana eşit dağıt">
               <svg viewBox="0 0 24 24"><path d="M4 4h7v7H4V4Zm9 0h7v7h-7V4ZM4 13h7v7H4v-7Zm9 0h7v7h-7v-7Z"/></svg>
               <span>Izgara</span>
@@ -231,6 +232,7 @@
         <div class="stage-body" id="stage-body">
           <div class="tiles hidden" id="tiles"></div>
           <div class="participants" id="participants"></div>
+          <div class="room hidden" id="room"></div>
         </div>
         <div class="self-shares hidden" id="self-share"></div>
         <div class="music-bar hidden" id="music-bar">
@@ -902,7 +904,15 @@
 
   <script src="changelog.js"></script>
   <script src="sfx.js"></script>
+  <script src="vendor/three/three.min.js"></script>
+  <script src="vendor/three/CopyShader.js"></script>
+  <script src="vendor/three/LuminosityHighPassShader.js"></script>
+  <script src="vendor/three/EffectComposer.js"></script>
+  <script src="vendor/three/RenderPass.js"></script>
+  <script src="vendor/three/ShaderPass.js"></script>
+  <script src="vendor/three/UnrealBloomPass.js"></script>
   <script src="app.js"></script>
+  <script src="room.js"></script>
   <script src="extras.js"></script>
   <script src="xfer.js"></script>
   <script src="appearance.js"></script>

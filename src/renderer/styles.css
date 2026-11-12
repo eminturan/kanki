@@ -1781,3 +1781,7 @@ label.check.locked { opacity: .55; cursor: not-allowed; }
 .xf-pc { font: 12px var(--mono); color: var(--text-2); flex: none; }
 .xf-arrow.out { color: #7cc4ff; }
 .xf-arrow.in { color: var(--accent); }
+
+/* Oyun odası (room.js) */
+.room { position: absolute; inset: 0; overflow: hidden; border-radius: inherit; background: #020203; }
+.room canvas { display: block; width: 100%; height: 100%; }

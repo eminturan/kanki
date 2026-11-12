@@ -2479,10 +2479,29 @@ function renderStage() {
   $('#stage-body').classList.toggle('with-strip', showTiles);
   $('#participants').classList.toggle('strip', showTiles);
   renderParticipants(members, showTiles);
+  syncRoomView(members);
   renderTiles();
   renderSelfShare();
   renderChatToggle();
 }
+
+// Oyun odası (room.js): kişiye özel görünüm, varsayılan Klasik, seçim bu bilgisayarda saklanır
+function syncRoomView(members) {
+  const btn = $('#btn-room');
+  btn.classList.toggle('hidden', !S.channelId || !roomSupported());
+  btn.textContent = settings.roomView ? '▦ Klasik' : '🎮 Oyun odası';
+  const on = roomActive();
+  $('#participants').classList.toggle('hidden', on);
+  $('#room').classList.toggle('hidden', !on);
+  if (!on) return roomUnmount();
+  if (!roomMount($('#room'))) return roomFail('Bu bilgisayarda 3D çizim (WebGL) açılamadı.');
+}
+function toggleRoomView() {
+  settings.roomView = !settings.roomView;
+  saveSettings();
+  renderStage();
+}
+$('#btn-room').addEventListener('click', toggleRoomView);
 
 // Kamera görüntüleri: kutular her çizimde yeniden kurulsa da video öğesi korunur (titreme olmasın)
 const camVideos = new Map(); // userId -> <video>
