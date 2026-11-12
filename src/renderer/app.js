@@ -1647,6 +1647,12 @@ function tileFullscreen(key) {
 function renderTiles() {
   const box = $('#tiles');
   const keys = visibleTileKeys();
+  if (roomActive())
+    roomTv(
+      keys
+        .map((k) => ({ key: k, label: shareLabel(k), stream: isOwnKey(k) ? S.myShares.get(splitKey(k)[1])?.stream : S.remoteScreens.get(k)?.video }))
+        .filter((x) => x.stream?.getVideoTracks().length)
+    );
   if (!S.layoutCustom) gridLayout();
   for (const [k, el] of tileEls) {
     if (!keys.includes(k)) {
@@ -2475,7 +2481,8 @@ function renderStage() {
   strip.classList.toggle('hidden', pills === 0);
 
   // İzlenen yayınlar sahnede serbest yerleşimli pencereler olarak durur; katılımcılar altta şerit olur
-  const showTiles = visibleTileKeys().length > 0;
+  if (S.roomTiles && !visibleTileKeys().length) S.roomTiles = false; // büyütülen yayın bitti: odaya dön
+  const showTiles = visibleTileKeys().length > 0 && !roomActive();
   $('#tiles').classList.toggle('hidden', !showTiles);
   $('#stage-body').classList.toggle('with-strip', showTiles);
   $('#participants').classList.toggle('strip', showTiles);
@@ -2490,7 +2497,7 @@ function renderStage() {
 function syncRoomView(members) {
   const btn = $('#btn-room');
   btn.classList.toggle('hidden', !S.channelId || !roomSupported());
-  btn.textContent = settings.roomView ? '▦ Klasik' : '🎮 Oyun odası';
+  btn.textContent = S.roomTiles ? '🎮 Odaya dön' : settings.roomView ? '▦ Klasik' : '🎮 Oyun odası';
   const on = roomActive();
   $('#participants').classList.toggle('hidden', on);
   $('#room').classList.toggle('hidden', !on);
@@ -2503,7 +2510,11 @@ function toggleRoomView() {
   saveSettings();
   renderStage();
 }
-$('#btn-room').addEventListener('click', toggleRoomView);
+$('#btn-room').addEventListener('click', () => {
+  if (!S.roomTiles) return toggleRoomView();
+  S.roomTiles = false;
+  renderStage();
+});
 
 // Kamera görüntüleri: kutular her çizimde yeniden kurulsa da video öğesi korunur (titreme olmasın)
 const camVideos = new Map(); // userId -> <video>

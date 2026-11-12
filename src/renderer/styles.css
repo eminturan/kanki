@@ -1793,3 +1793,8 @@ label.check.locked { opacity: .55; cursor: not-allowed; }
 .rm-ic .live { font-size: 9.5px; padding: 1px 5px; text-shadow: none; }
 .rm-a { font-size: 11px; color: #cfcfd6; margin-top: 3px; background: rgba(8,8,10,.6); padding: 1px 7px; border-radius: 7px; display: inline-block; }
 .rm-a:empty { display: none; }
+.rm-tv-bar { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 6px; padding: 5px 6px 5px 12px; border-radius: 12px; background: rgba(8,8,10,.8); color: #e9e9ee; font-size: 13px; font-weight: 600; max-width: calc(100% - 32px); }
+.rm-tv-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rm-tv-bar button { border: 0; border-radius: 8px; background: rgba(255,255,255,.08); color: inherit; font: inherit; padding: 4px 10px; cursor: pointer; }
+.rm-tv-bar button:hover { background: rgba(255,255,255,.16); }
+.rm-tv-bar button[data-act=big] { background: var(--accent, #22d47e); color: #06120b; }

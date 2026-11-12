@@ -20,7 +20,8 @@ function roomSupported() {
   }
   return roomWebgl;
 }
-const roomActive = () => !!(settings.roomView && S.channelId && roomSupported());
+// Büyüt modunda (S.roomTiles) oda kapanır, bugünkü yayın pencereleri açılır
+const roomActive = () => !!(settings.roomView && S.channelId && !S.roomTiles && roomSupported());
 
 function roomMount(el) {
   if (room.mounted) return true;
@@ -28,7 +29,8 @@ function roomMount(el) {
     const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
     renderer.domElement.addEventListener('webglcontextlost', (e) => {
       e.preventDefault();
-      roomFail('Ekran kartı bağlantısı koptu.');
+      // Odayı kendimiz kapatınca (forceContextLoss) da bu olay gelir; sadece açık odanın bağlamı koparsa hata say
+      if (room.renderer === renderer) roomFail('Ekran kartı bağlantısı koptu.');
     });
     el.append(renderer.domElement);
     room.tags = el.appendChild(document.createElement('div'));
@@ -59,7 +61,7 @@ function roomMount(el) {
     room.raf = requestAnimationFrame(roomFrame);
     return true;
   } catch (e) {
-    log('room mount', e?.message);
+    console.warn('[kanki] room mount failed', e?.stack || e);
     roomUnmount();
     return false;
   }
@@ -73,10 +75,12 @@ function roomUnmount() {
     room.renderer.dispose();
     room.renderer.forceContextLoss();
   }
+  if (room.tvVideo) room.tvVideo.srcObject = null;
+  room.tvTex?.dispose();
   room.el?.replaceChildren();
   room.chars.clear();
   room.tags = null;
-  Object.assign(room, { mounted: false, el: null, renderer: null, scene: null, camera: null, composer: null, bloomPass: null, raf: 0, fps: 0, bloom: false, ro: null, off: null, anim: [] });
+  Object.assign(room, { mounted: false, el: null, renderer: null, scene: null, camera: null, composer: null, bloomPass: null, raf: 0, fps: 0, bloom: false, ro: null, off: null, anim: [], tvVideo: null, tvTex: null, tvKey: null, tvList: [], tvBar: null });
 }
 
 function roomFail(why) {
@@ -88,7 +92,9 @@ function roomFail(why) {
 }
 
 function roomDebug() {
-  return { mounted: room.mounted, fps: room.fps, bloom: room.bloom, chars: Object.fromEntries([...room.chars].map(([id, c]) => [id, c.debug || {}])) };
+  const v = room.tvVideo;
+  const tv = { key: room.tvKey || null, playing: !!(v && v.srcObject && v.readyState >= 2 && !v.paused) };
+  return { mounted: room.mounted, fps: room.fps, bloom: room.bloom, tv, chars: Object.fromEntries([...room.chars].map(([id, c]) => [id, c.debug || {}])) };
 }
 
 // ---------- Sahne ----------
@@ -674,9 +680,7 @@ function roomPlan(c) {
   roomWander(c);
 }
 function roomWander(c) {
-  const anyLive = [...room.chars.values()].some((x) => screenSharesOf(x.u).length);
   const opts = [
-    ['tv', anyLive ? '📺 Yayını izliyor' : '🛋️ Koltukta takılıyor'],
     ['arcade', '🕹️ Atari oynuyor'],
     ['foos', '⚽ Langırt oynuyor'],
     ['walk', '🚶 Geziniyor'],
@@ -704,6 +708,8 @@ function roomMove(c, now, dt) {
   rmTmp.y = 0;
   const d = rmTmp.length();
   const act = c.tag.querySelector('.rm-a');
+  // koltuktaki: TV'de yayın varsa izliyor, yoksa takılıyor (yayın sonradan açılabilir)
+  if (c.goal === 'tv' && c.mode === 'free') c.label = c.debug.label = room.tvKey ? '📺 Yayını izliyor' : '🛋️ Koltukta takılıyor';
   if (!c.arrived && d > 0.08) {
     rmTmp.normalize();
     pos.addScaledVector(rmTmp, Math.min(d, dt * 2.2));
@@ -745,4 +751,57 @@ function roomMove(c, now, dt) {
       z.position.set(0.3 + t * 0.5, 2.5 + t * 1.1, 0);
       z.material.opacity = Math.sin(t * Math.PI);
     });
+}
+
+// ---------- TV: izlenen yayın duvardaki ekranda oynar ----------
+// list: [{ key, label, stream }] — yayın sesi bugünkü gibi ayrı çalar, TV videosu sessiz
+function roomTv(list) {
+  if (!room.mounted) return;
+  room.tvList = list;
+  if (!list.some((x) => x.key === room.tvKey)) room.tvKey = list[0]?.key || null;
+  const cur = list.find((x) => x.key === room.tvKey) || null;
+  if (!room.tvVideo) {
+    room.tvVideo = document.createElement('video');
+    Object.assign(room.tvVideo, { muted: true, playsInline: true, autoplay: true });
+  }
+  const v = room.tvVideo;
+  const want = cur?.stream || null;
+  if (v.srcObject !== want) {
+    v.srcObject = want;
+    if (want) v.play().catch(() => {});
+  }
+  if (want && !room.tvTex) {
+    room.tvTex = new THREE.VideoTexture(v);
+    room.tvTex.encoding = THREE.sRGBEncoding;
+  }
+  const map = want ? room.tvTex : room.tvLogo;
+  if (room.tv.material.map !== map) {
+    room.tv.material.map = map;
+    room.tv.material.needsUpdate = true;
+  }
+  roomTvBar(cur, list);
+}
+function roomTvBar(cur, list) {
+  let bar = room.tvBar;
+  if (!bar) {
+    bar = room.tvBar = room.el.appendChild(document.createElement('div'));
+    bar.className = 'rm-tv-bar';
+    bar.addEventListener('click', (e) => {
+      const act = e.target.closest('[data-act]')?.dataset.act;
+      const L = room.tvList;
+      const i = L.findIndex((x) => x.key === room.tvKey);
+      if (act === 'big') {
+        S.roomTiles = true;
+        renderStage();
+      } else if (act === 'prev' || act === 'next') {
+        room.tvKey = L[(i + (act === 'next' ? 1 : -1) + L.length) % L.length]?.key || null;
+        roomTv(L);
+      }
+    });
+  }
+  bar.classList.toggle('hidden', !cur);
+  if (!cur) return;
+  const multi = list.length > 1;
+  bar.innerHTML = `${multi ? '<button data-act="prev" title="Önceki yayın">‹</button>' : ''}<span class="rm-tv-name"></span>${multi ? '<button data-act="next" title="Sonraki yayın">›</button>' : ''}<button data-act="big" title="Yayını büyük izle (işaret, ping, yakınlaştırma burada)">⛶ Büyüt</button>`;
+  bar.querySelector('.rm-tv-name').textContent = '📺 ' + cur.label;
 }
