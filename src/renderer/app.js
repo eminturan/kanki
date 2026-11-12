@@ -325,6 +325,7 @@ setInterval(audioTick, 40);
 function setSpeaking(id, on) {
   if (!id) return;
   for (const el of $$(`[data-av="${id}"]`)) el.classList.toggle('speaking', on);
+  roomSpeaking(id, on);
 }
 
 function attachRemoteAudio(userId, stream) {

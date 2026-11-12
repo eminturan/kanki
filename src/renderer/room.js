@@ -546,6 +546,13 @@ function roomMakeChar(u) {
     g.add(w);
     return w;
   });
+  const zz = [0, 1, 2].map((k) => {
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: roomZTex(), transparent: true, depthWrite: false, opacity: 0 }));
+    sp.scale.setScalar(0.35 + k * 0.12);
+    sp.visible = false;
+    g.add(sp);
+    return sp;
+  });
   // ilk yer: odanın ortasına yakın rastgele
   g.position.set((Math.random() - 0.5) * 8, 0, 2 + Math.random() * 3);
   room.scene.add(g);
@@ -553,7 +560,7 @@ function roomMakeChar(u) {
   tag.className = 'rm-tag';
   tag.innerHTML = '<div class="rm-n"><span class="rm-name"></span><span class="rm-ic"></span></div><div class="rm-a"></div>';
   room.tags.append(tag);
-  return { id: u.id, g, bodyM, legs, arms, head, facePiv, face, rim, ring, waves, tag, phase: Math.random() * 6, debug: {} };
+  return { id: u.id, g, bodyM, legs, arms, head, facePiv, face, rim, ring, waves, zz, tag, phase: Math.random() * 6, speaking: false, debug: { speaking: false } };
 }
 
 function roomSync(members) {
@@ -577,11 +584,13 @@ function roomSync(members) {
     n.style.color = nc;
     c.tag.querySelector('.rm-ic').innerHTML = (u.muted ? ICON.micOff : '') + (u.deafened ? ICON.headOff : '') + (icons.includes('live') ? '<b class="live">CANLI</b>' : '');
     Object.assign(c.debug, { name, body, icons });
+    roomPlan(c);
   }
   for (const [id, c] of room.chars) {
     if (seen.has(id)) continue;
     room.scene.remove(c.g);
     c.tag.remove();
+    roomFree(c);
     room.chars.delete(id);
   }
 }
@@ -593,6 +602,7 @@ let roomTick = (now, dt) => {
   const cam = room.camera, W = room.el.clientWidth, H = room.el.clientHeight;
   const r = room.el.getBoundingClientRect();
   for (const c of room.chars.values()) {
+    roomMove(c, now, dt);
     c.head.getWorldQuaternion(rmQ);
     c.facePiv.quaternion.copy(rmQ.invert()).multiply(cam.quaternion);
     const p = c.g.position;
@@ -604,3 +614,135 @@ let roomTick = (now, dt) => {
     c.debug.screen = { x: r.left + ((rmTmp.x + 1) / 2) * W, y: r.top + ((1 - rmTmp.y) / 2) * H };
   }
 };
+
+// ---------- Davranış: boşta → puf, oyunda → masa, diğerleri gezer ----------
+let rmZ = null;
+function roomZTex() {
+  if (!rmZ)
+    rmZ = new THREE.CanvasTexture(
+      rmCanvas(64, 64, (g) => {
+        g.font = 'bold 54px sans-serif';
+        g.fillStyle = '#9ad8ff';
+        g.shadowColor = '#3a9bff';
+        g.shadowBlur = 10;
+        g.textAlign = 'center';
+        g.textBaseline = 'middle';
+        g.fillText('Z', 32, 34);
+      })
+    );
+  return rmZ;
+}
+const roomTaken = () => new Set([...room.chars.values()].map((c) => c.spot).filter(Boolean));
+function roomFree(c) {
+  c.spot = null;
+}
+// Varınca bakılacak yön [x, z] (null = kendi konumu)
+const RM_FACE = { tv: [0, -10], desk: [-20, null], arcade: [20, null], foos: [null, 3.6], puf: [0, -10] };
+function roomGo(c, goal, label, stay) {
+  roomFree(c);
+  c.goal = goal;
+  c.label = label;
+  c.until = performance.now() + stay;
+  c.arrived = false;
+  if (goal === 'walk') {
+    c.target = new THREE.Vector3((Math.random() - 0.5) * (RW - 6), 0, (Math.random() - 0.5) * (RD - 6));
+    c.sit = false;
+    c.look = null;
+  } else {
+    const taken = roomTaken();
+    const i = ROOM_SPOTS[goal].findIndex((_, j) => !taken.has(goal + j));
+    const [x, z] = ROOM_SPOTS[goal][i];
+    c.spot = goal + i;
+    c.target = new THREE.Vector3(x, 0, z);
+    c.sit = goal === 'tv' || goal === 'desk' || goal === 'puf';
+    const [fx, fz] = RM_FACE[goal];
+    c.look = new THREE.Vector3(fx ?? x, 0, fz ?? z);
+  }
+  Object.assign(c.debug, { goal, label });
+}
+const roomHasFree = (goal) => ROOM_SPOTS[goal].length > [...roomTaken()].filter((k) => k.startsWith(goal)).length;
+// Kişinin durumuna göre ne yapacağını seç (durum değişmediyse dokunma)
+function roomPlan(c) {
+  const u = c.u;
+  const game = u.activity?.game || '';
+  const mode = presenceOf(u) === 'idle' ? 'idle' : game ? 'game:' + game : 'free';
+  if (mode === c.mode) return;
+  c.mode = mode;
+  c.zz.forEach((z) => (z.visible = mode === 'idle'));
+  if (mode === 'idle') return roomGo(c, roomHasFree('puf') ? 'puf' : 'walk', '💤 Boşta', 1e12);
+  if (game) return roomGo(c, roomHasFree('desk') ? 'desk' : 'walk', '🎮 ' + game, 1e12);
+  roomWander(c);
+}
+function roomWander(c) {
+  const anyLive = [...room.chars.values()].some((x) => screenSharesOf(x.u).length);
+  const opts = [
+    ['tv', anyLive ? '📺 Yayını izliyor' : '🛋️ Koltukta takılıyor'],
+    ['arcade', '🕹️ Atari oynuyor'],
+    ['foos', '⚽ Langırt oynuyor'],
+    ['walk', '🚶 Geziniyor'],
+  ].filter(([g]) => g === 'walk' || roomHasFree(g));
+  const [goal, label] = opts[Math.floor(Math.random() * opts.length)];
+  roomGo(c, goal, label, 6000 + Math.random() * 6000);
+}
+function roomSpeaking(id, on) {
+  const c = room.chars.get(id);
+  if (!c) return;
+  c.speaking = !!on;
+  c.debug.speaking = c.speaking;
+}
+
+function roomLerpAngle(a, b, t) {
+  let d = ((b - a + Math.PI) % (Math.PI * 2)) - Math.PI;
+  if (d < -Math.PI) d += Math.PI * 2;
+  return a + d * t;
+}
+const RM_SIT_Y = { tv: 0.12, desk: 0.18, puf: 0.02 };
+function roomMove(c, now, dt) {
+  const pos = c.g.position;
+  if (!c.target) return;
+  rmTmp.copy(c.target).sub(pos);
+  rmTmp.y = 0;
+  const d = rmTmp.length();
+  const act = c.tag.querySelector('.rm-a');
+  if (!c.arrived && d > 0.08) {
+    rmTmp.normalize();
+    pos.addScaledVector(rmTmp, Math.min(d, dt * 2.2));
+    c.g.rotation.y = roomLerpAngle(c.g.rotation.y, Math.atan2(rmTmp.x, rmTmp.z), 0.2);
+    const sw = Math.sin(now * 0.012 + c.phase);
+    c.legs[0].rotation.x = sw * 0.6;
+    c.legs[1].rotation.x = -sw * 0.6;
+    c.arms[0].rotation.x = -sw * 0.5;
+    c.arms[1].rotation.x = sw * 0.5;
+    pos.y = Math.abs(sw) * 0.06;
+    c.head.rotation.z = 0;
+    act.textContent = c.goal === 'walk' ? c.label : '🚶 → ' + c.label;
+  } else {
+    c.arrived = true;
+    if (c.look) {
+      rmTmp.copy(c.look).sub(pos);
+      c.g.rotation.y = roomLerpAngle(c.g.rotation.y, Math.atan2(rmTmp.x, rmTmp.z), 0.15);
+    }
+    pos.y = c.sit ? RM_SIT_Y[c.goal] || 0 : 0;
+    c.legs.forEach((l) => (l.rotation.x = c.sit ? -1.4 : 0));
+    const play = c.goal === 'arcade' || c.goal === 'foos' || c.goal === 'desk';
+    c.arms.forEach((a, j) => (a.rotation.x = play ? -1.1 + Math.sin(now * 0.02 + j * 2) * 0.12 : c.sit ? -0.3 : 0));
+    c.head.rotation.z = c.mode === 'idle' ? 0.45 : Math.sin(now * 0.001 + c.phase) * 0.05;
+    act.textContent = c.label;
+    if (now > c.until && c.mode === 'free') roomWander(c);
+  }
+  // konuşma halkası ve dalgalar
+  const ring = c.ring.material;
+  ring.opacity += ((c.speaking ? 0.55 + Math.sin(now * 0.02) * 0.3 : 0) - ring.opacity) * 0.25;
+  c.head.position.y = 1.95 + (c.speaking ? Math.abs(Math.sin(now * 0.025)) * 0.03 : 0);
+  c.waves.forEach((w, k) => {
+    const t = (now * 0.0009 + k / 3) % 1;
+    w.scale.setScalar(1 + t * 1.6);
+    w.material.opacity = c.speaking ? (1 - t) * 0.7 : Math.max(0, w.material.opacity - 0.05);
+  });
+  if (c.mode === 'idle')
+    c.zz.forEach((z, k) => {
+      const t = (now * 0.0004 + k / 3) % 1;
+      z.position.set(0.3 + t * 0.5, 2.5 + t * 1.1, 0);
+      z.material.opacity = Math.sin(t * Math.PI);
+    });
+}
