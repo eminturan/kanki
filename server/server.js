@@ -501,6 +501,7 @@ function startServer(opts = {}) {
       iconV: iconV(),
       flashCooldown: flashCooldown(),
       pingCooldown: pingCooldown(),
+      roomTheme: conf.roomTheme || 'neon',
     });
   }
   // Ping bekleme süresi (saniye, 0 = sınırsız). Ayarlanmadıysa 3 sn.
@@ -1267,7 +1268,7 @@ function startServer(opts = {}) {
           admin: isAdmin,
           mod: isModUser(me),
           token: me.token,
-          features: ['sfx', 'activity', 'log', 'pins', 'polls', 'votes', ...(fileUploads() ? ['files'] : []), 'preview', 'gif', 'roles', 'chpass', 'afk', 'bans', 'marks', 'watch', 'perms', 'audit', 'timeout', 'serverDeafen', 'moveAll', 'purge', 'slowmode', 'readOnly', 'announce', 'welcomeMessage', 'headers', 'afkMic', 'webClient', 'info', 'leaveVoice', 'icon', 'flash', 'flashCooldown', 'liftVoteMute', 'storm', 'bolts', 'ping', 'pingCooldown', 'pingColor', 'p2pFiles'],
+          features: ['sfx', 'activity', 'log', 'pins', 'polls', 'votes', ...(fileUploads() ? ['files'] : []), 'preview', 'gif', 'roles', 'chpass', 'afk', 'bans', 'marks', 'watch', 'perms', 'audit', 'timeout', 'serverDeafen', 'moveAll', 'purge', 'slowmode', 'readOnly', 'announce', 'welcomeMessage', 'headers', 'afkMic', 'webClient', 'info', 'leaveVoice', 'icon', 'flash', 'flashCooldown', 'liftVoteMute', 'storm', 'bolts', 'ping', 'pingCooldown', 'pingColor', 'p2pFiles', 'roomTheme'],
           // Roller ve yetkiler
           perms: [...permsOf(me)],
           roles: userRoleIds(me),
@@ -2429,6 +2430,7 @@ function startServer(opts = {}) {
           if (typeof m.turnUser === 'string') set('turnUser', m.turnUser.trim().slice(0, 200), 'TURN kullanıcı adı');
           if (typeof m.turnPass === 'string') set('turnPass', m.turnPass.slice(0, 200), 'TURN şifresi');
           if ('pingCooldown' in m) set('pingCooldown', Math.max(0, Math.min(600, Math.floor(Number(m.pingCooldown) || 0))), 'ping bekleme süresi');
+          if (['neon', 'club', 'retro'].includes(m.roomTheme)) set('roomTheme', m.roomTheme, 'oda teması');
           if ('flashCooldown' in m) set('flashCooldown', Math.max(0, Math.min(3600, Math.floor(Number(m.flashCooldown) || 0))), 'flash bekleme süresi');
           if (typeof m.icon === 'string') {
             // Sunucu resmi: küçültülmüş PNG/JPEG/WebP/GIF (en fazla ~256 KB), boş metin kaldırır

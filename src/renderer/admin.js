@@ -990,7 +990,7 @@ function ssRenderStats() {
   const n = m?.bans?.length || 0;
   $('#ss-n-bans').textContent = n ? String(n) : '';
 }
-const OV_FIELDS = ['#adm-name', '#adm-desc', '#adm-password', '#adm-nopass', '#adm-welcome', '#adm-afk-ch', '#adm-afk-min', '#adm-gif-prov', '#adm-gif-key', '#adm-previews', '#adm-flash-cd', '#adm-ping-cd'];
+const OV_FIELDS = ['#adm-name', '#adm-desc', '#adm-password', '#adm-nopass', '#adm-welcome', '#adm-afk-ch', '#adm-afk-min', '#adm-gif-prov', '#adm-gif-key', '#adm-previews', '#adm-flash-cd', '#adm-ping-cd', '#adm-room-theme'];
 function ssFillOverview(force) {
   if (SS.ovDirty && !force) return;
   const m = SS.info;
@@ -1024,6 +1024,8 @@ function ssFillOverview(force) {
   set('#adm-flash-cd', m?.flashCooldown ?? S.flashCd ?? 30);
   $('#adm-flash-card').classList.toggle('hidden', !feat('flashCooldown'));
   set('#adm-ping-cd', m?.pingCooldown ?? S.pingCd ?? 3);
+  set('#adm-room-theme', S.roomTheme || 'neon');
+  $('#adm-room-card').classList.toggle('hidden', !feat('roomTheme'));
   $('#adm-ping-card').classList.toggle('hidden', !feat('pingCooldown'));
   $('#adm-gif-state').textContent = m ? (m.hasGifKey ? '(kayıtlı)' : '(girilmedi)') : '';
   ssFillAnnouncement();
@@ -1072,6 +1074,7 @@ $('#ss-save').addEventListener('click', () => {
     cfg.linkPreviews = $('#adm-previews').checked;
   }
   if (feat('pingCooldown')) cfg.pingCooldown = Math.max(0, Math.min(600, Math.floor(Number($('#adm-ping-cd').value) || 0)));
+  if (feat('roomTheme')) cfg.roomTheme = $('#adm-room-theme').value;
   if (feat('flashCooldown')) cfg.flashCooldown = Math.max(0, Math.min(3600, Math.floor(Number($('#adm-flash-cd').value) || 0)));
   void m;
   send(cfg);

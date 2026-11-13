@@ -1973,6 +1973,10 @@ function onMessage(m) {
       S.serverName = m.serverName;
       if (typeof m.flashCooldown === 'number') S.flashCd = m.flashCooldown;
       if (typeof m.pingCooldown === 'number') S.pingCd = m.pingCooldown;
+      if ((m.roomTheme || 'neon') !== (S.roomTheme || 'neon')) {
+        S.roomTheme = m.roomTheme;
+        if (typeof roomUnmount === 'function' && roomActive()) roomUnmount(); // aşağıdaki çizimde yeni temayla kurulur
+      }
       if (m.iconV !== S.iconV) syncServerIcon(m.iconV);
       S.channels = m.channels;
       S.users = new Map(m.users.map((u) => [u.id, u]));

@@ -6,6 +6,14 @@
  */
 const CHANGELOG = [
   {
+    version: '1.1.7',
+    date: '2026-11-13',
+    title: 'Oyun odası temaları',
+    added: [
+      'Oyun odasına iki yeni tema: Gece kulübü (dönen ışıklar, disko topu, zeminde renkli benekler) ve Retro arcade (neon ızgara zemin, gün batımı posteri). Temayı sunucuyu yöneten kişi Sunucu ayarları › Genel bakış › Oyun odası teması bölümünden seçer; herkes aynısını görür.',
+    ],
+  },
+  {
     version: '1.1.6',
     date: '2026-11-13',
     title: 'Oyun odası: oyundayken de karakterini yönet',

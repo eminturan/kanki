@@ -53,11 +53,11 @@ function roomMount(el) {
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.15;
+    renderer.toneMappingExposure = roomTheme().exp;
     renderer.outputEncoding = THREE.sRGBEncoding;
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x020203);
-    scene.fog = new THREE.FogExp2(0x020203, 0.012);
+    scene.background = new THREE.Color(roomTheme().bg);
+    scene.fog = new THREE.FogExp2(roomTheme().bg, roomTheme().fog);
     const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
     const composer = new THREE.EffectComposer(renderer);
     composer.addPass(new THREE.RenderPass(scene, camera));
@@ -114,6 +114,13 @@ function roomDebug() {
 }
 
 // ---------- Sahne ----------
+// Oda temaları (sunucu genelinde; sunucuyu yönetme yetkisi olan seçer). neon: ilk tasarım
+const ROOM_THEMES = {
+  neon: { bg: 0x020203, fog: 0.012, exp: 1.15, hemi: [0x8a90ff, 0x1a0508, 0.55], key: 0.55, walls: [0x1b1320, 0x151522], neon: [0xff3048, 0x3a6bff, 0xb04dff], lights: [0xff3048, 0x3a6bff, 0xb04dff], led: true, beams: 0.045, wood: [22, 34, 12], dust: 0xffc0d0 },
+  club: { bg: 0x000000, fog: 0.02, exp: 1.25, hemi: [0x40206a, 0x050008, 0.22], key: 0.12, walls: [0x0b0812, 0x09080f], neon: [0xff00b4, 0x00e5ff, 0x8a2bff], lights: [0xff00b4, 0x00e5ff, 0x8a2bff], led: true, beams: 0.09, sweep: true, disco: true, wood: [260, 20, 7], dust: 0xd0a0ff },
+  retro: { bg: 0x0d0020, fog: 0.014, exp: 1.15, hemi: [0xff7ad9, 0x2a0050, 0.55], key: 0.4, walls: [0x2a0a4a, 0x200840], neon: [0xff7a00, 0xff2fd0, 0x00f0ff], lights: [0xff7a00, 0xff2fd0, 0x00f0ff], led: true, beams: 0.05, grid: true, dust: 0xffb0ff, sunset: true },
+};
+const roomTheme = () => ROOM_THEMES[S.roomTheme] || ROOM_THEMES.neon;
 const RW = 20, RD = 15; // oda genişliği / derinliği
 // Görev yerleri [x, z] (karakterler buralara gider)
 const ROOM_SPOTS = {
@@ -149,16 +156,17 @@ function rmLight(c, x, y, z, i = 1.4, d = 12) {
 function roomBuild() {
   const sc = room.scene;
   const W = RW, D = RD;
-  sc.add(new THREE.HemisphereLight(0x8a90ff, 0x1a0508, 0.55));
-  const key = new THREE.DirectionalLight(0xffffff, 0.55);
+  const th = roomTheme();
+  sc.add(new THREE.HemisphereLight(...th.hemi));
+  const key = new THREE.DirectionalLight(0xffffff, th.key);
   key.position.set(6, 14, 8);
   key.castShadow = true;
   key.shadow.mapSize.set(1024, 1024);
   Object.assign(key.shadow.camera, { left: -14, right: 14, top: 14, bottom: -14 });
   sc.add(key);
-  rmLight(0xff3048, -8, 3, -6);
-  rmLight(0x3a6bff, 8, 3, -6);
-  rmLight(0xb04dff, 0, 3.5, 6, 0.9, 14);
+  rmLight(th.lights[0], -8, 3, -6);
+  rmLight(th.lights[1], 8, 3, -6);
+  rmLight(th.lights[2], 0, 3.5, 6, 0.9, 14);
 
   // zemin: koyu ahşap parke
   const floorTex = new THREE.CanvasTexture(
@@ -167,7 +175,7 @@ function roomBuild() {
       for (let r = 0; r < rows; r++) {
         for (let x = -((r * 157) % 256); x < 512; ) {
           const w = 170 + ((r * 53 + x * 7) & 127);
-          g.fillStyle = `hsl(${22 + ((r + x) % 5)}, 34%, ${12 + ((r * 7 + x) & 7) * 0.9}%)`;
+          g.fillStyle = th.grid ? '#120326' : `hsl(${th.wood[0] + ((r + x) % 5)}, ${th.wood[1]}%, ${th.wood[2] + ((r * 7 + x) & 7) * 0.9}%)`;
           g.fillRect(x, r * h, w, h);
           g.strokeStyle = 'rgba(0,0,0,0.22)';
           g.lineWidth = 1;
@@ -185,6 +193,16 @@ function roomBuild() {
         g.fillStyle = '#07050a';
         g.fillRect(0, r * h, 512, 2);
       }
+      if (th.grid) {
+        g.strokeStyle = '#ff2fd0';
+        g.shadowColor = '#ff2fd0';
+        g.shadowBlur = 8;
+        g.lineWidth = 3;
+        for (let i = 0; i <= 512; i += 64) {
+          g.beginPath(); g.moveTo(i, 0); g.lineTo(i, 512); g.stroke();
+          g.beginPath(); g.moveTo(0, i); g.lineTo(512, i); g.stroke();
+        }
+      }
     })
   );
   floorTex.encoding = THREE.sRGBEncoding;
@@ -199,14 +217,14 @@ function roomBuild() {
 
   // duvarlar: kameraya bakan gizlenir; neon şeritler duvara bağlı
   room.walls = [
-    [rmBox(W, 5, 0.3, rmMat(0x1b1320), 0, 2.5, -D / 2), new THREE.Vector3(0, 0, -1)],
-    [rmBox(0.3, 5, D, rmMat(0x151522), -W / 2, 2.5, 0), new THREE.Vector3(-1, 0, 0)],
-    [rmBox(0.3, 5, D, rmMat(0x151522), W / 2, 2.5, 0), new THREE.Vector3(1, 0, 0)],
-    [rmBox(W, 5, 0.3, rmMat(0x1b1320), 0, 2.5, D / 2), new THREE.Vector3(0, 0, 1)],
+    [rmBox(W, 5, 0.3, rmMat(th.walls[0]), 0, 2.5, -D / 2), new THREE.Vector3(0, 0, -1)],
+    [rmBox(0.3, 5, D, rmMat(th.walls[1]), -W / 2, 2.5, 0), new THREE.Vector3(-1, 0, 0)],
+    [rmBox(0.3, 5, D, rmMat(th.walls[1]), W / 2, 2.5, 0), new THREE.Vector3(1, 0, 0)],
+    [rmBox(W, 5, 0.3, rmMat(th.walls[0]), 0, 2.5, D / 2), new THREE.Vector3(0, 0, 1)],
   ];
-  rmBox(W - 1, 0.08, 0.08, rmGlow(0xff3048), 0, 2.1, 0.2, room.walls[0][0]);
-  rmBox(0.08, 0.08, D - 1, rmGlow(0x3a6bff), 0.2, 2.1, 0, room.walls[1][0]);
-  rmBox(0.08, 0.08, D - 1, rmGlow(0xb04dff), -0.2, 2.1, 0, room.walls[2][0]);
+  rmBox(W - 1, 0.08, 0.08, rmGlow(th.neon[0]), 0, 2.1, 0.2, room.walls[0][0]);
+  rmBox(0.08, 0.08, D - 1, rmGlow(th.neon[1]), 0.2, 2.1, 0, room.walls[1][0]);
+  rmBox(0.08, 0.08, D - 1, rmGlow(th.neon[2]), -0.2, 2.1, 0, room.walls[2][0]);
 
   // "KANKİ" tabelası (arada titrer) ve kumanda tabelası
   const signCan = rmCanvas(512, 160, () => {});
@@ -217,12 +235,13 @@ function roomBuild() {
     g.font = 'italic 900 112px -apple-system, "Segoe UI", sans-serif';
     g.textAlign = 'center';
     g.textBaseline = 'middle';
-    g.shadowColor = '#ff3048';
+    const sc0 = '#' + new THREE.Color(th.neon[0]).getHexString();
+    g.shadowColor = sc0;
     g.shadowBlur = on ? 30 : 6;
-    g.strokeStyle = on ? '#ffd0d6' : '#5a1520';
+    g.strokeStyle = on ? '#ffffff' : '#333';
     g.lineWidth = 5;
     g.strokeText('KANKİ', 256, 84);
-    g.fillStyle = on ? '#ff3048' : '#3a0a12';
+    g.fillStyle = on ? sc0 : '#222';
     g.fillText('KANKİ', 256, 84);
     signTex.needsUpdate = true;
   };
@@ -230,7 +249,7 @@ function roomBuild() {
   const sign = new THREE.Mesh(new THREE.PlaneGeometry(4, 1.25), new THREE.MeshBasicMaterial({ map: signTex, transparent: true, toneMapped: false }));
   sign.position.set(-6.6, 3.3, -D / 2 + 0.2);
   sc.add(sign);
-  const signLight = rmLight(0xff3048, -6.6, 3, -D / 2 + 1.2, 1.6, 8);
+  const signLight = rmLight(th.neon[0], -6.6, 3, -D / 2 + 1.2, 1.6, 8);
   let flick = false;
   room.anim.push((now) => {
     const f = now % 7000 > 6500 && Math.random() < 0.5;
@@ -258,23 +277,29 @@ function roomBuild() {
   rmBox(W - 0.6, 0.04, 0.06, ledMat, 0, 0.03, -D / 2 + 0.2);
   rmBox(0.06, 0.04, D - 0.6, ledMat, -W / 2 + 0.2, 0.03, 0);
   rmBox(0.06, 0.04, D - 0.6, ledMat, W / 2 - 0.2, 0.03, 0);
-  room.anim.push((now) => ledMat.color.setHSL((now * 0.00008) % 1, 1, 0.55));
+  room.anim.push((now) => ledMat.color.setHSL((now * (th.sweep ? 0.0004 : 0.00008)) % 1, 1, 0.55));
+  ledMat.visible = th.led;
 
   // tavan lambaları ve ışık konileri
   room.beams = [];
   [[-5, -2], [5, -2], [0, 3]].forEach(([x, z], i) => {
     const cone = new THREE.Mesh(
       new THREE.ConeGeometry(2.2, 5, 32, 1, true),
-      new THREE.MeshBasicMaterial({ color: [0xff3048, 0x3a6bff, 0xb04dff][i], transparent: true, opacity: 0.05, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending })
+      new THREE.MeshBasicMaterial({ color: th.lights[i], transparent: true, opacity: 0.05, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending })
     );
     cone.position.set(x, 2.5, z);
     sc.add(cone);
     room.beams.push(cone);
-    const lamp = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.1, 20), new THREE.MeshBasicMaterial({ color: [0xff6070, 0x6a8bff, 0xc87dff][i], toneMapped: false }));
+    const lamp = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.1, 20), new THREE.MeshBasicMaterial({ color: th.lights[i], toneMapped: false }));
     lamp.position.set(x, 4.98, z);
     sc.add(lamp);
   });
-  room.anim.push((now) => room.beams.forEach((b, i) => (b.material.opacity = 0.045 + Math.sin(now * 0.0015 + i * 2) * 0.02)));
+  room.anim.push((now) =>
+    room.beams.forEach((b, i) => {
+      b.material.opacity = th.beams ? th.beams + Math.sin(now * 0.0015 + i * 2) * 0.02 : 0;
+      if (th.sweep) b.rotation.set(Math.sin(now * 0.0011 + i * 2.1) * 0.45, 0, Math.cos(now * 0.0009 + i * 1.3) * 0.45); // kulüp: ışıklar döner
+    })
+  );
 
   // havada süzülen toz
   const N = 260;
@@ -297,7 +322,7 @@ function roomBuild() {
       g.fillRect(0, 0, 32, 32);
     })
   );
-  room.dust = new THREE.Points(dustGeo, new THREE.PointsMaterial({ size: 0.07, map: dot, transparent: true, opacity: 0.55, color: 0xffc0d0, depthWrite: false, blending: THREE.AdditiveBlending }));
+  room.dust = new THREE.Points(dustGeo, new THREE.PointsMaterial({ size: 0.07, map: dot, transparent: true, opacity: 0.55, color: th.dust, depthWrite: false, blending: THREE.AdditiveBlending }));
   sc.add(room.dust);
   room.anim.push((now) => {
     if (!room.dust.visible) return;
@@ -589,11 +614,62 @@ function roomBuild() {
     ledMat2.color.setHex(p.cleaning ? (now % 1200 < 600 ? 0x3ad0ff : 0x1a70aa) : 0x22d47e);
   });
 
+  // ---- temaya özel eşyalar ----
+  if (th.disco) {
+    // disko topu: tavanda döner, aynalı yüzeyler
+    const ball = new THREE.Mesh(new THREE.IcosahedronGeometry(0.55, 2), rmMat(0xffffff, { metalness: 1, roughness: 0.12, flatShading: true }));
+    ball.position.set(0, 4.2, 0);
+    ball.userData.live = true;
+    sc.add(ball);
+    rmBox(0.02, 0.6, 0.02, rmMat(0x888888), 0, 4.75, 0);
+    room.anim.push((now) => (ball.rotation.y = now * 0.0006));
+    // zeminde dönen renkli ışık benekleri
+    const spots = new THREE.Group();
+    spots.userData.live = true;
+    for (let i = 0; i < 26; i++) {
+      const d = new THREE.Mesh(new THREE.CircleGeometry(0.12, 12), new THREE.MeshBasicMaterial({ color: th.neon[i % 3], transparent: true, opacity: 0.55, toneMapped: false, depthWrite: false }));
+      d.rotation.x = -Math.PI / 2;
+      const a = i * 2.4, r = 1.5 + (i % 6) * 1.1;
+      d.position.set(Math.cos(a) * r, 0.03, Math.sin(a) * r * 0.8);
+      spots.add(d);
+    }
+    sc.add(spots);
+    room.anim.push((now) => (spots.rotation.y = now * 0.0003));
+  }
+  if (th.sunset) {
+    // retro: sağ duvarda (akvaryumun üstünde) gün batımı ve dağlar posteri
+    const ret = new THREE.CanvasTexture(
+      rmCanvas(512, 256, (g) => {
+        const gr = g.createLinearGradient(0, 0, 0, 256);
+        gr.addColorStop(0, '#1a0040');
+        gr.addColorStop(0.55, '#ff2fd0');
+        gr.addColorStop(1, '#ff7a00');
+        g.fillStyle = gr;
+        g.fillRect(0, 0, 512, 256);
+        g.fillStyle = '#ffd23a';
+        g.beginPath();
+        g.arc(256, 170, 80, Math.PI, 0);
+        g.fill();
+        g.fillStyle = '#1a0040';
+        for (let y = 120; y < 175; y += 12) g.fillRect(0, y, 512, 4);
+        g.fillStyle = '#12002a';
+        g.beginPath();
+        g.moveTo(0, 256); g.lineTo(90, 150); g.lineTo(170, 210); g.lineTo(260, 140); g.lineTo(360, 215); g.lineTo(440, 160); g.lineTo(512, 200); g.lineTo(512, 256);
+        g.fill();
+      })
+    );
+    ret.encoding = THREE.sRGBEncoding;
+    const post = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 2), new THREE.MeshBasicMaterial({ map: ret, toneMapped: false }));
+    post.rotation.y = -Math.PI / 2;
+    post.position.set(-0.17, 0.9, -1);
+    room.walls[2][0].add(post);
+  }
+
   // yansımalar: sahneden bir kez ortam haritası (her karede ek maliyeti yok)
   // (odanın kendisi değil, odanın ışıklarını taklit eden küçük bir sahne: hızlı ve sorunsuz)
   const envSc = new THREE.Scene();
-  envSc.add(new THREE.Mesh(new THREE.BoxGeometry(20, 6, 15), new THREE.MeshBasicMaterial({ color: 0x0b0a10, side: THREE.BackSide })));
-  for (const [c, x, y, z, w, h] of [[0xff3048, -6, 2, -7.4, 6, 0.6], [0xff9a70, 0, 1.5, -7.4, 6, 3.5], [0x3a6bff, 6, 2, -7.4, 6, 0.6], [0x3a6bff, -9.9, 2, 0, 0.1, 0.5], [0xb04dff, 9.9, 2, 0, 0.1, 0.5], [0xffffff, 0, 2.9, 0, 6, 0.1]]) {
+  envSc.add(new THREE.Mesh(new THREE.BoxGeometry(20, 6, 15), new THREE.MeshBasicMaterial({ color: new THREE.Color(th.walls[0]).multiplyScalar(0.5), side: THREE.BackSide })));
+  for (const [c, x, y, z, w, h] of [[th.neon[0], -6, 2, -7.4, 6, 0.6], [0xff9a70, 0, 1.5, -7.4, 6, 3.5], [th.neon[1], 6, 2, -7.4, 6, 0.6], [th.neon[1], -9.9, 2, 0, 0.1, 0.5], [th.neon[2], 9.9, 2, 0, 0.1, 0.5], [0xffffff, 0, 2.9, 0, 6, 0.1]]) {
     const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, w === 0.1 ? 14 : 0.1), new THREE.MeshBasicMaterial({ color: new THREE.Color(c).multiplyScalar(3) }));
     m.position.set(x, y, z);
     envSc.add(m);
